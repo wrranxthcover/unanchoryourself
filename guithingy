@@ -1,6 +1,6 @@
 -- Entity Scanner - Rooms: Es-stablished
--- Pattern: 1-3 chars (ï/letters mix) + dash + 1-2000
--- View Entity = auto camera follow, no click needed
+-- Pattern 1: 1-3 chars (ï/letters mix) + dash + 1-2000
+-- Pattern 2: MOB1 to MOB25
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -13,21 +13,38 @@ if LocalPlayer.PlayerGui:FindFirstChild("EntityScannerGui") then
 end
 
 -- ============================================
--- PATTERN
+-- PATTERNS
+-- 1: ï-1, ïBï-100, GAï-1000 etc
+-- 2: MOB1, MOB2 ... MOB25
 -- ============================================
 
 local function matchesEntityPattern(name)
+    -- Pattern 1: 1-3 chars (ï + letters) + dash + 1-2000
     local dashPos = name:find("%-(%d+)$")
-    if not dashPos then return false end
-    local prefix = name:sub(1, dashPos - 1)
-    local num = tonumber(name:sub(dashPos + 1))
-    if not num or num < 1 or num > 2000 then return false end
-    local cleaned = prefix:gsub("\195\175", "X"):gsub("\195\143", "X")
-    if #cleaned < 1 or #cleaned > 3 then return false end
-    if not cleaned:match("^[A-Za-zX]+$") then return false end
-    local stripped = prefix:gsub("\195\175", ""):gsub("\195\143", "")
-    if not stripped:match("^[A-Za-z]*$") then return false end
-    return true
+    if dashPos then
+        local prefix = name:sub(1, dashPos - 1)
+        local num = tonumber(name:sub(dashPos + 1))
+        if num and num >= 1 and num <= 2000 then
+            local cleaned = prefix:gsub("\195\175", "X"):gsub("\195\143", "X")
+            if #cleaned >= 1 and #cleaned <= 3 and cleaned:match("^[A-Za-zX]+$") then
+                local stripped = prefix:gsub("\195\175", ""):gsub("\195\143", "")
+                if stripped:match("^[A-Za-z]*$") then
+                    return true
+                end
+            end
+        end
+    end
+
+    -- Pattern 2: MOB1 to MOB25
+    local mobNum = name:match("^MOB(%d+)$") or name:match("^[Mm][Oo][Bb](%d+)$")
+    if mobNum then
+        local n = tonumber(mobNum)
+        if n and n >= 1 and n <= 25 then
+            return true
+        end
+    end
+
+    return false
 end
 
 local function getEntityNumber(name)
@@ -35,8 +52,13 @@ local function getEntityNumber(name)
 end
 
 local function getEntityPrefix(name)
+    -- MOB pattern
+    if name:match("^[Mm][Oo][Bb]%d+$") then
+        return "MOB"
+    end
+    -- ï pattern
     local dashPos = name:find("%-(%d+)$")
-    if not dashPos then return "" end
+    if not dashPos then return name end
     return name:sub(1, dashPos - 1)
 end
 
@@ -196,7 +218,7 @@ local DLabel = Instance.new("TextLabel")
 DLabel.Size = UDim2.new(1, -12, 0, 14)
 DLabel.Position = UDim2.new(0, 6, 0, 88)
 DLabel.BackgroundTransparency = 1
-DLabel.Text = "🔍 ï/letter mix pattern"
+DLabel.Text = "🔍 ï-pattern + MOB1-25"
 DLabel.TextColor3 = Color3.fromRGB(70, 70, 110)
 DLabel.TextSize = 8
 DLabel.Font = Enum.Font.Gotham
@@ -419,11 +441,11 @@ local function runDebug()
         if matchesEntityPattern(obj.Name) then
             found += 1
             print(string.format("  ✅ MATCH: '%s' [%s] Path:%s", obj.Name, obj.ClassName, obj:GetFullName()))
-        elseif obj.Name:match("%-%d") then
+        elseif obj.Name:match("%-%d") or obj.Name:match("%d") then
             nearMatch += 1
-            if nearMatch <= 30 then
+            if nearMatch <= 40 then
                 local bytes = {}
-                for i = 1, #obj.Name do
+                for i = 1, math.min(#obj.Name, 20) do
                     table.insert(bytes, string.format("%02X", string.byte(obj.Name, i)))
                 end
                 print(string.format("  ⚠ NEAR: '%s' [%s] Bytes:[%s]", obj.Name, obj.ClassName, table.concat(bytes, " ")))
@@ -431,7 +453,7 @@ local function runDebug()
         end
     end
     print(string.format("Found: %d exact | %d near-matches", found, nearMatch))
-    DLabel.Text = "🔎 Found: " .. found .. " exact | " .. nearMatch .. " near"
+    DLabel.Text = "🔎 Found: " .. found .. " | Near: " .. nearMatch
     DLabel.TextColor3 = found > 0 and Color3.fromRGB(0, 255, 100) or Color3.fromRGB(255, 80, 80)
 end
 
@@ -471,7 +493,6 @@ local function stopViewEntity()
         Camera.CameraType = Enum.CameraType.Custom
     end
 
-    -- Reset camera to player
     local char = LocalPlayer.Character
     if char then
         local head = char:FindFirstChild("Head")
@@ -492,9 +513,7 @@ local function stopViewEntity()
 end
 
 -- ============================================
--- START VIEW ENTITY
--- Auto-follows entity, camera stays close
--- NO right-click needed, fully automatic
+-- START VIEW ENTITY (auto orbit, close-up)
 -- ============================================
 
 local function startViewEntity(entity)
@@ -523,11 +542,10 @@ local function startViewEntity(entity)
     savedCameraType = Camera.CameraType
     Camera.CameraType = Enum.CameraType.Scriptable
 
-    -- Auto orbit angle
     local angle = 0
-    local CLOSE_DIST = 12  -- how close the camera stays
-    local HEIGHT = 5       -- camera height above entity
-    local ORBIT_SPEED = 0.3 -- slow auto-rotate
+    local CLOSE_DIST = 12
+    local HEIGHT = 5
+    local ORBIT_SPEED = 0.3
 
     viewEntityConn = RunService.Heartbeat:Connect(function(dt)
         if not viewingEntity or not entity or not entity.Parent then
@@ -541,7 +559,6 @@ local function startViewEntity(entity)
             if not root then stopViewEntity(); return end
         end
 
-        -- Auto rotate around entity
         angle = angle + dt * ORBIT_SPEED
 
         local targetPos = root.Position
@@ -551,13 +568,11 @@ local function startViewEntity(entity)
             math.cos(angle) * CLOSE_DIST
         )
 
-        -- Smooth camera
         Camera.CFrame = Camera.CFrame:Lerp(
             CFrame.lookAt(camPos, targetPos),
             0.08
         )
 
-        -- Update distance label
         local char = LocalPlayer.Character
         local myR = char and char:FindFirstChild("HumanoidRootPart")
         if myR then
@@ -568,7 +583,7 @@ local function startViewEntity(entity)
 end
 
 -- ============================================
--- START VIEW HUD (free movement overlay)
+-- START VIEW HUD
 -- ============================================
 
 local function startView(entity)
@@ -774,13 +789,19 @@ local function track(entity)
         end)
     end
 
+    -- Sort: MOB entities get high sort value to group them
     local num = getEntityNumber(entity.Name)
     local prefix = getEntityPrefix(entity.Name)
     local sortVal = 0
-    for i = 1, #prefix do
-        sortVal = sortVal + string.byte(prefix, i) * (100 ^ (4 - i))
+
+    if prefix == "MOB" then
+        sortVal = 9000000 + num -- MOBs sort at bottom
+    else
+        for i = 1, #prefix do
+            sortVal = sortVal + string.byte(prefix, i) * (100 ^ (4 - i))
+        end
+        sortVal = sortVal + num
     end
-    sortVal = sortVal + num
 
     local entry = Instance.new("Frame")
     entry.Size = UDim2.new(1, -4, 0, 30)
@@ -1151,4 +1172,4 @@ end)
 initialScan()
 runDebug()
 print("[Entity Scanner] Loaded")
-print("[Entity Scanner] 🎥 View Entity = auto orbit, close-up, no click needed")
+print("[Entity Scanner] Patterns: ï-mix + MOB1-25")
