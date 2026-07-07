@@ -1011,7 +1011,7 @@ task.spawn(function()
 end)
 
 -- ============================================
--- DISTANCE UPDATE
+-- DISTANCE UPDATE (with color change)
 -- ============================================
 
 RunService.Heartbeat:Connect(function()
@@ -1033,16 +1033,71 @@ RunService.Heartbeat:Connect(function()
         end
         if tp and tp.Parent then
             local dist = math.floor((myP - tp.Position).Magnitude)
-            local col = dist < 18 and Color3.fromRGB(255, 40, 40)
+
+            -- Distance text color (short range indicator)
+            local textCol = dist < 18 and Color3.fromRGB(255, 40, 40)
                 or dist < 50 and Color3.fromRGB(255, 180, 30)
                 or Color3.fromRGB(140, 140, 140)
             local txt = dist .. "s"
-            if d.distLabel then d.distLabel.Text = txt; d.distLabel.TextColor3 = col end
-            if d.entryDist then d.entryDist.Text = txt; d.entryDist.TextColor3 = col end
+            if d.distLabel then d.distLabel.Text = txt; d.distLabel.TextColor3 = textCol end
+            if d.entryDist then d.entryDist.Text = txt; d.entryDist.TextColor3 = textCol end
+
+            -- ESP color based on distance (white → yellow → orange → red)
+            local espColor
+            if dist >= 50000 then
+                -- Far: white
+                espColor = Color3.fromRGB(255, 255, 255)
+            elseif dist >= 25000 then
+                -- 50000→25000: white to yellow
+                local t = (dist - 25000) / 25000
+                espColor = Color3.fromRGB(255, math.floor(255), math.floor(255 * t))
+            elseif dist >= 10000 then
+                -- 25000→10000: yellow to orange
+                local t = (dist - 10000) / 15000
+                espColor = Color3.fromRGB(255, math.floor(140 + 115 * t), 0)
+            else
+                -- <10000: orange to red
+                local t = math.clamp(dist / 10000, 0, 1)
+                espColor = Color3.fromRGB(255, math.floor(140 * t), 0)
+            end
+
+            -- Apply to highlight
+            if d.highlight then
+                d.highlight.FillColor = espColor
+                d.highlight.OutlineColor = espColor
+            end
+
+            -- Apply to billboard name
+            if d.billboard then
+                local nameLabel = d.billboard:FindFirstChildWhichIsA("TextLabel")
+                if nameLabel and nameLabel.Name ~= "DL" then
+                    nameLabel.TextColor3 = espColor
+                end
+            end
+
+            -- Apply to entry stroke + dot
+            if d.entry then
+                local stroke = d.entry:FindFirstChildWhichIsA("UIStroke")
+                if stroke then stroke.Color = espColor end
+                local dot = nil
+                for _, child in ipairs(d.entry:GetChildren()) do
+                    if child:IsA("Frame") and child.Size == UDim2.new(0, 5, 0, 5) then
+                        dot = child
+                        break
+                    end
+                end
+                if dot then dot.BackgroundColor3 = espColor end
+                local nl = d.entry:FindFirstChild("NL") or d.entry:FindFirstChildWhichIsA("TextLabel")
+                -- Update name color in list
+                for _, child in ipairs(d.entry:GetChildren()) do
+                    if child:IsA("TextLabel") and child.Name ~= "EDL" and child.TextSize == 10 then
+                        child.TextColor3 = espColor
+                    end
+                end
+            end
         end
     end
 end)
-
 -- ============================================
 -- BUTTONS
 -- ============================================
