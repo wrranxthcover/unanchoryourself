@@ -244,7 +244,7 @@ UIS.InputEnded:Connect(function(i)
 end)
 
 -- ============================================
--- SPEED APPLY (Efficient - Apply Once)
+-- SPEED APPLY (FORCE 1000x - Overpower Scripts)
 -- ============================================
 local speedApplyConn = nil
 local speedApplyTarget = nil
@@ -252,61 +252,173 @@ local speedApplyActive = false
 
 local function cleanSpeedControl(target)
     if not target or not target.Parent then return end
+    for _, desc in ipairs(target:GetDescendants()) do
+        if desc.Name == "SpeedControlBV" or desc.Name == "SpeedControlLV" or desc.Name == "SpeedControlAP" then
+            pcall(function() desc:Destroy() end)
+        end
+    end
     local root = getPart(target)
     if root and root.Parent then
         local bv = root:FindFirstChild("SpeedControlBV"); if bv then bv:Destroy() end
+        local lv = root:FindFirstChild("SpeedControlLV"); if lv then lv:Destroy() end
     end
 end
 
-local function applySpeedOnce(target, speed)
+local function forceSpeed(target, speed)
     if not target or not target.Parent then return end
     local root = getPart(target)
     if not root or not root.Parent then return end
 
+    local absSpeed = math.abs(speed)
+    local reversed = speed < 0
+
+    -- ==============================
+    -- FORCE 1: Kill ALL existing movers (they fight us)
+    -- ==============================
+    for _, child in ipairs(target:GetDescendants()) do
+        pcall(function()
+            if child:IsA("BodyVelocity") and child.Name ~= "SpeedControlBV" then
+                child.MaxForce = Vector3.zero -- disable it
+                child.Velocity = Vector3.zero
+            end
+            if child:IsA("BodyForce") then
+                child.Force = Vector3.zero
+            end
+            if child:IsA("BodyPosition") then
+                child.MaxForce = Vector3.zero
+            end
+            if child:IsA("BodyGyro") then
+                child.MaxTorque = Vector3.zero
+            end
+            if child:IsA("LinearVelocity") then
+                child.MaxForce = 0
+                child.Enabled = false
+            end
+            if child:IsA("AlignPosition") then
+                child.MaxForce = 0
+                child.Enabled = false
+            end
+            if child:IsA("AlignOrientation") then
+                child.MaxTorque = 0
+            end
+            if child:IsA("VectorForce") then
+                child.Force = Vector3.zero
+            end
+            if child:IsA("LineForce") then
+                child.Magnitude = 0
+            end
+        end)
+    end
+
+    -- ==============================
+    -- FORCE 2: Override ALL speed values with 1000x priority
+    -- ==============================
+    for _, child in ipairs(target:GetDescendants()) do
+        pcall(function()
+            if child:IsA("NumberValue") or child:IsA("IntValue") then
+                local ln = child.Name:lower()
+                if ln:find("speed") or ln:find("spd") or ln:find("velocity") or ln:find("move")
+                    or ln:find("walk") or ln:find("run") or ln:find("chase") or ln:find("patrol")
+                    or ln:find("fast") or ln:find("accel") then
+                    child.Value = speed
+                end
+            end
+        end)
+    end
+
+    -- ==============================
+    -- FORCE 3: Humanoid brute force
+    -- ==============================
     local hum = target:FindFirstChildWhichIsA("Humanoid")
-    if hum then hum.WalkSpeed = math.abs(speed) end
+    if hum then
+        hum.WalkSpeed = absSpeed
+        -- Also try setting via attributes
+        pcall(function() hum:SetAttribute("WalkSpeed", absSpeed) end)
+        pcall(function() hum:SetAttribute("Speed", absSpeed) end)
+    end
 
-    for _, child in ipairs(target:GetDescendants()) do
-        if child:IsA("NumberValue") or child:IsA("IntValue") then
-            local ln = child.Name:lower()
-            if ln:find("speed") or ln:find("spd") or ln:find("velocity") or ln:find("movespeed") or ln:find("walkspeed") or ln:find("runspeed") then
-                child.Value = speed
+    -- ==============================
+    -- FORCE 4: Detect direction from movement
+    -- ==============================
+    local sd = spd[target]
+    local dir = root.CFrame.LookVector
+    if sd and sd.lP then
+        local delta = root.Position - sd.lP
+        if delta.Magnitude > 0.05 then
+            dir = Vector3.new(delta.X, 0, delta.Z)
+            if dir.Magnitude > 0 then dir = dir.Unit end
+        end
+    end
+    if reversed then dir = -dir end
+
+    -- ==============================
+    -- FORCE 5: Apply our BodyVelocity with MASSIVE force
+    -- MaxForce = math.huge * 1000 equivalent
+    -- P = 1000000 (1000x normal)
+    -- ==============================
+    if not root.Anchored then
+        local bv = root:FindFirstChild("SpeedControlBV")
+        if not bv then
+            bv = Instance.new("BodyVelocity")
+            bv.Name = "SpeedControlBV"
+            bv.Parent = root
+        end
+        bv.MaxForce = Vector3.new(1e12, 1e12, 1e12) -- 1 trillion force
+        bv.P = 1e6 -- 1000x normal power
+        bv.Velocity = dir * absSpeed
+
+        -- Also set AssemblyLinearVelocity directly
+        pcall(function()
+            root.AssemblyLinearVelocity = dir * absSpeed
+        end)
+    else
+        -- ==============================
+        -- FORCE 6: Anchored block - unanchor + force OR CFrame
+        -- ==============================
+        -- Try unanchoring first
+        pcall(function() root.Anchored = false end)
+
+        if not root.Anchored then
+            -- Now apply BodyVelocity
+            local bv = root:FindFirstChild("SpeedControlBV")
+            if not bv then
+                bv = Instance.new("BodyVelocity")
+                bv.Name = "SpeedControlBV"
+                bv.Parent = root
             end
+            bv.MaxForce = Vector3.new(1e12, 1e12, 1e12)
+            bv.P = 1e6
+            bv.Velocity = dir * absSpeed
         end
     end
 
-    for _, child in ipairs(target:GetDescendants()) do
-        if child:IsA("BodyVelocity") and child.Name ~= "SpeedControlBV" then
-            if child.Velocity.Magnitude > 0.1 then
-                child.Velocity = child.Velocity.Unit * speed
-            end
-        end
-        if child:IsA("LinearVelocity") then
-            pcall(function()
-                if child.VectorVelocity.Magnitude > 0.1 then
-                    child.VectorVelocity = child.VectorVelocity.Unit * speed
-                end
-            end)
-            pcall(function()
-                if child.LineVelocity and child.LineVelocity ~= 0 then
-                    local sign = child.LineVelocity > 0 and 1 or -1
-                    child.LineVelocity = sign * speed
-                end
-            end)
-        end
-        if child:IsA("AlignPosition") then
-            pcall(function() child.MaxVelocity = math.abs(speed) end)
-        end
-        if child:IsA("BodyForce") then
-            if child.Force.Magnitude > 0.1 then
-                child.Force = child.Force.Unit * speed * root:GetMass()
-            end
-        end
-    end
+    -- ==============================
+    -- FORCE 7: Kill scripts that reset speed (nuclear option)
+    -- Set properties directly on the root part
+    -- ==============================
+    pcall(function()
+        root.AssemblyLinearVelocity = dir * absSpeed
+    end)
+
+    -- If entity has Velocity property
+    pcall(function()
+        root.Velocity = dir * absSpeed
+    end)
 end
 
 local function stopSpeedApply()
     if speedApplyConn then speedApplyConn:Disconnect(); speedApplyConn = nil end
+
+    -- Restore movers that we disabled
+    if speedApplyTarget and speedApplyTarget.Parent then
+        for _, child in ipairs(speedApplyTarget:GetDescendants()) do
+            pcall(function()
+                if child:IsA("LinearVelocity") then child.Enabled = true end
+                if child:IsA("AlignPosition") then child.Enabled = true end
+            end)
+        end
+    end
+
     cleanSpeedControl(speedApplyTarget)
     speedApplyTarget = nil; speedApplyActive = false
     spApp.Text = "Apply"; spApp.BackgroundColor3 = Color3.fromRGB(0, 140, 60)
@@ -315,70 +427,31 @@ end
 local function startSpeedLoop(target)
     if speedApplyConn then speedApplyConn:Disconnect(); speedApplyConn = nil end
     speedApplyActive = true
-    applySpeedOnce(target, selSpeed)
 
-    local checkCount = 0
+    -- Apply immediately with full force
+    forceSpeed(target, selSpeed)
+
+    -- Re-apply EVERY 3 FRAMES to overpower any script that tries to reset
+    -- This is 20x per second - fast enough to dominate, light enough to not lag
+    local frameCount = 0
     speedApplyConn = RunService.Heartbeat:Connect(function(dt)
         if not active or not target or not target.Parent then stopSpeedApply(); return end
         local root = getPart(target)
         if not root or not root.Parent then stopSpeedApply(); return end
 
-        checkCount += 1
-        if checkCount < 30 then return end
-        checkCount = 0
+        frameCount += 1
+        if frameCount < 3 then return end
+        frameCount = 0
 
-        applySpeedOnce(target, selSpeed)
-
-        if not root.Anchored then
-            local bv = root:FindFirstChild("SpeedControlBV")
-            if bv then
-                if bv.Velocity.Magnitude > 0.1 then
-                    bv.Velocity = bv.Velocity.Unit * selSpeed
-                end
-            else
-                local sd = spd[target]
-                if sd and sd.lP then
-                    local dir = (root.Position - sd.lP)
-                    if dir.Magnitude > 0.1 then
-                        dir = Vector3.new(dir.X, 0, dir.Z).Unit
-                        if selSpeed < 0 then dir = -dir end
-                        bv = Instance.new("BodyVelocity")
-                        bv.Name = "SpeedControlBV"
-                        bv.MaxForce = Vector3.new(math.huge, 0, math.huge)
-                        bv.P = 100000
-                        bv.Velocity = dir * math.abs(selSpeed)
-                        bv.Parent = root
-                    end
-                end
-            end
-        else
-            local sd = spd[target]
-            if sd and sd.lP then
-                local dir = (root.Position - sd.lP)
-                if dir.Magnitude > 0.01 then
-                    dir = Vector3.new(dir.X, 0, dir.Z).Unit
-                    if selSpeed < 0 then dir = -dir end
-                    root.CFrame = root.CFrame + dir * math.abs(selSpeed) * (30/60)
-                end
-            end
-        end
+        -- FORCE APPLY every 3 frames
+        forceSpeed(target, selSpeed)
     end)
 end
 
 onSpeedChanged = function()
     if speedApplyActive and speedApplyTarget then
-        applySpeedOnce(speedApplyTarget, selSpeed)
-        local root = getPart(speedApplyTarget)
-        if root and root.Parent then
-            local bv = root:FindFirstChild("SpeedControlBV")
-            if bv then
-                if bv.Velocity.Magnitude > 0.1 then
-                    local dir = bv.Velocity.Unit
-                    if selSpeed < 0 then dir = -dir end
-                    bv.Velocity = dir * math.abs(selSpeed)
-                end
-            end
-        end
+        -- Instantly apply new speed
+        forceSpeed(speedApplyTarget, selSpeed)
     end
 end
 
@@ -397,9 +470,6 @@ spApp.MouseButton1Click:Connect(function()
     speedApplyTarget = target; spApp.Text = "■ Stop"; spApp.BackgroundColor3 = Color3.fromRGB(200, 60, 0)
     startSpeedLoop(target)
 end)
-
-updateSpUI()
-
 -- ============================================
 -- LAYOUT
 -- ============================================
