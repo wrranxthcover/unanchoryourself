@@ -419,16 +419,40 @@ local function startViewEntity(entity)
     VEBtn.Text = "🎥 ON"; VEBtn.BackgroundColor3 = Color3.fromRGB(0, 140, 50)
     savedCameraType = Camera.CameraType; Camera.CameraType = Enum.CameraType.Scriptable
     local ang = 0
+    local lastTargetPos = root.Position
+    
     viewEntityConn = RunService.Heartbeat:Connect(function(dt)
         if not viewingEntity or not entity or not entity.Parent then stopViewEntity(); return end
         if not root or not root.Parent then root = getEntityPart(entity); data.targetPart = root; if not root then stopViewEntity(); return end end
-        ang = ang + dt * 0.3; local tp = root.Position
-        Camera.CFrame = Camera.CFrame:Lerp(CFrame.lookAt(tp + Vector3.new(math.sin(ang)*12, 5, math.cos(ang)*12), tp), 0.08)
+        
+        ang = ang + dt * 0.3
+        local targetPos = root.Position
+        
+        -- Calculate entity speed
+        local entSpeed = (targetPos - lastTargetPos).Magnitude / math.max(dt, 0.001)
+        lastTargetPos = targetPos
+        
+        -- Camera follows faster than entity
+        -- Minimum 0.15, scales up with speed
+        local followSpeed = math.clamp(0.15 + (entSpeed / 100), 0.15, 0.95)
+        
+        local camGoal = targetPos + Vector3.new(math.sin(ang) * 12, 5, math.cos(ang) * 12)
+        
+        -- If entity is very fast, snap harder
+        if entSpeed > FAST_THRESHOLD then
+            followSpeed = 0.85
+        end
+        
+        Camera.CFrame = Camera.CFrame:Lerp(CFrame.lookAt(camGoal, targetPos), followSpeed)
+        
         local c = LP.Character; local mr = c and c:FindFirstChild("HumanoidRootPart")
-        if mr then VEL.Text = "🎥 " .. entity.Name .. " | " .. math.floor((mr.Position - tp).Magnitude) .. "s" end
+        if mr then 
+            local dist = math.floor((mr.Position - targetPos).Magnitude)
+            local speedTxt = entSpeed > FAST_THRESHOLD and " ⚡" or ""
+            VEL.Text = "🎥 " .. entity.Name .. " | " .. dist .. "s" .. speedTxt
+        end
     end)
 end
-
 -- ============================================
 -- VIEW HUD
 -- ============================================
