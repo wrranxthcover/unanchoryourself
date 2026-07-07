@@ -1,4 +1,4 @@
--- Entity Scanner v6 - Speed Range -100 to 10000
+-- Entity Scanner v7 - FORCE 1000x Speed Control
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
@@ -107,19 +107,14 @@ local TB = Instance.new("Frame"); TB.Size = UDim2.new(1, 0, 0, 36); TB.Backgroun
 Instance.new("UICorner", TB).CornerRadius = UDim.new(0, 8)
 local tbf = Instance.new("Frame"); tbf.Size = UDim2.new(1, 0, 0, 10); tbf.Position = UDim2.new(0, 0, 1, -10)
 tbf.BackgroundColor3 = TB.BackgroundColor3; tbf.Parent = TB
-
 local si = Instance.new("TextLabel"); si.Size = UDim2.new(0, 26, 1, 0); si.Position = UDim2.new(0, 6, 0, 0)
-si.BackgroundTransparency = 1; si.Text = "◎"; si.TextColor3 = Color3.new(1,1,1); si.TextSize = 16
-si.Font = Enum.Font.GothamBold; si.Parent = TB
-
+si.BackgroundTransparency = 1; si.Text = "◎"; si.TextColor3 = Color3.new(1,1,1); si.TextSize = 16; si.Font = Enum.Font.GothamBold; si.Parent = TB
 local tl = Instance.new("TextLabel"); tl.Size = UDim2.new(1, -60, 1, 0); tl.Position = UDim2.new(0, 34, 0, 0)
 tl.BackgroundTransparency = 1; tl.Text = "Entity Scanner"; tl.TextColor3 = Color3.new(1,1,1); tl.TextSize = 15
 tl.Font = Enum.Font.GothamBold; tl.TextXAlignment = Enum.TextXAlignment.Left; tl.Parent = TB
-
 local xbtn = Instance.new("TextButton"); xbtn.Size = UDim2.new(0, 22, 0, 22); xbtn.Position = UDim2.new(1, -28, 0.5, -11)
 xbtn.BackgroundColor3 = Color3.fromRGB(180, 35, 35); xbtn.Text = "✕"; xbtn.TextColor3 = Color3.new(1,1,1)
-xbtn.TextSize = 12; xbtn.Font = Enum.Font.GothamBold; xbtn.Parent = TB
-Instance.new("UICorner", xbtn).CornerRadius = UDim.new(0, 4)
+xbtn.TextSize = 12; xbtn.Font = Enum.Font.GothamBold; xbtn.Parent = TB; Instance.new("UICorner", xbtn).CornerRadius = UDim.new(0, 4)
 
 local sf = Instance.new("Frame"); sf.Size = UDim2.new(1, -12, 0, 38); sf.Position = UDim2.new(0, 6, 0, 42)
 sf.BackgroundColor3 = Color3.fromRGB(15, 15, 28); sf.Parent = MF; Instance.new("UICorner", sf).CornerRadius = UDim.new(0, 6)
@@ -129,9 +124,8 @@ rl.TextSize = 10; rl.Font = Enum.Font.GothamSemibold; rl.TextXAlignment = Enum.T
 local cl2 = Instance.new("TextLabel"); cl2.Size = UDim2.new(1, -8, 0, 15); cl2.Position = UDim2.new(0, 5, 0, 20)
 cl2.BackgroundTransparency = 1; cl2.Text = "Entities: 0"; cl2.TextColor3 = Color3.fromRGB(255, 190, 40)
 cl2.TextSize = 9; cl2.Font = Enum.Font.GothamSemibold; cl2.TextXAlignment = Enum.TextXAlignment.Left; cl2.Parent = sf
-
 local dlb = Instance.new("TextLabel"); dlb.Size = UDim2.new(1, -12, 0, 12); dlb.Position = UDim2.new(0, 6, 0, 83)
-dlb.BackgroundTransparency = 1; dlb.Text = "🔍 Block Speed Control"; dlb.TextColor3 = Color3.fromRGB(70, 70, 110)
+dlb.BackgroundTransparency = 1; dlb.Text = "🔍 FORCE 1000x Speed"; dlb.TextColor3 = Color3.fromRGB(70, 70, 110)
 dlb.TextSize = 7; dlb.Font = Enum.Font.Gotham; dlb.TextXAlignment = Enum.TextXAlignment.Left; dlb.Parent = MF
 
 local function mb(par, txt, col, xP, xS)
@@ -160,43 +154,33 @@ local spPanel = Instance.new("Frame"); spPanel.Size = UDim2.new(1, -12, 0, 55); 
 spPanel.BackgroundColor3 = Color3.fromRGB(25, 20, 10); spPanel.Visible = false; spPanel.Parent = MF
 Instance.new("UICorner", spPanel).CornerRadius = UDim.new(0, 6)
 local spSt2 = Instance.new("UIStroke"); spSt2.Color = Color3.fromRGB(200, 140, 0); spSt2.Thickness = 1; spSt2.Parent = spPanel
-
 local spTit = Instance.new("TextLabel"); spTit.Size = UDim2.new(1, 0, 0, 14); spTit.Position = UDim2.new(0, 5, 0, 2)
-spTit.BackgroundTransparency = 1; spTit.Text = "⚡ Speed (-100 to 10000)"; spTit.TextColor3 = Color3.fromRGB(255, 200, 80)
+spTit.BackgroundTransparency = 1; spTit.Text = "⚡ FORCE Speed (-100 to 10000)"; spTit.TextColor3 = Color3.fromRGB(255, 200, 80)
 spTit.TextSize = 8; spTit.Font = Enum.Font.GothamBold; spTit.TextXAlignment = Enum.TextXAlignment.Left; spTit.Parent = spPanel
 
 local slBG = Instance.new("Frame"); slBG.Size = UDim2.new(0.55, 0, 0, 10); slBG.Position = UDim2.new(0.03, 0, 0, 20)
-slBG.BackgroundColor3 = Color3.fromRGB(40, 35, 20); slBG.Parent = spPanel
-Instance.new("UICorner", slBG).CornerRadius = UDim.new(0, 5)
-
+slBG.BackgroundColor3 = Color3.fromRGB(40, 35, 20); slBG.Parent = spPanel; Instance.new("UICorner", slBG).CornerRadius = UDim.new(0, 5)
 local slFill = Instance.new("Frame"); slFill.Size = UDim2.new(0.05, 0, 1, 0)
-slFill.BackgroundColor3 = Color3.fromRGB(255, 180, 0); slFill.Parent = slBG
-Instance.new("UICorner", slFill).CornerRadius = UDim.new(0, 5)
-
+slFill.BackgroundColor3 = Color3.fromRGB(255, 180, 0); slFill.Parent = slBG; Instance.new("UICorner", slFill).CornerRadius = UDim.new(0, 5)
 local slKnob = Instance.new("Frame"); slKnob.Size = UDim2.new(0, 12, 0, 12)
 slKnob.AnchorPoint = Vector2.new(0.5, 0.5); slKnob.Position = UDim2.new(0.05, 0, 0.5, 0)
-slKnob.BackgroundColor3 = Color3.fromRGB(255, 220, 100); slKnob.Parent = slBG
-Instance.new("UICorner", slKnob).CornerRadius = UDim.new(1, 0)
+slKnob.BackgroundColor3 = Color3.fromRGB(255, 220, 100); slKnob.Parent = slBG; Instance.new("UICorner", slKnob).CornerRadius = UDim.new(1, 0)
 
 local spVal = Instance.new("TextLabel"); spVal.Size = UDim2.new(0.17, 0, 0, 14); spVal.Position = UDim2.new(0.6, 0, 0, 18)
 spVal.BackgroundTransparency = 1; spVal.Text = "50"; spVal.TextColor3 = Color3.fromRGB(255, 220, 100)
 spVal.TextSize = 11; spVal.Font = Enum.Font.GothamBold; spVal.Parent = spPanel
-
 local spApp = Instance.new("TextButton"); spApp.Size = UDim2.new(0.18, 0, 0, 14); spApp.Position = UDim2.new(0.8, 0, 0, 18)
 spApp.BackgroundColor3 = Color3.fromRGB(0, 140, 60); spApp.Text = "Apply"; spApp.TextColor3 = Color3.new(1,1,1)
-spApp.TextSize = 8; spApp.Font = Enum.Font.GothamBold; spApp.Parent = spPanel
-Instance.new("UICorner", spApp).CornerRadius = UDim.new(0, 3)
+spApp.TextSize = 8; spApp.Font = Enum.Font.GothamBold; spApp.Parent = spPanel; Instance.new("UICorner", spApp).CornerRadius = UDim.new(0, 3)
 
 local qBtns = {{"-100", Color3.fromRGB(140, 60, 0), -100},{"+100", Color3.fromRGB(0, 100, 50), 100},
     {"-500", Color3.fromRGB(140, 30, 0), -500},{"+500", Color3.fromRGB(0, 80, 40), 500}}
 for i, info in ipairs(qBtns) do
     local qb = Instance.new("TextButton"); qb.Size = UDim2.new(0, 28, 0, 13); qb.Position = UDim2.new(0, 3+(i-1)*32, 0, 38)
     qb.BackgroundColor3 = info[2]; qb.Text = info[1]; qb.TextColor3 = Color3.new(1,1,1)
-    qb.TextSize = 6; qb.Font = Enum.Font.GothamBold; qb.Parent = spPanel
-    Instance.new("UICorner", qb).CornerRadius = UDim.new(0, 3)
+    qb.TextSize = 6; qb.Font = Enum.Font.GothamBold; qb.Parent = spPanel; Instance.new("UICorner", qb).CornerRadius = UDim.new(0, 3)
     qb.MouseButton1Click:Connect(function() selSpeed = math.clamp(selSpeed+info[3], MIN_SPEED, MAX_SPEED); updateSpUI() end)
 end
-
 local presets = {{"-100",-100},{"0",0},{"5000",5000},{"MAX",10000}}
 for i, info in ipairs(presets) do
     local pb = Instance.new("TextButton"); pb.Size = UDim2.new(0, 28, 0, 13); pb.Position = UDim2.new(0, 133+(i-1)*32, 0, 38)
@@ -206,9 +190,7 @@ for i, info in ipairs(presets) do
     pb.MouseButton1Click:Connect(function() selSpeed = info[2]; updateSpUI() end)
 end
 
--- Forward declare
 local onSpeedChanged
-
 function updateSpUI()
     local pct = (selSpeed - MIN_SPEED) / (MAX_SPEED - MIN_SPEED)
     slFill.Size = UDim2.new(math.max(pct, 0.01), 0, 1, 0)
@@ -223,270 +205,180 @@ function updateSpUI()
 end
 
 local draggingSl = false
-slBG.InputBegan:Connect(function(i)
-    if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
-        draggingSl = true
-        local rel = (i.Position.X-slBG.AbsolutePosition.X)/slBG.AbsoluteSize.X
-        selSpeed = math.clamp(math.floor(MIN_SPEED + rel * (MAX_SPEED - MIN_SPEED)), MIN_SPEED, MAX_SPEED); updateSpUI()
-    end
-end)
-slKnob.InputBegan:Connect(function(i)
-    if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then draggingSl = true end
-end)
-UIS.InputChanged:Connect(function(i)
-    if draggingSl and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
-        local rel = math.clamp((i.Position.X-slBG.AbsolutePosition.X)/slBG.AbsoluteSize.X, 0, 1)
-        selSpeed = math.clamp(math.floor(MIN_SPEED + rel * (MAX_SPEED - MIN_SPEED)), MIN_SPEED, MAX_SPEED); updateSpUI()
-    end
-end)
-UIS.InputEnded:Connect(function(i)
-    if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then draggingSl = false end
-end)
+slBG.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+    draggingSl = true; local rel = (i.Position.X-slBG.AbsolutePosition.X)/slBG.AbsoluteSize.X
+    selSpeed = math.clamp(math.floor(MIN_SPEED+rel*(MAX_SPEED-MIN_SPEED)), MIN_SPEED, MAX_SPEED); updateSpUI() end end)
+slKnob.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then draggingSl = true end end)
+UIS.InputChanged:Connect(function(i) if draggingSl and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
+    local rel = math.clamp((i.Position.X-slBG.AbsolutePosition.X)/slBG.AbsoluteSize.X, 0, 1)
+    selSpeed = math.clamp(math.floor(MIN_SPEED+rel*(MAX_SPEED-MIN_SPEED)), MIN_SPEED, MAX_SPEED); updateSpUI() end end)
+UIS.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then draggingSl = false end end)
 
 -- ============================================
--- SPEED APPLY (FORCE 1000x - Overpower Scripts)
+-- FORCE SPEED (10 Methods - Every Frame)
 -- ============================================
 local speedApplyConn = nil
 local speedApplyTarget = nil
 local speedApplyActive = false
 
-local function cleanSpeedControl(target)
-    if not target or not target.Parent then return end
-    for _, desc in ipairs(target:GetDescendants()) do
-        if desc.Name == "SpeedControlBV" or desc.Name == "SpeedControlLV" or desc.Name == "SpeedControlAP" then
-            pcall(function() desc:Destroy() end)
-        end
-    end
-    local root = getPart(target)
-    if root and root.Parent then
-        local bv = root:FindFirstChild("SpeedControlBV"); if bv then bv:Destroy() end
-        local lv = root:FindFirstChild("SpeedControlLV"); if lv then lv:Destroy() end
-    end
-end
-
 local function forceSpeed(target, speed)
     if not target or not target.Parent then return end
-
     local absSpeed = math.abs(speed)
     local reversed = speed < 0
 
-    -- Get ALL parts in the entity
     local allParts = {}
-    if target:IsA("BasePart") then
-        table.insert(allParts, target)
-    else
-        for _, desc in ipairs(target:GetDescendants()) do
-            if desc:IsA("BasePart") then
-                table.insert(allParts, desc)
-            end
-        end
-    end
-
+    if target:IsA("BasePart") then table.insert(allParts, target)
+    else for _, desc in ipairs(target:GetDescendants()) do if desc:IsA("BasePart") then table.insert(allParts, desc) end end end
     if #allParts == 0 then return end
 
-    -- Get the main root part
-    local root = getPart(target)
-    if not root then root = allParts[1] end
+    local root = getPart(target); if not root then root = allParts[1] end
 
-    -- ==============================
-    -- FORCE 1: Kill EVERYTHING that moves this entity
-    -- Kill on the model AND all parts
-    -- ==============================
-    local function killMovers(obj)
-        for _, child in ipairs(obj:GetDescendants()) do
-            pcall(function()
-                if child:IsA("BodyVelocity") and child.Name ~= "SpeedControlBV" then
-                    child:Destroy()
-                end
-                if child:IsA("BodyForce") then child:Destroy() end
-                if child:IsA("BodyPosition") then child:Destroy() end
-                if child:IsA("BodyGyro") then child:Destroy() end
-                if child:IsA("LinearVelocity") and child.Name ~= "SpeedControlLV" then
-                    child:Destroy()
-                end
-                if child:IsA("AlignPosition") and child.Name ~= "SpeedControlAP" then
-                    child:Destroy()
-                end
-                if child:IsA("AlignOrientation") then child:Destroy() end
-                if child:IsA("VectorForce") then child:Destroy() end
-                if child:IsA("LineForce") then child:Destroy() end
-                if child:IsA("BodyThrust") then child:Destroy() end
-                if child:IsA("RocketPropulsion") then child:Destroy() end
-            end)
+    -- FORCE 1: DESTROY all movers
+    for _, child in ipairs(target:GetDescendants()) do pcall(function()
+        if child:IsA("BodyVelocity") and child.Name ~= "SpeedControlBV" then child:Destroy() end
+        if child:IsA("BodyForce") then child:Destroy() end
+        if child:IsA("BodyPosition") then child:Destroy() end
+        if child:IsA("BodyGyro") then child:Destroy() end
+        if child:IsA("LinearVelocity") then child:Destroy() end
+        if child:IsA("AlignPosition") then child:Destroy() end
+        if child:IsA("AlignOrientation") then child:Destroy() end
+        if child:IsA("VectorForce") then child:Destroy() end
+        if child:IsA("LineForce") then child:Destroy() end
+        if child:IsA("BodyThrust") then child:Destroy() end
+        if child:IsA("RocketPropulsion") then child:Destroy() end
+    end) end
+
+    -- FORCE 2: Disable scripts
+    for _, child in ipairs(target:GetDescendants()) do pcall(function()
+        if child:IsA("Script") or child:IsA("LocalScript") then child.Disabled = true end
+    end) end
+
+    -- FORCE 3: Override values
+    for _, child in ipairs(target:GetDescendants()) do pcall(function()
+        if child:IsA("NumberValue") or child:IsA("IntValue") then
+            local ln = child.Name:lower()
+            if ln:find("speed") or ln:find("spd") or ln:find("velocity") or ln:find("move")
+                or ln:find("walk") or ln:find("run") or ln:find("chase") or ln:find("patrol")
+                or ln:find("fast") or ln:find("accel") or ln:find("rate") then child.Value = speed end
+        end
+    end) end
+
+    -- FORCE 4: Humanoid
+    for _, child in ipairs(target:GetDescendants()) do pcall(function()
+        if child:IsA("Humanoid") then child.WalkSpeed = absSpeed
+            pcall(function() child:SetAttribute("WalkSpeed", absSpeed) end)
+            pcall(function() child:SetAttribute("Speed", absSpeed) end) end
+    end) end
+
+    -- FORCE 5: Direction
+    local sd = spd[target]
+    local dir = root.CFrame.LookVector
+    if sd and sd.forceLastPos then
+        local delta = root.Position - sd.forceLastPos
+        if delta.Magnitude > 0.01 then
+            local flatDir = Vector3.new(delta.X, 0, delta.Z)
+            if flatDir.Magnitude > 0 then dir = flatDir.Unit; sd.lastMoveDir = dir end
         end
     end
-    killMovers(target)
+    if sd and sd.lastMoveDir then dir = sd.lastMoveDir end
+    if reversed then dir = -dir end
+    if sd then sd.forceLastPos = root.Position end
 
-    -- ==============================
-    -- FORCE 2: Kill ALL scripts on the entity
-    -- They keep resetting movement
-    -- ==============================
-    for _, child in ipairs(target:GetDescendants()) do
-        pcall(function()
-            if child:IsA("Script") or child:IsA("LocalScript") then
-                child.Disabled = true
-            end
-        end)
-    end
+    -- FORCE 6: Unanchor
+    for _, part in ipairs(allParts) do pcall(function() part.Anchored = false end) end
 
-    -- ==============================
-    -- FORCE 3: Override ALL speed/config values
-    -- ==============================
-    for _, child in ipairs(target:GetDescendants()) do
-        pcall(function()
-            if child:IsA("NumberValue") or child:IsA("IntValue") then
-                local ln = child.Name:lower()
-                if ln:find("speed") or ln:find("spd") or ln:find("velocity") or ln:find("move")
-                    or ln:find("walk") or ln:find("run") or ln:find("chase") or ln:find("patrol")
-                    or ln:find("fast") or ln:find("accel") or ln:find("rate") then
-                    child.Value = speed
-                end
-            end
-        end)
-    end
-
-    -- ==============================
-    -- FORCE 4: Humanoid override
-    -- ==============================
-    for _, child in ipairs(target:GetDescendants()) do
-        pcall(function()
-            if child:IsA("Humanoid") then
-                child.WalkSpeed = absSpeed
-                pcall(function() child:SetAttribute("WalkSpeed", absSpeed) end)
-                pcall(function() child:SetAttribute("Speed", absSpeed) end)
-            end
-        end)
-    end
-
-    -- ==============================
-    -- FORCE 5: Detect movement direction
-    -- ==============================
-    if root then spd[entity] = {lP=root.Position, lT=tick(), sp=0, sa={}, pP=root.Position, pT=tick(),
-    idleCheck=0, idleState="■ Idle", idleCol=Color3.fromRGB(100,100,100), lSize=root.Size,
-    forceLastPos=root.Position, lastMoveDir=nil} end
-    -- ==============================
-    -- FORCE 6: Unanchor ALL parts
-    -- ==============================
-    for _, part in ipairs(allParts) do
-        pcall(function()
-            if part.Anchored then
-                part.Anchored = false
-            end
-        end)
-    end
-
-    -- ==============================
-    -- FORCE 7: Weld all parts to root if not welded
-    -- So they move together
-    -- ==============================
+    -- FORCE 7: Weld parts together
     for _, part in ipairs(allParts) do
         if part ~= root then
             local hasWeld = false
             for _, j in ipairs(part:GetJoints()) do
-                if j:IsA("WeldConstraint") or j:IsA("Weld") or j:IsA("Motor6D") then
-                    hasWeld = true; break
-                end
-            end
-            if not hasWeld then
-                pcall(function()
-                    local w = Instance.new("WeldConstraint")
-                    w.Name = "SpeedControlWeld"
-                    w.Part0 = root
-                    w.Part1 = part
-                    w.Parent = root
-                end)
-            end
+                if j:IsA("WeldConstraint") or j:IsA("Weld") or j:IsA("Motor6D") then hasWeld = true; break end end
+            if not hasWeld then pcall(function()
+                local w = Instance.new("WeldConstraint"); w.Name = "SpeedControlWeld"
+                w.Part0 = root; w.Part1 = part; w.Parent = root end) end
         end
     end
 
-    -- ==============================
-    -- FORCE 8: Apply MASSIVE BodyVelocity to root
-    -- ==============================
+    -- FORCE 8: BodyVelocity 10^15
     if not root.Anchored then
         local bv = root:FindFirstChild("SpeedControlBV")
-        if not bv then
-            bv = Instance.new("BodyVelocity")
-            bv.Name = "SpeedControlBV"
-            bv.Parent = root
-        end
-        bv.MaxForce = Vector3.new(1e15, 1e15, 1e15)
-        bv.P = 1e8
+        if not bv then bv = Instance.new("BodyVelocity"); bv.Name = "SpeedControlBV"; bv.Parent = root end
+        bv.MaxForce = Vector3.new(1e15, 1e15, 1e15); bv.P = 1e8
         bv.Velocity = dir * absSpeed
-
-        -- Also direct set
         pcall(function() root.AssemblyLinearVelocity = dir * absSpeed end)
         pcall(function() root.Velocity = dir * absSpeed end)
     end
 
-    -- ==============================
-    -- FORCE 9: Move ALL parts velocity
-    -- ==============================
-    for _, part in ipairs(allParts) do
-        pcall(function()
-            part.AssemblyLinearVelocity = dir * absSpeed
-            part.Velocity = dir * absSpeed
-        end)
-    end
+    -- FORCE 9: All parts velocity
+    for _, part in ipairs(allParts) do pcall(function()
+        part.AssemblyLinearVelocity = dir * absSpeed; part.Velocity = dir * absSpeed end) end
 
-    -- ==============================
-    -- FORCE 10: CFrame override (last resort)
-    -- Directly teleport in movement direction
-    -- ==============================
+    -- FORCE 10: CFrame teleport
     if absSpeed > 0 and dir.Magnitude > 0 then
-        local moveAmount = dir * absSpeed * (1/60) -- per frame movement
-        if target:IsA("Model") then
-            pcall(function()
-                target:PivotTo(target:GetPivot() + moveAmount)
-            end)
-        else
-            pcall(function()
-                root.CFrame = root.CFrame + moveAmount
-            end)
-        end
+        local moveAmt = dir * absSpeed * (1/60)
+        if target:IsA("Model") then pcall(function() target:PivotTo(target:GetPivot() + moveAmt) end)
+        else pcall(function() root.CFrame = root.CFrame + moveAmt end) end
     end
 end
-onSpeedChanged = function()
-    if speedApplyActive and speedApplyTarget then
-        -- Instantly apply new speed
-        forceSpeed(speedApplyTarget, selSpeed)
-    end
+
+local function cleanSpeedControl(target)
+    if not target or not target.Parent then return end
+    for _, desc in ipairs(target:GetDescendants()) do pcall(function()
+        if desc.Name == "SpeedControlBV" or desc.Name == "SpeedControlLV" or desc.Name == "SpeedControlWeld" then desc:Destroy() end
+    end) end
 end
 
 local function stopSpeedApply()
     if speedApplyConn then speedApplyConn:Disconnect(); speedApplyConn = nil end
-
-    -- Re-enable scripts we disabled
     if speedApplyTarget and speedApplyTarget.Parent then
-        for _, child in ipairs(speedApplyTarget:GetDescendants()) do
-            pcall(function()
-                if child:IsA("Script") or child:IsA("LocalScript") then
-                    child.Disabled = false
-                end
-            end)
-        end
-        -- Remove our welds
-        for _, child in ipairs(speedApplyTarget:GetDescendants()) do
-            pcall(function()
-                if child.Name == "SpeedControlWeld" then child:Destroy() end
-                if child.Name == "SpeedControlBV" then child:Destroy() end
-                if child.Name == "SpeedControlLV" then child:Destroy() end
-            end)
-        end
+        for _, child in ipairs(speedApplyTarget:GetDescendants()) do pcall(function()
+            if child:IsA("Script") or child:IsA("LocalScript") then child.Disabled = false end end) end
+        cleanSpeedControl(speedApplyTarget)
     end
-
     speedApplyTarget = nil; speedApplyActive = false
     spApp.Text = "Apply"; spApp.BackgroundColor3 = Color3.fromRGB(0, 140, 60)
 end
+
+local function startSpeedLoop(target)
+    if speedApplyConn then speedApplyConn:Disconnect(); speedApplyConn = nil end
+    speedApplyActive = true
+    forceSpeed(target, selSpeed)
+    speedApplyConn = RunService.Heartbeat:Connect(function(dt)
+        if not active or not target or not target.Parent then stopSpeedApply(); return end
+        local root = getPart(target); if not root or not root.Parent then stopSpeedApply(); return end
+        forceSpeed(target, selSpeed)
+    end)
+end
+
+onSpeedChanged = function()
+    if speedApplyActive and speedApplyTarget then forceSpeed(speedApplyTarget, selSpeed) end
+end
+
+spApp.MouseButton1Click:Connect(function()
+    if speedApplyActive then stopSpeedApply(); return end
+    local target = viewEntTarget
+    if not target then
+        local c = LP.Character; local mr = c and c:FindFirstChild("HumanoidRootPart")
+        if mr then local near, nd = nil, math.huge
+            for ent, d in pairs(tracked) do local tp = d.targetPart; if tp and tp.Parent then
+                local dist = (mr.Position-tp.Position).Magnitude; if dist < nd then near = ent; nd = dist end
+            end end; target = near end
+    end
+    if not target then spApp.Text = "None!"; task.delay(1, function() if not speedApplyActive then spApp.Text = "Apply" end end); return end
+    speedApplyTarget = target; spApp.Text = "■ Stop"; spApp.BackgroundColor3 = Color3.fromRGB(200, 60, 0)
+    startSpeedLoop(target)
+end)
+
+updateSpUI()
+
 -- ============================================
 -- LAYOUT
 -- ============================================
-local tabF = Instance.new("Frame"); tabF.Size = UDim2.new(1, -12, 0, 20)
-tabF.BackgroundTransparency = 1; tabF.Parent = MF
+local tabF = Instance.new("Frame"); tabF.Size = UDim2.new(1, -12, 0, 20); tabF.BackgroundTransparency = 1; tabF.Parent = MF
 local liveTab = mb(tabF, "⚡ Live", Color3.fromRGB(0, 80, 160), 0, 0.5)
 local undoTab = mb(tabF, "↩ Undo (0)", Color3.fromRGB(80, 40, 0), 0.5, 0.5)
 
-local vp2 = Instance.new("Frame"); vp2.Size = UDim2.new(1, -12, 0, 20)
-vp2.BackgroundColor3 = Color3.fromRGB(22, 0, 50); vp2.Visible = false; vp2.Parent = MF
+local vp2 = Instance.new("Frame"); vp2.Size = UDim2.new(1, -12, 0, 20); vp2.BackgroundColor3 = Color3.fromRGB(22, 0, 50); vp2.Visible = false; vp2.Parent = MF
 Instance.new("UICorner", vp2).CornerRadius = UDim.new(0, 4)
 local vst2 = Instance.new("UIStroke"); vst2.Color = Color3.fromRGB(120, 0, 240); vst2.Thickness = 1; vst2.Parent = vp2
 local vlb = Instance.new("TextLabel"); vlb.Size = UDim2.new(0.6, 0, 1, 0); vlb.Position = UDim2.new(0, 5, 0, 0)
@@ -494,11 +386,9 @@ vlb.BackgroundTransparency = 1; vlb.Text = "👁 None"; vlb.TextColor3 = Color3.
 vlb.TextSize = 8; vlb.Font = Enum.Font.GothamSemibold; vlb.TextXAlignment = Enum.TextXAlignment.Left; vlb.Parent = vp2
 local svb2 = Instance.new("TextButton"); svb2.Size = UDim2.new(0, 40, 0, 14); svb2.Position = UDim2.new(1, -45, 0.5, -7)
 svb2.BackgroundColor3 = Color3.fromRGB(145, 20, 20); svb2.Text = "✕Stop"; svb2.TextColor3 = Color3.new(1,1,1)
-svb2.TextSize = 7; svb2.Font = Enum.Font.GothamBold; svb2.Parent = vp2
-Instance.new("UICorner", svb2).CornerRadius = UDim.new(0, 3)
+svb2.TextSize = 7; svb2.Font = Enum.Font.GothamBold; svb2.Parent = vp2; Instance.new("UICorner", svb2).CornerRadius = UDim.new(0, 3)
 
-local vep2 = Instance.new("Frame"); vep2.Size = UDim2.new(1, -12, 0, 20)
-vep2.BackgroundColor3 = Color3.fromRGB(0, 30, 10); vep2.Visible = false; vep2.Parent = MF
+local vep2 = Instance.new("Frame"); vep2.Size = UDim2.new(1, -12, 0, 20); vep2.BackgroundColor3 = Color3.fromRGB(0, 30, 10); vep2.Visible = false; vep2.Parent = MF
 Instance.new("UICorner", vep2).CornerRadius = UDim.new(0, 4)
 local vest2 = Instance.new("UIStroke"); vest2.Color = Color3.fromRGB(0, 200, 80); vest2.Thickness = 1; vest2.Parent = vep2
 local velb2 = Instance.new("TextLabel"); velb2.Size = UDim2.new(0.6, 0, 1, 0); velb2.Position = UDim2.new(0, 5, 0, 0)
@@ -506,14 +396,12 @@ velb2.BackgroundTransparency = 1; velb2.Text = "🎥 None"; velb2.TextColor3 = C
 velb2.TextSize = 8; velb2.Font = Enum.Font.GothamSemibold; velb2.TextXAlignment = Enum.TextXAlignment.Left; velb2.Parent = vep2
 local sveb2 = Instance.new("TextButton"); sveb2.Size = UDim2.new(0, 40, 0, 14); sveb2.Position = UDim2.new(1, -45, 0.5, -7)
 sveb2.BackgroundColor3 = Color3.fromRGB(145, 20, 20); sveb2.Text = "✕Stop"; sveb2.TextColor3 = Color3.new(1,1,1)
-sveb2.TextSize = 7; sveb2.Font = Enum.Font.GothamBold; sveb2.Parent = vep2
-Instance.new("UICorner", sveb2).CornerRadius = UDim.new(0, 3)
+sveb2.TextSize = 7; sveb2.Font = Enum.Font.GothamBold; sveb2.Parent = vep2; Instance.new("UICorner", sveb2).CornerRadius = UDim.new(0, 3)
 
 local scr = Instance.new("ScrollingFrame"); scr.BackgroundColor3 = Color3.fromRGB(12, 12, 24)
 scr.ScrollBarThickness = 2; scr.ScrollBarImageColor3 = Color3.fromRGB(0, 120, 255)
 scr.AutomaticCanvasSize = Enum.AutomaticSize.Y; scr.CanvasSize = UDim2.new(0,0,0,0); scr.Parent = MF
-Instance.new("UICorner", scr).CornerRadius = UDim.new(0, 4)
-Instance.new("UIListLayout", scr).Padding = UDim.new(0, 2)
+Instance.new("UICorner", scr).CornerRadius = UDim.new(0, 4); Instance.new("UIListLayout", scr).Padding = UDim.new(0, 2)
 local lpad = Instance.new("UIPadding"); lpad.PaddingTop = UDim.new(0,2); lpad.PaddingLeft = UDim.new(0,2); lpad.PaddingRight = UDim.new(0,2); lpad.Parent = scr
 local el = Instance.new("TextLabel"); el.Name = "Empty"; el.Size = UDim2.new(1, 0, 0, 28); el.BackgroundTransparency = 1
 el.Text = "No entities..."; el.TextColor3 = Color3.fromRGB(60, 60, 90); el.TextSize = 8; el.Font = Enum.Font.GothamSemibold; el.Parent = scr
@@ -526,8 +414,7 @@ local upad = Instance.new("UIPadding"); upad.PaddingTop = UDim.new(0,2); upad.Pa
 local ue = Instance.new("TextLabel"); ue.Size = UDim2.new(1, 0, 0, 28); ue.BackgroundTransparency = 1
 ue.Text = "No blacklisted..."; ue.TextColor3 = Color3.fromRGB(80, 60, 30); ue.TextSize = 8; ue.Font = Enum.Font.GothamSemibold; ue.Parent = uscr
 
-local pbar = Instance.new("Frame"); pbar.Size = UDim2.new(0.16, 0, 0, 2)
-pbar.BackgroundColor3 = Color3.fromRGB(0, 170, 255); pbar.Parent = MF
+local pbar = Instance.new("Frame"); pbar.Size = UDim2.new(0.16, 0, 0, 2); pbar.BackgroundColor3 = Color3.fromRGB(0, 170, 255); pbar.Parent = MF
 
 local function layoutGUI()
     local y = 151; local off = speedPanelOpen and 58 or 0
@@ -541,25 +428,24 @@ end
 layoutGUI()
 
 -- ============================================
--- RED ALERT
+-- ALERT
 -- ============================================
 local AG = Instance.new("ScreenGui"); AG.Name = "RedAlertGui"; AG.ResetOnSpawn = false; AG.DisplayOrder = 200; AG.Parent = LP.PlayerGui
 local AF = Instance.new("Frame"); AF.Size = UDim2.new(0,0,0,75); AF.AnchorPoint = Vector2.new(0.5,0)
-AF.Position = UDim2.new(0.5,0,0,10); AF.BackgroundColor3 = Color3.fromRGB(120,0,0)
-AF.ClipsDescendants = true; AF.Visible = false; AF.Parent = AG
+AF.Position = UDim2.new(0.5,0,0,10); AF.BackgroundColor3 = Color3.fromRGB(120,0,0); AF.ClipsDescendants = true; AF.Visible = false; AF.Parent = AG
 Instance.new("UICorner", AF).CornerRadius = UDim.new(0, 8)
 local astk = Instance.new("UIStroke"); astk.Color = Color3.fromRGB(255,0,0); astk.Thickness = 2; astk.Parent = AF
 local an = Instance.new("TextLabel"); an.Size = UDim2.new(1,0,0,24); an.Position = UDim2.new(0,0,0,2)
-an.BackgroundTransparency = 1; an.TextColor3 = Color3.new(1,1,1); an.TextSize = 20
-an.Font = Enum.Font.GothamBlack; an.TextStrokeTransparency = 0; an.TextStrokeColor3 = Color3.fromRGB(80,0,0); an.Parent = AF
+an.BackgroundTransparency = 1; an.TextColor3 = Color3.new(1,1,1); an.TextSize = 20; an.Font = Enum.Font.GothamBlack
+an.TextStrokeTransparency = 0; an.TextStrokeColor3 = Color3.fromRGB(80,0,0); an.Parent = AF
 local asp = Instance.new("TextLabel"); asp.Size = UDim2.new(1,0,0,12); asp.Position = UDim2.new(0,0,0,24)
 asp.BackgroundTransparency = 1; asp.TextColor3 = Color3.fromRGB(255,255,100); asp.TextSize = 9; asp.Font = Enum.Font.GothamBold; asp.Parent = AF
 local ahc = Instance.new("Frame"); ahc.Size = UDim2.new(1,0,0,18); ahc.Position = UDim2.new(0,0,0,38)
 ahc.BackgroundTransparency = 1; ahc.ClipsDescendants = true; ahc.Parent = AF
 local ht = "⚠ HIDE! ⚠ HIDE! ⚠ HIDE! ⚠ HIDE! ⚠ HIDE! "
 local ah1 = Instance.new("TextLabel"); ah1.Size = UDim2.new(3,0,1,0); ah1.BackgroundTransparency = 1; ah1.Text = ht
-ah1.TextColor3 = Color3.fromRGB(255,60,60); ah1.TextSize = 13; ah1.Font = Enum.Font.GothamBlack
-ah1.TextStrokeTransparency = 0.2; ah1.TextXAlignment = Enum.TextXAlignment.Left; ah1.Parent = ahc
+ah1.TextColor3 = Color3.fromRGB(255,60,60); ah1.TextSize = 13; ah1.Font = Enum.Font.GothamBlack; ah1.TextStrokeTransparency = 0.2
+ah1.TextXAlignment = Enum.TextXAlignment.Left; ah1.Parent = ahc
 local ah2 = ah1:Clone(); ah2.Position = UDim2.new(0,500,0,0); ah2.Parent = ahc
 local ad = Instance.new("TextLabel"); ad.Size = UDim2.new(1,0,0,10); ad.Position = UDim2.new(0,0,1,-12)
 ad.BackgroundTransparency = 1; ad.TextColor3 = Color3.fromRGB(255,180,180); ad.TextSize = 8; ad.Font = Enum.Font.GothamSemibold; ad.Parent = AF
@@ -571,11 +457,9 @@ LS.BackgroundTransparency = 1; LS.Parent = AG; Instance.new("UIListLayout", LS).
 -- ============================================
 local track, untrack, blacklistEnt, stopV, stopVE, showAl, hideAl
 
-local function switchTab(t)
-    curTab = t; scr.Visible = t == "live"; uscr.Visible = t == "undo"
+local function switchTab(t) curTab = t; scr.Visible = t == "live"; uscr.Visible = t == "undo"
     liveTab.BackgroundColor3 = t == "live" and Color3.fromRGB(0,80,160) or Color3.fromRGB(0,40,80)
-    undoTab.BackgroundColor3 = t == "undo" and Color3.fromRGB(180,100,0) or Color3.fromRGB(80,40,0)
-end
+    undoTab.BackgroundColor3 = t == "undo" and Color3.fromRGB(180,100,0) or Color3.fromRGB(80,40,0) end
 liveTab.MouseButton1Click:Connect(function() switchTab("live") end)
 undoTab.MouseButton1Click:Connect(function() switchTab("undo") end)
 
@@ -593,34 +477,27 @@ local function addUndo(name)
     local db = Instance.new("TextButton"); db.Size = UDim2.new(0,45,0,16); db.Position = UDim2.new(1,-55,0.5,-8)
     db.BackgroundColor3 = Color3.fromRGB(140,20,20); db.Text = "🗑Delete"; db.TextColor3 = Color3.new(1,1,1)
     db.TextSize = 7; db.Font = Enum.Font.GothamBold; db.Parent = e; Instance.new("UICorner", db).CornerRadius = UDim.new(0,3)
-    rb.MouseButton1Click:Connect(function()
-        bl[name] = nil; blCount -= 1; updUndo(); e:Destroy(); undoEntries[name] = nil
-        for _, obj in ipairs(workspace:GetDescendants()) do
-            if obj.Name == name and matchPat(obj.Name) and not pChars[obj] and not tracked[obj] then
-                task.defer(function() if obj.Parent then track(obj) end end) end end end)
+    rb.MouseButton1Click:Connect(function() bl[name] = nil; blCount -= 1; updUndo(); e:Destroy(); undoEntries[name] = nil
+        for _, obj in ipairs(workspace:GetDescendants()) do if obj.Name == name and matchPat(obj.Name) and not pChars[obj] and not tracked[obj] then
+            task.defer(function() if obj.Parent then track(obj) end end) end end end)
     db.MouseButton1Click:Connect(function() e:Destroy(); undoEntries[name] = nil end)
     undoEntries[name] = e; updUndo()
 end
 
-stopV = function()
-    viewing = false; if viewConn then viewConn:Disconnect(); viewConn = nil end
+stopV = function() viewing = false; if viewConn then viewConn:Disconnect(); viewConn = nil end
     if viewIndicator then pcall(function() viewIndicator:Destroy() end); viewIndicator = nil end
     vp2.Visible = false; vwB.BackgroundColor3 = Color3.fromRGB(70,0,150); vwB.Text = "👁 View"
     for _, d in pairs(tracked) do local b = d.entry and d.entry:FindFirstChild("VB"); if b then b.Text = "👁"; b.BackgroundColor3 = Color3.fromRGB(70,0,150) end end
-    viewTarget = nil; layoutGUI()
-end
+    viewTarget = nil; layoutGUI() end
 
-stopVE = function()
-    viewingEnt = false; if viewEntConn then viewEntConn:Disconnect(); viewEntConn = nil end
+stopVE = function() viewingEnt = false; if viewEntConn then viewEntConn:Disconnect(); viewEntConn = nil end
     if savedCamType then Camera.CameraType = savedCamType; savedCamType = nil else Camera.CameraType = Enum.CameraType.Custom end
     local c = LP.Character; if c then local h = c:FindFirstChild("Head"); if h then Camera.CFrame = CFrame.new(h.Position+Vector3.new(0,2,8), h.Position) end end
     vep2.Visible = false; veB.Text = "🎥 View Entity"; veB.BackgroundColor3 = Color3.fromRGB(30,60,30)
     for _, d in pairs(tracked) do local b = d.entry and d.entry:FindFirstChild("VEB"); if b then b.Text = "🎥"; b.BackgroundColor3 = Color3.fromRGB(20,80,40) end end
-    viewEntTarget = nil; stopSpeedApply(); layoutGUI()
-end
+    viewEntTarget = nil; stopSpeedApply(); layoutGUI() end
 
-local function startVE(entity)
-    if viewingEnt then stopVE() end
+local function startVE(entity) if viewingEnt then stopVE() end
     local data = tracked[entity]; if not data then return end
     local root = data.targetPart; if not root or not root.Parent then root = getPart(entity); data.targetPart = root end
     if not root then return end; if viewing then stopV() end
@@ -631,17 +508,14 @@ local function startVE(entity)
     viewEntConn = RunService.Heartbeat:Connect(function(dt)
         if not viewingEnt or not entity or not entity.Parent then stopVE(); return end
         if not root or not root.Parent then root = getPart(entity); data.targetPart = root; if not root then stopVE(); return end end
-        ang = ang + dt*0.3; local tp = root.Position
-        local es = (tp-lastTP).Magnitude/math.max(dt,0.001); lastTP = tp
+        ang = ang + dt*0.3; local tp = root.Position; local es = (tp-lastTP).Magnitude/math.max(dt,0.001); lastTP = tp
         local fs = math.clamp(0.15+(es/100), 0.15, 0.95); if es > FAST_THRESH then fs = 0.85 end
         Camera.CFrame = Camera.CFrame:Lerp(CFrame.lookAt(tp+Vector3.new(math.sin(ang)*12,5,math.cos(ang)*12), tp), fs)
         local c = LP.Character; local mr = c and c:FindFirstChild("HumanoidRootPart")
         if mr then velb2.Text = "🎥 "..entity.Name.." | "..math.floor((mr.Position-tp).Magnitude).."s"..(es > FAST_THRESH and " ⚡" or "") end
-    end); layoutGUI()
-end
+    end); layoutGUI() end
 
-local function startV(entity)
-    if viewing then stopV() end
+local function startV(entity) if viewing then stopV() end
     local data = tracked[entity]; if not data then return end
     local root = data.targetPart; if not root or not root.Parent then root = getPart(entity); data.targetPart = root end
     if not root then return end; if viewingEnt then stopVE() end
@@ -664,59 +538,47 @@ local function startV(entity)
         if on then ar.Position = UDim2.new(0, math.clamp(sp.X,80,vpS.X-80), 0, math.clamp(sp.Y,8,50))
         else local dir = (root.Position-Camera.CFrame.Position).Unit; local d2 = Camera.CFrame.RightVector:Dot(dir)
             ar.Position = UDim2.new(d2>0 and 1 or 0, d2>0 and -80 or 10, 0, 8) end
-    end); layoutGUI()
-end
+    end); layoutGUI() end
 
--- Alert
 local function clrLS() for _, f in pairs(leftEntries) do pcall(function() f:Destroy() end) end; leftEntries = {} end
 local function updLS(rl3, cn)
     for n, f in pairs(leftEntries) do if not rl3[n] or n == cn then pcall(function() f:Destroy() end); leftEntries[n] = nil end end
     local ct = 0; for n in pairs(rl3) do if n ~= cn then ct += 1 end end
     local eh = ct<=3 and 26 or ct<=6 and 22 or ct<=10 and 18 or 15
     local fz = ct<=3 and 10 or ct<=6 and 9 or ct<=10 and 8 or 7
-    for n, dist in pairs(rl3) do
-        if n == cn then continue end
-        if leftEntries[n] then leftEntries[n].LayoutOrder = dist
-            local d2 = leftEntries[n]:FindFirstChild("DL"); if d2 then d2.Text = dist.."s" end
-        else
-            local f = Instance.new("Frame"); f.Size = UDim2.new(1,0,0,eh); f.BackgroundColor3 = Color3.fromRGB(100,0,0)
-            f.BackgroundTransparency = 0.15; f.LayoutOrder = dist; f.Parent = LS
-            Instance.new("UICorner", f).CornerRadius = UDim.new(0,4); Instance.new("UIStroke", f).Color = Color3.fromRGB(255,40,40)
+    for n, dist in pairs(rl3) do if n == cn then continue end
+        if leftEntries[n] then leftEntries[n].LayoutOrder = dist; local d2 = leftEntries[n]:FindFirstChild("DL"); if d2 then d2.Text = dist.."s" end
+        else local f = Instance.new("Frame"); f.Size = UDim2.new(1,0,0,eh); f.BackgroundColor3 = Color3.fromRGB(100,0,0)
+            f.BackgroundTransparency = 0.15; f.LayoutOrder = dist; f.Parent = LS; Instance.new("UICorner", f).CornerRadius = UDim.new(0,4)
+            Instance.new("UIStroke", f).Color = Color3.fromRGB(255,40,40)
             local nl = Instance.new("TextLabel"); nl.Size = UDim2.new(0.6,-5,1,0); nl.Position = UDim2.new(0,5,0,0)
             nl.BackgroundTransparency = 1; nl.Text = "⚠ "..n; nl.TextColor3 = Color3.fromRGB(255,200,200)
             nl.TextSize = fz; nl.Font = Enum.Font.GothamBold; nl.TextXAlignment = Enum.TextXAlignment.Left; nl.TextTruncate = Enum.TextTruncate.AtEnd; nl.Parent = f
             local d2 = Instance.new("TextLabel"); d2.Name = "DL"; d2.Size = UDim2.new(0.4,-5,1,0); d2.Position = UDim2.new(0.6,0,0,0)
             d2.BackgroundTransparency = 1; d2.Text = dist.."s"; d2.TextColor3 = Color3.fromRGB(255,100,100)
             d2.TextSize = fz; d2.Font = Enum.Font.GothamSemibold; d2.TextXAlignment = Enum.TextXAlignment.Right; d2.Parent = f
-            leftEntries[n] = f end end
-end
+            leftEntries[n] = f end end end
 
 showAl = function(name, dist, allR, spTxt)
     if alertOn and alertEnt == name then ad.Text = dist.."s"; asp.Text = spTxt or ""; updLS(allR, name); return end
     alertEnt = name; an.Text = "⚠ "..name; ad.Text = dist.."s"; asp.Text = spTxt or ""
     if not alertOn then AF.Size = UDim2.new(0,0,0,75); AF.Visible = true; alertOn = true
-        TweenService:Create(AF, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(0,420,0,75)}):Play()
-    end; alertOn = true
+        TweenService:Create(AF, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(0,420,0,75)}):Play() end; alertOn = true
     if alertScrConn then alertScrConn:Disconnect() end; local sx, tw = 0, 500
     alertScrConn = RunService.Heartbeat:Connect(function(dt) if not alertOn then return end; sx = sx-dt*150; if sx < -tw then sx = sx+tw end
         ah1.Position = UDim2.new(0,sx,0,0); ah2.Position = UDim2.new(0,sx+tw,0,0) end)
     if alertPulseConn then alertPulseConn:Disconnect() end
     alertPulseConn = RunService.Heartbeat:Connect(function() if not alertOn then return end; local p = (math.sin(tick()*8)+1)/2
         astk.Color = Color3.fromRGB(math.floor(180+75*p),0,0); AF.BackgroundColor3 = Color3.fromRGB(math.floor(80+60*p),0,0) end)
-    updLS(allR, name)
-end
+    updLS(allR, name) end
 
-hideAl = function()
-    if not alertOn then return end; alertOn = false; alertEnt = nil
+hideAl = function() if not alertOn then return end; alertOn = false; alertEnt = nil
     TweenService:Create(AF, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {Size = UDim2.new(0,0,0,75)}):Play()
     task.delay(0.25, function() if not alertOn then AF.Visible = false end end)
     if alertScrConn then alertScrConn:Disconnect(); alertScrConn = nil end
-    if alertPulseConn then alertPulseConn:Disconnect(); alertPulseConn = nil end; clrLS()
-end
+    if alertPulseConn then alertPulseConn:Disconnect(); alertPulseConn = nil end; clrLS() end
 
--- Untrack/Blacklist
-untrack = function(entity)
-    local d = tracked[entity]; if not d then return end
+untrack = function(entity) local d = tracked[entity]; if not d then return end
     pcall(function() if d.highlight then d.highlight:Destroy() end end)
     pcall(function() if d.billboard then d.billboard:Destroy() end end)
     if d.dConn then d.dConn:Disconnect() end; if d.cConn then d.cConn:Disconnect() end
@@ -724,14 +586,12 @@ untrack = function(entity)
     local root = getPart(entity); if root and root.Parent then local bv = root:FindFirstChild("SpeedControlBV"); if bv then bv:Destroy() end end
     spd[entity] = nil; tracked[entity] = nil; entCount = math.max(0, entCount-1)
     cl2.Text = "Entities: "..entCount; cl2.TextColor3 = entCount > 0 and Color3.fromRGB(255,50,50) or Color3.fromRGB(255,190,40); el.Visible = entCount == 0
-    if viewTarget == entity then stopV() end; if viewEntTarget == entity then stopVE() end; if alertEnt == entity.Name then hideAl() end
-end
+    if viewTarget == entity then stopV() end; if viewEntTarget == entity then stopVE() end; if alertEnt == entity.Name then hideAl() end end
 
 blacklistEnt = function(name) bl[name] = true; blCount += 1; addUndo(name)
     local rem = {}; for ent in pairs(tracked) do if ent.Name == name then table.insert(rem, ent) end end
     for _, ent in ipairs(rem) do untrack(ent) end end
 
--- Track
 track = function(entity)
     if tracked[entity] or not entity.Parent or bl[entity.Name] then return end
     local color = getCol(entity.Name); local d = {}
@@ -755,7 +615,10 @@ track = function(entity)
             if ch:IsA("BasePart") and not d.targetPart then d.targetPart = ch; sBB(ch) end
             if isMinion(ch.Name) and not tracked[ch] then task.defer(function() if ch.Parent then track(ch) end end) end end)
         for _, ch in ipairs(entity:GetChildren()) do if isMinion(ch.Name) and not tracked[ch] then task.defer(function() if ch.Parent then track(ch) end end) end end end
-    if root then spd[entity] = {lP=root.Position, lT=tick(), sp=0, sa={}, pP=root.Position, pT=tick(), idleCheck=0, idleState="■ Idle", idleCol=Color3.fromRGB(100,100,100), lSize=root.Size} end
+
+    if root then spd[entity] = {lP=root.Position, lT=tick(), sp=0, sa={}, pP=root.Position, pT=tick(),
+        idleCheck=0, idleState="■ Idle", idleCol=Color3.fromRGB(100,100,100), lSize=root.Size,
+        forceLastPos=root.Position, lastMoveDir=nil} end
 
     local num = getNum(entity.Name); local pre = getPrefix(entity.Name); local sv = 0
     if pre == "MOB" then sv = 9e6+num elseif pre == "eye" then sv = 9.5e6 elseif pre == "mouth" then sv = 9500001
@@ -803,8 +666,7 @@ end
 for _, obj in ipairs(workspace:GetDescendants()) do if isEnt(obj) then track(obj) end end
 for ent in pairs(tracked) do for _, ch in ipairs(ent:GetDescendants()) do if isMinion(ch.Name) and not tracked[ch] then track(ch) end end end
 
-workspace.DescendantAdded:Connect(function(obj)
-    if not active then return end
+workspace.DescendantAdded:Connect(function(obj) if not active then return end
     if matchPat(obj.Name) and not pChars[obj] and not bl[obj.Name] then
         task.defer(function() if not obj.Parent or tracked[obj] then return end
             if obj:IsA("Model") then local t = 0; while t < 15 do if obj:FindFirstChildWhichIsA("BasePart",true) then break end; t+=1; task.wait(0.2); if not obj.Parent then return end end end
@@ -816,7 +678,6 @@ workspace.DescendantAdded:Connect(function(obj)
         local p = obj.Parent; if p and matchPat(p.Name) and not bl[p.Name] and not pChars[p] and not tracked[p] then track(p) end end) end
 end)
 workspace.DescendantRemoving:Connect(function(obj) if tracked[obj] then untrack(obj) end end)
-
 task.spawn(function() while active do task.wait(3)
     for _, obj in ipairs(workspace:GetDescendants()) do if isEnt(obj) and not tracked[obj] then track(obj) end end
     for ent in pairs(tracked) do if ent.Parent then for _, ch in ipairs(ent:GetChildren()) do if isMinion(ch.Name) and not tracked[ch] then track(ch) end end end end
@@ -826,16 +687,14 @@ end end)
 RunService.Heartbeat:Connect(function()
     if not active then return end; dF += 1; if dF < dSkip then return end; dF = 0
     local char = LP.Character; local myR = char and char:FindFirstChild("HumanoidRootPart"); if not myR then return end
-    local myP = myR.Position; local now = tick()
-    local cRN, cRD, cRS = nil, math.huge, ""; local allR = {}
+    local myP = myR.Position; local now = tick(); local cRN, cRD, cRS = nil, math.huge, ""; local allR = {}
 
     for ent, d in pairs(tracked) do
         local tp = d.targetPart; if not tp or not tp.Parent then tp = getPart(ent); d.targetPart = tp end
         if tp and tp.Parent then
             local dist = math.floor((myP-tp.Position).Magnitude)
             local sd = spd[ent]; local sTxt, sCol = "", Color3.fromRGB(180,180,100)
-            if sd then
-                local dt = now - sd.lT
+            if sd then local dt = now - sd.lT
                 if dt > 0.1 then
                     local s = (tp.Position-sd.lP).Magnitude/dt; sd.lP = tp.Position; sd.lT = now
                     table.insert(sd.sa, s); if #sd.sa > 5 then table.remove(sd.sa, 1) end
@@ -844,8 +703,8 @@ RunService.Heartbeat:Connect(function()
                     elseif avg >= SLOW_THRESH then sTxt = "→ "..math.floor(avg); sCol = Color3.fromRGB(255,200,80)
                     elseif avg >= 0.5 then sTxt = "🐌 "..string.format("%.1f", avg); sCol = Color3.fromRGB(120,180,120)
                     else
-                        if not sd.idleCheck or now - sd.idleCheck > 1 then
-                            sd.idleCheck = now; sd.idleState = "■ Idle"; sd.idleCol = Color3.fromRGB(100,100,100)
+                        if not sd.idleCheck or now - sd.idleCheck > 1 then sd.idleCheck = now
+                            sd.idleState = "■ Idle"; sd.idleCol = Color3.fromRGB(100,100,100)
                             local desp = false
                             if tp.Transparency > 0.3 then desp = true end
                             if not sd.lSize then sd.lSize = tp.Size end
@@ -854,8 +713,7 @@ RunService.Heartbeat:Connect(function()
                             local hum = ent:FindFirstChildWhichIsA("Humanoid"); if hum and hum.Health <= 0 then desp = true end
                             if tp.Position.Y < -50 then desp = true end
                             if desp then sd.idleState = "💨 Despawning!"; sd.idleCol = Color3.fromRGB(150,80,255)
-                            else
-                                local nL, nT = false, false
+                            else local nL, nT = false, false
                                 local ok, nearby = pcall(function() return workspace:GetPartBoundsInRadius(tp.Position, 8) end)
                                 if ok and nearby then for _, part in ipairs(nearby) do if part ~= tp then local pn = part.Name:lower()
                                     if pn:find("locker") or pn:find("closet") or pn:find("wardrobe") or pn:find("cabinet") or pn:find("hide") then nL = true end
@@ -864,11 +722,10 @@ RunService.Heartbeat:Connect(function()
                                 if nL then sd.idleState = "🚪 Checking Locker!"; sd.idleCol = Color3.fromRGB(255,150,50)
                                 elseif nT then sd.idleState = "🪑 Checking Table!"; sd.idleCol = Color3.fromRGB(200,180,80) end
                             end
-                        end
-                        sTxt = sd.idleState or "■ Idle"; sCol = sd.idleCol or Color3.fromRGB(100,100,100)
-                    end
-                end
-            else spd[ent] = {lP=tp.Position, lT=now, sp=0, sa={}, pP=tp.Position, pT=now, idleCheck=0, idleState="■ Idle", idleCol=Color3.fromRGB(100,100,100), lSize=tp.Size} end
+                        end; sTxt = sd.idleState or "■ Idle"; sCol = sd.idleCol or Color3.fromRGB(100,100,100) end end
+            else spd[ent] = {lP=tp.Position, lT=now, sp=0, sa={}, pP=tp.Position, pT=now,
+                idleCheck=0, idleState="■ Idle", idleCol=Color3.fromRGB(100,100,100), lSize=tp.Size,
+                forceLastPos=tp.Position, lastMoveDir=nil} end
 
             local tc = dist<18 and Color3.fromRGB(255,40,40) or dist<50 and Color3.fromRGB(255,180,30) or Color3.fromRGB(140,140,140)
             if d.distLabel then d.distLabel.Text = dist.."s"; d.distLabel.TextColor3 = tc end
@@ -885,13 +742,11 @@ RunService.Heartbeat:Connect(function()
             if d.nameLabel then d.nameLabel.TextColor3 = ec end; if d.entryName then d.entryName.TextColor3 = ec end
             if d.entryStroke then d.entryStroke.Color = ec end; if d.entryDot then d.entryDot.BackgroundColor3 = ec end
 
-            if dist < RED_THRESH and matchPat(ent.Name) then
-                local appr = true
+            if dist < RED_THRESH and matchPat(ent.Name) then local appr = true
                 if sd and sd.pP then local toP = (myP-tp.Position).Unit; local vel = Vector3.zero
                     local pdt = now-(sd.pT or now); if pdt > 0 then vel = (tp.Position-sd.pP)/pdt end
                     if vel.Magnitude > 0.5 then appr = vel.Unit:Dot(toP) > 0.1 end; sd.pP = tp.Position; sd.pT = now end
-                if appr then allR[ent.Name] = dist; if dist < cRD then cRN = ent.Name; cRD = dist; cRS = sTxt end end
-            end
+                if appr then allR[ent.Name] = dist; if dist < cRD then cRN = ent.Name; cRD = dist; cRS = sTxt end end end
         end
     end
     if cRN then showAl(cRN, cRD, allR, cRS) else hideAl() end
@@ -917,10 +772,8 @@ veB.MouseButton1Click:Connect(function() if viewingEnt then stopVE(); return end
     if near then for _, dd in pairs(tracked) do local b = dd.entry and dd.entry:FindFirstChild("VEB"); if b then b.Text = "🎥"; b.BackgroundColor3 = Color3.fromRGB(20,80,40) end end
         startVE(near); local d = tracked[near]; local b = d and d.entry and d.entry:FindFirstChild("VEB"); if b then b.Text = "✔"; b.BackgroundColor3 = Color3.fromRGB(0,160,60) end end end)
 spB.MouseButton1Click:Connect(function() speedPanelOpen = not speedPanelOpen; spPanel.Visible = speedPanelOpen; layoutGUI() end)
-dbB.MouseButton1Click:Connect(function()
-    local found, near2 = 0, 0
-    for _, obj in ipairs(workspace:GetDescendants()) do
-        if matchPat(obj.Name) and not bl[obj.Name] then found += 1
+dbB.MouseButton1Click:Connect(function() local found, near2 = 0, 0
+    for _, obj in ipairs(workspace:GetDescendants()) do if matchPat(obj.Name) and not bl[obj.Name] then found += 1
         elseif obj.Name:match("%-%d") then near2 += 1 end end
     dlb.Text = "🔎 "..found.." | "..near2.." near | "..blCount.." blocked" end)
 svb2.MouseButton1Click:Connect(stopV); sveb2.MouseButton1Click:Connect(stopVE)
@@ -934,6 +787,6 @@ task.spawn(function() while active do
     task.wait(0.066) end end)
 
 layoutGUI()
-print("[Entity Scanner v6] ✅ Loaded")
-print("Speed range: -100 to 10000 | Negative = reverse direction")
-print("Slider color: 🔵Blue(neg) → 🟢Green(0-100) → 🟡Yellow(100-1000) → 🟠Orange(1000-5000) → 🔴Red(5000+)")
+print("[Entity Scanner v7] ✅ FORCE 1000x Speed Control")
+print("10 Force Methods | Every Frame | -100 to 10000")
+print("Destroys movers | Disables scripts | CFrame teleport | 10^15 BodyVelocity")
