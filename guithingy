@@ -164,7 +164,7 @@ Instance.new("UICorner", spPanel).CornerRadius = UDim.new(0, 6)
 local spSt2 = Instance.new("UIStroke"); spSt2.Color = Color3.fromRGB(200, 140, 0); spSt2.Thickness = 1; spSt2.Parent = spPanel
 
 local spTit = Instance.new("TextLabel"); spTit.Size = UDim2.new(1, 0, 0, 14); spTit.Position = UDim2.new(0, 5, 0, 2)
-spTit.BackgroundTransparency = 1; spTit.Text = "⚡ Block Speed (-100-10000)"; spTit.TextColor3 = Color3.fromRGB(255, 200, 80)
+spTit.BackgroundTransparency = 1; spTit.Text = "⚡ Block Speed (-100 to 10000)"; spTit.TextColor3 = Color3.fromRGB(255, 200, 80)
 spTit.TextSize = 8; spTit.Font = Enum.Font.GothamBold; spTit.TextXAlignment = Enum.TextXAlignment.Left; spTit.Parent = spPanel
 
 local slBG = Instance.new("Frame"); slBG.Size = UDim2.new(0.58, 0, 0, 10); slBG.Position = UDim2.new(0.03, 0, 0, 20)
