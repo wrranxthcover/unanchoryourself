@@ -1152,12 +1152,14 @@ local function track(entity)
     end
 
     -- Init speed tracking
-    if root then
+        if root then
         speedData[entity] = {
             lastPos = root.Position,
             lastTime = tick(),
             speed = 0,
             samples = {},
+            prevPos = root.Position,
+            prevTime = tick(),
         }
     end
 
@@ -1431,15 +1433,47 @@ RunService.Heartbeat:Connect(function()
             if d.entryStroke then d.entryStroke.Color = espColor end
             if d.entryDot then d.entryDot.BackgroundColor3 = espColor end
 
-            -- Red alert tracking
+                        -- Red alert tracking (ONLY if approaching)
             if dist < RED_THRESHOLD and matchesEntityPattern(ent.Name) then
-                allRed[ent.Name] = dist
-                if dist < closestRedDist then
-                    closestRedName = ent.Name; closestRedDist = dist; closestRedSpeed = speedTxt
+                local isApproaching = false
+                if sd and #sd.samples > 0 then
+                    -- Check if distance is decreasing
+                    local prevDist = (myP - sd.lastPos).Magnitude
+                    -- If entity is closer now than its movement direction suggests
+                    -- Simple: check if entity is moving TOWARD player
+                    local entPos = tp.Position
+                    local toPlayer = (myP - entPos).Unit
+                    local entVelocity = Vector3.zero
+                    if sd.prevPos then
+                        local dt2 = now - (sd.prevTime or now)
+                        if dt2 > 0 then
+                            entVelocity = (entPos - sd.prevPos) / dt2
+                        end
+                    end
+                    -- Dot product: positive = moving toward player
+                    local dot = entVelocity.Unit:Dot(toPlayer)
+                    isApproaching = dot > 0.1 or sd.speed < 0.5 -- approaching or idle nearby
+                    
+                    sd.prevPos = entPos
+                    sd.prevTime = now
+                else
+                    -- No speed data yet, assume approaching to be safe
+                    isApproaching = true
+                    if sd then
+                        sd.prevPos = tp.Position
+                        sd.prevTime = now
+                    end
+                end
+
+                if isApproaching then
+                    allRed[ent.Name] = dist
+                    if dist < closestRedDist then
+                        closestRedName = ent.Name
+                        closestRedDist = dist
+                        closestRedSpeed = speedTxt
+                    end
                 end
             end
-        end
-    end
 
     if closestRedName then
         showAlert(closestRedName, closestRedDist, allRed, closestRedSpeed)
