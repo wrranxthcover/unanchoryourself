@@ -14,11 +14,9 @@ end
 
 -- ============================================
 -- PATTERN: 1-3 letters, dash, 1-2000
--- A-1, AB-50, ABC-1000, Z-2000
 -- ============================================
 
 local function matchesEntityPattern(name)
-    -- Must be: letters (1-3) + dash + number (1-2000)
     local letters, num = name:match("^([A-Za-z][A-Za-z]?[A-Za-z]?)%-(%d+)$")
     if not letters or not num then return false end
     local n = tonumber(num)
@@ -33,7 +31,6 @@ local function getEntityLetters(name)
     return name:match("^([A-Za-z]+)%-") or ""
 end
 
--- Color from letters
 local colorCache = {}
 local function getEntityColor(name)
     if colorCache[name] then return colorCache[name] end
@@ -89,8 +86,8 @@ ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.Parent = LocalPlayer.PlayerGui
 
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 280, 0, 380)
-MainFrame.Position = UDim2.new(0, 14, 0.5, -190)
+MainFrame.Size = UDim2.new(0, 300, 0, 420)
+MainFrame.Position = UDim2.new(0, 14, 0.5, -210)
 MainFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 20)
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
@@ -103,7 +100,7 @@ MS.Color = Color3.fromRGB(0, 140, 255)
 MS.Thickness = 1.5
 MS.Parent = MainFrame
 
--- Title
+-- Title Bar
 local TBar = Instance.new("Frame")
 TBar.Size = UDim2.new(1, 0, 0, 36)
 TBar.BackgroundColor3 = Color3.fromRGB(0, 80, 160)
@@ -182,7 +179,7 @@ CL.Font = Enum.Font.GothamSemibold
 CL.TextXAlignment = Enum.TextXAlignment.Left
 CL.Parent = SF
 
--- Pattern
+-- Pattern label
 local PL = Instance.new("TextLabel")
 PL.Size = UDim2.new(1, -12, 0, 14)
 PL.Position = UDim2.new(0, 6, 0, 88)
@@ -194,14 +191,17 @@ PL.Font = Enum.Font.Gotham
 PL.TextXAlignment = Enum.TextXAlignment.Left
 PL.Parent = MainFrame
 
--- Toggles
+-- ============================================
+-- TOGGLE BUTTONS ROW 1: ESP | Names | 👁 View
+-- ============================================
+
 local TF = Instance.new("Frame")
 TF.Size = UDim2.new(1, -12, 0, 28)
 TF.Position = UDim2.new(0, 6, 0, 105)
 TF.BackgroundTransparency = 1
 TF.Parent = MainFrame
 
-local function mkBtn(txt, col, xP, xS)
+local function mkBtn(parent, txt, col, xP, xS)
     local b = Instance.new("TextButton")
     b.Size = UDim2.new(xS, -2, 1, 0)
     b.Position = UDim2.new(xP, 1, 0, 0)
@@ -211,19 +211,35 @@ local function mkBtn(txt, col, xP, xS)
     b.TextSize = 10
     b.Font = Enum.Font.GothamBold
     b.BorderSizePixel = 0
-    b.Parent = TF
+    b.Parent = parent
     Instance.new("UICorner", b).CornerRadius = UDim.new(0, 4)
     return b
 end
 
-local EspBtn  = mkBtn("ESP: ON",   Color3.fromRGB(0, 130, 60),  0,     0.333)
-local NameBtn = mkBtn("Names: ON", Color3.fromRGB(0, 95, 160),  0.333, 0.333)
-local ViewBtn = mkBtn("👁 View",   Color3.fromRGB(70, 0, 150),  0.666, 0.334)
+local EspBtn  = mkBtn(TF, "ESP: ON",   Color3.fromRGB(0, 130, 60),  0,     0.333)
+local NameBtn = mkBtn(TF, "Names: ON", Color3.fromRGB(0, 95, 160),  0.333, 0.333)
+local ViewBtn = mkBtn(TF, "👁 View",   Color3.fromRGB(70, 0, 150),  0.666, 0.334)
 
--- View Panel
+-- ============================================
+-- TOGGLE BUTTONS ROW 2: View Entity (full width)
+-- ============================================
+
+local TF2 = Instance.new("Frame")
+TF2.Size = UDim2.new(1, -12, 0, 26)
+TF2.Position = UDim2.new(0, 6, 0, 136)
+TF2.BackgroundTransparency = 1
+TF2.Parent = MainFrame
+
+local VEBtn = mkBtn(TF2, "🎥 View Entity: OFF", Color3.fromRGB(30, 60, 30), 0, 1)
+
+-- ============================================
+-- STATUS PANELS
+-- ============================================
+
+-- View HUD panel
 local VP = Instance.new("Frame")
 VP.Size = UDim2.new(1, -12, 0, 26)
-VP.Position = UDim2.new(0, 6, 0, 137)
+VP.Position = UDim2.new(0, 6, 0, 166)
 VP.BackgroundColor3 = Color3.fromRGB(22, 0, 50)
 VP.BorderSizePixel = 0
 VP.Visible = false
@@ -259,17 +275,56 @@ SVBtn.BorderSizePixel = 0
 SVBtn.Parent = VP
 Instance.new("UICorner", SVBtn).CornerRadius = UDim.new(0, 3)
 
+-- View Entity panel
+local VEP = Instance.new("Frame")
+VEP.Size = UDim2.new(1, -12, 0, 26)
+VEP.Position = UDim2.new(0, 6, 0, 196)
+VEP.BackgroundColor3 = Color3.fromRGB(0, 30, 10)
+VEP.BorderSizePixel = 0
+VEP.Visible = false
+VEP.Parent = MainFrame
+Instance.new("UICorner", VEP).CornerRadius = UDim.new(0, 4)
+
+local VESt = Instance.new("UIStroke")
+VESt.Color = Color3.fromRGB(0, 200, 80)
+VESt.Thickness = 1.2
+VESt.Parent = VEP
+
+local VEL = Instance.new("TextLabel")
+VEL.Size = UDim2.new(0.6, 0, 1, 0)
+VEL.Position = UDim2.new(0, 5, 0, 0)
+VEL.BackgroundTransparency = 1
+VEL.Text = "🎥 None"
+VEL.TextColor3 = Color3.fromRGB(80, 255, 140)
+VEL.TextSize = 10
+VEL.Font = Enum.Font.GothamSemibold
+VEL.TextXAlignment = Enum.TextXAlignment.Left
+VEL.TextTruncate = Enum.TextTruncate.AtEnd
+VEL.Parent = VEP
+
+local SVEBtn = Instance.new("TextButton")
+SVEBtn.Size = UDim2.new(0, 50, 0, 16)
+SVEBtn.Position = UDim2.new(1, -55, 0.5, -8)
+SVEBtn.BackgroundColor3 = Color3.fromRGB(145, 20, 20)
+SVEBtn.Text = "✕ Stop"
+SVEBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+SVEBtn.TextSize = 9
+SVEBtn.Font = Enum.Font.GothamBold
+SVEBtn.BorderSizePixel = 0
+SVEBtn.Parent = VEP
+Instance.new("UICorner", SVEBtn).CornerRadius = UDim.new(0, 3)
+
 -- Divider
 local Div = Instance.new("Frame")
 Div.Size = UDim2.new(1, -18, 0, 1)
-Div.Position = UDim2.new(0, 9, 0, 170)
+Div.Position = UDim2.new(0, 9, 0, 228)
 Div.BackgroundColor3 = Color3.fromRGB(38, 38, 60)
 Div.BorderSizePixel = 0
 Div.Parent = MainFrame
 
 local LH = Instance.new("TextLabel")
 LH.Size = UDim2.new(1, -12, 0, 14)
-LH.Position = UDim2.new(0, 6, 0, 174)
+LH.Position = UDim2.new(0, 6, 0, 232)
 LH.BackgroundTransparency = 1
 LH.Text = "⚡ Live:"
 LH.TextColor3 = Color3.fromRGB(120, 120, 170)
@@ -280,8 +335,8 @@ LH.Parent = MainFrame
 
 -- Scroll
 local Scroll = Instance.new("ScrollingFrame")
-Scroll.Size = UDim2.new(1, -12, 1, -194)
-Scroll.Position = UDim2.new(0, 6, 0, 190)
+Scroll.Size = UDim2.new(1, -12, 1, -252)
+Scroll.Position = UDim2.new(0, 6, 0, 248)
 Scroll.BackgroundColor3 = Color3.fromRGB(12, 12, 24)
 Scroll.BorderSizePixel = 0
 Scroll.ScrollBarThickness = 2
@@ -312,7 +367,7 @@ EL.TextSize = 9
 EL.Font = Enum.Font.GothamSemibold
 EL.Parent = Scroll
 
--- Pulse
+-- Pulse bar
 local PBar = Instance.new("Frame")
 PBar.Size = UDim2.new(0.16, 0, 0, 2)
 PBar.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
@@ -323,22 +378,31 @@ PBar.Parent = MainFrame
 -- STATE
 -- ============================================
 
-local active = true
-local espOn = true
-local namesOn = true
-local viewing = false
-local viewTarget = nil
-local viewConn = nil
-local tracked = {}
+local active      = true
+local espOn       = true
+local namesOn     = true
+
+-- View HUD state (free movement, HUD overlay)
+local viewing     = false
+local viewTarget  = nil
+local viewConn    = nil
+local viewIndicator = nil
+
+-- View Entity state (camera orbits entity)
+local viewingEntity    = false
+local viewEntityTarget = nil
+local viewEntityConn   = nil
+local savedCameraType  = nil
+
+-- Shared
+local tracked  = {}
 local entCount = 0
 local DIST_SKIP = 10
-local dFrame = 0
+local dFrame   = 0
 
 -- ============================================
--- VIEW MODE (free movement HUD)
+-- STOP VIEW HUD
 -- ============================================
-
-local viewIndicator = nil
 
 local function stopView()
     viewing = false
@@ -357,6 +421,168 @@ local function stopView()
     viewTarget = nil
 end
 
+-- ============================================
+-- STOP VIEW ENTITY
+-- ============================================
+
+local function stopViewEntity()
+    viewingEntity = false
+    if viewEntityConn then viewEntityConn:Disconnect(); viewEntityConn = nil end
+
+    -- Restore camera
+    if savedCameraType then
+        Camera.CameraType = savedCameraType
+        savedCameraType = nil
+    else
+        Camera.CameraType = Enum.CameraType.Custom
+    end
+
+    VEP.Visible = false
+    VEBtn.Text = "🎥 View Entity: OFF"
+    VEBtn.BackgroundColor3 = Color3.fromRGB(30, 60, 30)
+
+    for _, d in pairs(tracked) do
+        local b = d.entry and d.entry:FindFirstChild("VEB")
+        if b then b.Text = "🎥"; b.BackgroundColor3 = Color3.fromRGB(20, 80, 40) end
+    end
+    viewEntityTarget = nil
+end
+
+-- ============================================
+-- START VIEW ENTITY
+-- Camera smoothly orbits/looks at entity
+-- Mouse left/right rotates orbit angle
+-- Mouse up/down changes elevation
+-- ============================================
+
+local function startViewEntity(entity)
+    if viewingEntity then stopViewEntity() end
+
+    local data = tracked[entity]
+    if not data then return end
+
+    local root = data.targetPart
+    if not root or not root.Parent then
+        root = entity:FindFirstChildWhichIsA("BasePart")
+        data.targetPart = root
+    end
+    if not root then return end
+
+    -- Stop HUD view if active
+    if viewing then stopView() end
+
+    viewingEntity = true
+    viewEntityTarget = entity
+
+    VEP.Visible = true
+    VEL.Text = "🎥 " .. entity.Name
+    VEBtn.Text = "🎥 View Entity: ON"
+    VEBtn.BackgroundColor3 = Color3.fromRGB(0, 140, 50)
+
+    -- Save and override camera
+    savedCameraType = Camera.CameraType
+    Camera.CameraType = Enum.CameraType.Scriptable
+
+    -- Orbit state
+    local orbitAngleH = 0   -- horizontal angle (radians)
+    local orbitAngleV = 0.3 -- vertical angle (radians), slight elevation
+    local orbitDist   = 20  -- distance from entity
+    local lastMousePos = nil
+    local sensitivity = 0.005
+
+    -- Distance from player to entity for initial orbit dist
+    local char = LocalPlayer.Character
+    local myR = char and char:FindFirstChild("HumanoidRootPart")
+    if myR then
+        orbitDist = math.clamp((myR.Position - root.Position).Magnitude * 0.8, 8, 80)
+    end
+
+    -- Clamp vertical angle
+    local MIN_V = math.rad(-70)
+    local MAX_V = math.rad(70)
+
+    -- Mouse input tracking
+    local UIS = game:GetService("UserInputService")
+    local dragging = false
+
+    local mouseDownConn = UIS.InputBegan:Connect(function(inp)
+        if inp.UserInputType == Enum.UserInputType.MouseButton2 then
+            dragging = true
+            lastMousePos = UIS:GetMouseLocation()
+        end
+    end)
+
+    local mouseUpConn = UIS.InputEnded:Connect(function(inp)
+        if inp.UserInputType == Enum.UserInputType.MouseButton2 then
+            dragging = false
+            lastMousePos = nil
+        end
+    end)
+
+    -- Scroll to zoom
+    local scrollConn = UIS.InputChanged:Connect(function(inp)
+        if inp.UserInputType == Enum.UserInputType.MouseWheel then
+            orbitDist = math.clamp(orbitDist - inp.Position.Z * 3, 4, 120)
+        end
+    end)
+
+    viewEntityConn = RunService.Heartbeat:Connect(function()
+        if not viewingEntity or not entity or not entity.Parent then
+            mouseDownConn:Disconnect()
+            mouseUpConn:Disconnect()
+            scrollConn:Disconnect()
+            stopViewEntity()
+            return
+        end
+
+        if not root or not root.Parent then
+            root = entity:FindFirstChildWhichIsA("BasePart")
+            data.targetPart = root
+            if not root then
+                mouseDownConn:Disconnect()
+                mouseUpConn:Disconnect()
+                scrollConn:Disconnect()
+                stopViewEntity()
+                return
+            end
+        end
+
+        -- Mouse drag to orbit
+        if dragging and lastMousePos then
+            local curPos = UIS:GetMouseLocation()
+            local delta = curPos - lastMousePos
+            orbitAngleH = orbitAngleH - delta.X * sensitivity
+            orbitAngleV = math.clamp(orbitAngleV - delta.Y * sensitivity, MIN_V, MAX_V)
+            lastMousePos = curPos
+        end
+
+        -- Calculate camera position orbiting entity
+        local targetPos = root.Position
+        local camOffset = Vector3.new(
+            math.cos(orbitAngleV) * math.sin(orbitAngleH),
+            math.sin(orbitAngleV),
+            math.cos(orbitAngleV) * math.cos(orbitAngleH)
+        ) * orbitDist
+
+        local camPos = targetPos + camOffset
+
+        -- Smooth camera
+        Camera.CFrame = CFrame.lookAt(camPos, targetPos)
+
+        -- Update panel label distance
+        local char2 = LocalPlayer.Character
+        local myR2 = char2 and char2:FindFirstChild("HumanoidRootPart")
+        if myR2 then
+            local dist = math.floor((myR2.Position - root.Position).Magnitude)
+            VEL.Text = "🎥 " .. entity.Name .. " | " .. dist .. "s"
+        end
+    end)
+end
+
+-- ============================================
+-- START VIEW HUD (free movement overlay)
+-- ============================================
+
 local function startView(entity)
     if viewing then stopView() end
 
@@ -370,6 +596,9 @@ local function startView(entity)
     end
     if not root then return end
 
+    -- Stop View Entity if active
+    if viewingEntity then stopViewEntity() end
+
     viewing = true
     viewTarget = entity
     VP.Visible = true
@@ -377,7 +606,6 @@ local function startView(entity)
     ViewBtn.Text = "👁 ..."
     ViewBtn.BackgroundColor3 = Color3.fromRGB(115, 0, 235)
 
-    -- Create floating indicator
     local indicator = Instance.new("ScreenGui")
     indicator.Name = "ViewIndicator"
     indicator.ResetOnSpawn = false
@@ -467,6 +695,7 @@ local function untrack(entity)
     CL.TextColor3 = entCount > 0 and Color3.fromRGB(255, 50, 50) or Color3.fromRGB(255, 190, 40)
     EL.Visible = entCount == 0
     if viewTarget == entity then stopView() end
+    if viewEntityTarget == entity then stopViewEntity() end
 end
 
 local function track(entity)
@@ -487,7 +716,7 @@ local function track(entity)
     hl.Parent = entity
     d.highlight = hl
 
-    -- Root
+    -- Root part
     local root = entity:FindFirstChild("HumanoidRootPart")
         or entity:FindFirstChild("Head")
         or entity:FindFirstChild("Torso")
@@ -534,7 +763,7 @@ local function track(entity)
         d.distLabel = dt
     end
 
-    -- List entry
+    -- Sorting
     local num = getEntityNumber(entity.Name)
     local letters = getEntityLetters(entity.Name):upper()
     local sortVal = 0
@@ -543,6 +772,7 @@ local function track(entity)
     end
     sortVal = sortVal * 2001 + num
 
+    -- List entry
     local entry = Instance.new("Frame")
     entry.Size = UDim2.new(1, -4, 0, 30)
     entry.BackgroundColor3 = Color3.fromRGB(16, 16, 34)
@@ -566,7 +796,7 @@ local function track(entity)
     Instance.new("UICorner", dot).CornerRadius = UDim.new(1, 0)
 
     local nl = Instance.new("TextLabel")
-    nl.Size = UDim2.new(0.5, -14, 0.5, 0)
+    nl.Size = UDim2.new(0.42, -14, 0.5, 0)
     nl.Position = UDim2.new(0, 14, 0, 1)
     nl.BackgroundTransparency = 1
     nl.Text = entity.Name
@@ -579,7 +809,7 @@ local function track(entity)
 
     local edl = Instance.new("TextLabel")
     edl.Name = "EDL"
-    edl.Size = UDim2.new(0.5, -14, 0.5, 0)
+    edl.Size = UDim2.new(0.42, -14, 0.5, 0)
     edl.Position = UDim2.new(0, 14, 0.5, -1)
     edl.BackgroundTransparency = 1
     edl.Text = "..."
@@ -589,10 +819,11 @@ local function track(entity)
     edl.TextXAlignment = Enum.TextXAlignment.Left
     edl.Parent = entry
 
+    -- 👁 HUD View button
     local vb = Instance.new("TextButton")
     vb.Name = "VB"
-    vb.Size = UDim2.new(0, 28, 0, 18)
-    vb.Position = UDim2.new(1, -33, 0.5, -9)
+    vb.Size = UDim2.new(0, 26, 0, 18)
+    vb.Position = UDim2.new(1, -62, 0.5, -9)
     vb.BackgroundColor3 = Color3.fromRGB(70, 0, 150)
     vb.Text = "👁"
     vb.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -602,17 +833,47 @@ local function track(entity)
     vb.Parent = entry
     Instance.new("UICorner", vb).CornerRadius = UDim.new(0, 3)
 
+    -- 🎥 View Entity button
+    local veb = Instance.new("TextButton")
+    veb.Name = "VEB"
+    veb.Size = UDim2.new(0, 26, 0, 18)
+    veb.Position = UDim2.new(1, -33, 0.5, -9)
+    veb.BackgroundColor3 = Color3.fromRGB(20, 80, 40)
+    veb.Text = "🎥"
+    veb.TextColor3 = Color3.fromRGB(255, 255, 255)
+    veb.TextSize = 10
+    veb.Font = Enum.Font.GothamBold
+    veb.BorderSizePixel = 0
+    veb.Parent = entry
+    Instance.new("UICorner", veb).CornerRadius = UDim.new(0, 3)
+
+    -- VB click: HUD overlay
     vb.MouseButton1Click:Connect(function()
         if viewTarget == entity then
             stopView()
         else
             for _, dd in pairs(tracked) do
-                local bb = dd.entry and dd.entry:FindFirstChild("VB")
-                if bb then bb.Text = "👁"; bb.BackgroundColor3 = Color3.fromRGB(70, 0, 150) end
+                local bb2 = dd.entry and dd.entry:FindFirstChild("VB")
+                if bb2 then bb2.Text = "👁"; bb2.BackgroundColor3 = Color3.fromRGB(70, 0, 150) end
             end
             startView(entity)
             vb.Text = "✔"
             vb.BackgroundColor3 = Color3.fromRGB(115, 0, 235)
+        end
+    end)
+
+    -- VEB click: Camera orbit
+    veb.MouseButton1Click:Connect(function()
+        if viewEntityTarget == entity then
+            stopViewEntity()
+        else
+            for _, dd in pairs(tracked) do
+                local bb2 = dd.entry and dd.entry:FindFirstChild("VEB")
+                if bb2 then bb2.Text = "🎥"; bb2.BackgroundColor3 = Color3.fromRGB(20, 80, 40) end
+            end
+            startViewEntity(entity)
+            veb.Text = "✔"
+            veb.BackgroundColor3 = Color3.fromRGB(0, 160, 60)
         end
     end)
 
@@ -658,7 +919,7 @@ workspace.DescendantRemoving:Connect(function(obj)
 end)
 
 -- ============================================
--- DISTANCE UPDATE (throttled)
+-- DISTANCE UPDATE
 -- ============================================
 
 RunService.Heartbeat:Connect(function()
@@ -691,7 +952,7 @@ RunService.Heartbeat:Connect(function()
 end)
 
 -- ============================================
--- BUTTONS
+-- TOP BUTTON LOGIC
 -- ============================================
 
 EspBtn.MouseButton1Click:Connect(function()
@@ -712,6 +973,7 @@ NameBtn.MouseButton1Click:Connect(function()
     end
 end)
 
+-- 👁 View: nearest entity HUD
 ViewBtn.MouseButton1Click:Connect(function()
     if viewing then stopView(); return end
     local char = LocalPlayer.Character
@@ -746,11 +1008,48 @@ ViewBtn.MouseButton1Click:Connect(function()
     end
 end)
 
+-- 🎥 View Entity: nearest entity camera orbit
+VEBtn.MouseButton1Click:Connect(function()
+    if viewingEntity then stopViewEntity(); return end
+    local char = LocalPlayer.Character
+    local myR = char and char:FindFirstChild("HumanoidRootPart")
+    if not myR then return end
+    local near, nDist = nil, math.huge
+    for ent, d in pairs(tracked) do
+        local tp = d.targetPart
+        if tp and tp.Parent then
+            local dist = (myR.Position - tp.Position).Magnitude
+            if dist < nDist then near = ent; nDist = dist end
+        end
+    end
+    if near then
+        for _, dd in pairs(tracked) do
+            local bb = dd.entry and dd.entry:FindFirstChild("VEB")
+            if bb then bb.Text = "🎥"; bb.BackgroundColor3 = Color3.fromRGB(20, 80, 40) end
+        end
+        startViewEntity(near)
+        local nd = tracked[near]
+        local bb = nd and nd.entry and nd.entry:FindFirstChild("VEB")
+        if bb then bb.Text = "✔"; bb.BackgroundColor3 = Color3.fromRGB(0, 160, 60) end
+    else
+        VEBtn.Text = "None!"
+        VEBtn.BackgroundColor3 = Color3.fromRGB(130, 20, 20)
+        task.delay(1, function()
+            if not viewingEntity then
+                VEBtn.Text = "🎥 View Entity: OFF"
+                VEBtn.BackgroundColor3 = Color3.fromRGB(30, 60, 30)
+            end
+        end)
+    end
+end)
+
 SVBtn.MouseButton1Click:Connect(stopView)
+SVEBtn.MouseButton1Click:Connect(stopViewEntity)
 
 XBtn.MouseButton1Click:Connect(function()
     active = false
     stopView()
+    stopViewEntity()
     for ent in pairs(tracked) do untrack(ent) end
     ScreenGui:Destroy()
 end)
@@ -766,7 +1065,12 @@ task.spawn(function()
         if pP >= 0.84 then pD = -1 elseif pP <= 0 then pD = 1 end
         PBar.Position = UDim2.new(pP, 0, 1, -2)
         SIcon.TextTransparency = ((math.sin(tick() * 2) + 1) / 2) * 0.35
-        if viewing then VSt.Transparency = ((math.sin(tick() * 3) + 1) / 2) * 0.3 end
+        if viewingEntity then
+            VESt.Transparency = ((math.sin(tick() * 3) + 1) / 2) * 0.3
+        end
+        if viewing then
+            VSt.Transparency = ((math.sin(tick() * 3) + 1) / 2) * 0.3
+        end
         task.wait(0.066)
     end
 end)
@@ -776,6 +1080,7 @@ end)
 -- ============================================
 
 initialScan()
-print("[Entity Scanner] ✔ Loaded")
-print("[Entity Scanner] Pattern: ABC-1 to ABC-2000")
-print("[Entity Scanner] View = free movement HUD")
+print("[Entity Scanner] Loaded")
+print("[Entity Scanner] 👁 View = HUD overlay, free movement")
+print("[Entity Scanner] 🎥 View Entity = camera orbits entity")
+print("[Entity Scanner] Right-click drag = rotate | Scroll = zoom")
