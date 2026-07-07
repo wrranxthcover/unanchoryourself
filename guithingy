@@ -1,7 +1,7 @@
 -- Entity Scanner - Rooms: Es-stablished
 -- Pattern: 1-3 chars (ï/letters mix) + dash + 1-2000
 -- Examples: ï-1, ïï-50, ïBï-100, GAï-1000, RXï-500
-
+-- w ai
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
