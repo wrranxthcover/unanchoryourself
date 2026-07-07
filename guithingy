@@ -1,7 +1,7 @@
 -- Entity Scanner - Rooms: Es-stablished
 -- Pattern: 1-3 chars (ï/letters mix) + dash + 1-2000
--- Examples: ï-1, ïï-50, ïBï-100, GAï-1000, RXï-500
--- w ais
+-- View Entity = auto camera follow, no click needed
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -13,29 +13,20 @@ if LocalPlayer.PlayerGui:FindFirstChild("EntityScannerGui") then
 end
 
 -- ============================================
--- PATTERN: 1-3 chars (ï + A-Z mix), dash, 1-2000
--- ï-1, ïï-50, ïBï-100, Eïï-200, RXï-500, GAï-1000
+-- PATTERN
 -- ============================================
 
 local function matchesEntityPattern(name)
     local dashPos = name:find("%-(%d+)$")
     if not dashPos then return false end
-
     local prefix = name:sub(1, dashPos - 1)
     local num = tonumber(name:sub(dashPos + 1))
-
     if not num or num < 1 or num > 2000 then return false end
-
-    -- Replace ï (UTF-8: 0xC3 0xAF) and Ï (UTF-8: 0xC3 0x8F) with single char
     local cleaned = prefix:gsub("\195\175", "X"):gsub("\195\143", "X")
-
     if #cleaned < 1 or #cleaned > 3 then return false end
     if not cleaned:match("^[A-Za-zX]+$") then return false end
-
-    -- Original must only contain A-Z, a-z, or ï/Ï bytes
     local stripped = prefix:gsub("\195\175", ""):gsub("\195\143", "")
     if not stripped:match("^[A-Za-z]*$") then return false end
-
     return true
 end
 
@@ -80,14 +71,9 @@ Players.PlayerRemoving:Connect(function(p)
     if p.Character then playerChars[p.Character] = nil end
 end)
 
--- ============================================
--- ENTITY CHECK - ANY INSTANCE TYPE
--- ============================================
-
 local function isEntity(obj)
     if playerChars[obj] then return false end
-    if not matchesEntityPattern(obj.Name) then return false end
-    return true
+    return matchesEntityPattern(obj.Name)
 end
 
 local function getEntityPart(obj)
@@ -122,10 +108,10 @@ MainFrame.Draggable = true
 MainFrame.Parent = ScreenGui
 Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 8)
 
-local MS = Instance.new("UIStroke")
-MS.Color = Color3.fromRGB(0, 140, 255)
-MS.Thickness = 1.5
-MS.Parent = MainFrame
+local MStroke = Instance.new("UIStroke")
+MStroke.Color = Color3.fromRGB(0, 140, 255)
+MStroke.Thickness = 1.5
+MStroke.Parent = MainFrame
 
 -- Title Bar
 local TBar = Instance.new("Frame")
@@ -206,7 +192,6 @@ CL.Font = Enum.Font.GothamSemibold
 CL.TextXAlignment = Enum.TextXAlignment.Left
 CL.Parent = SF
 
--- Debug label
 local DLabel = Instance.new("TextLabel")
 DLabel.Size = UDim2.new(1, -12, 0, 14)
 DLabel.Position = UDim2.new(0, 6, 0, 88)
@@ -219,7 +204,7 @@ DLabel.TextXAlignment = Enum.TextXAlignment.Left
 DLabel.Parent = MainFrame
 
 -- ============================================
--- ROW 1: ESP | Names | View
+-- ROW 1: ESP | Names | View HUD
 -- ============================================
 
 local TF = Instance.new("Frame")
@@ -394,7 +379,6 @@ EL.TextSize = 9
 EL.Font = Enum.Font.GothamSemibold
 EL.Parent = Scroll
 
--- Pulse bar
 local PBar = Instance.new("Frame")
 PBar.Size = UDim2.new(0.16, 0, 0, 2)
 PBar.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
@@ -417,7 +401,6 @@ local viewIndicator = nil
 local viewingEntity = false
 local viewEntityTarget = nil
 local viewEntityConn = nil
-local viewEntityInputConns = {}
 local savedCameraType = nil
 
 local tracked = {}
@@ -432,7 +415,6 @@ local dFrame = 0
 local function runDebug()
     print("========== ENTITY SCANNER DEBUG ==========")
     local found, nearMatch = 0, 0
-
     for _, obj in ipairs(workspace:GetDescendants()) do
         if matchesEntityPattern(obj.Name) then
             found += 1
@@ -440,20 +422,15 @@ local function runDebug()
         elseif obj.Name:match("%-%d") then
             nearMatch += 1
             if nearMatch <= 30 then
-                -- Print raw bytes for debugging
                 local bytes = {}
                 for i = 1, #obj.Name do
                     table.insert(bytes, string.format("%02X", string.byte(obj.Name, i)))
                 end
-                print(string.format("  ⚠ NEAR: '%s' [%s] Bytes:[%s] Path:%s",
-                    obj.Name, obj.ClassName, table.concat(bytes, " "), obj:GetFullName()))
+                print(string.format("  ⚠ NEAR: '%s' [%s] Bytes:[%s]", obj.Name, obj.ClassName, table.concat(bytes, " ")))
             end
         end
     end
-
     print(string.format("Found: %d exact | %d near-matches", found, nearMatch))
-    print("===========================================")
-
     DLabel.Text = "🔎 Found: " .. found .. " exact | " .. nearMatch .. " near"
     DLabel.TextColor3 = found > 0 and Color3.fromRGB(0, 255, 100) or Color3.fromRGB(255, 80, 80)
 end
@@ -486,16 +463,21 @@ end
 local function stopViewEntity()
     viewingEntity = false
     if viewEntityConn then viewEntityConn:Disconnect(); viewEntityConn = nil end
-    for _, conn in ipairs(viewEntityInputConns) do
-        pcall(function() conn:Disconnect() end)
-    end
-    viewEntityInputConns = {}
 
     if savedCameraType then
         Camera.CameraType = savedCameraType
         savedCameraType = nil
     else
         Camera.CameraType = Enum.CameraType.Custom
+    end
+
+    -- Reset camera to player
+    local char = LocalPlayer.Character
+    if char then
+        local head = char:FindFirstChild("Head")
+        if head then
+            Camera.CFrame = CFrame.new(head.Position + Vector3.new(0, 2, 8), head.Position)
+        end
     end
 
     VEP.Visible = false
@@ -510,7 +492,9 @@ local function stopViewEntity()
 end
 
 -- ============================================
--- START VIEW ENTITY (camera orbit)
+-- START VIEW ENTITY
+-- Auto-follows entity, camera stays close
+-- NO right-click needed, fully automatic
 -- ============================================
 
 local function startViewEntity(entity)
@@ -539,47 +523,13 @@ local function startViewEntity(entity)
     savedCameraType = Camera.CameraType
     Camera.CameraType = Enum.CameraType.Scriptable
 
-    local orbitAngleH = 0
-    local orbitAngleV = 0.3
-    local orbitDist = 20
-    local lastMousePos = nil
-    local sensitivity = 0.005
-    local dragging = false
+    -- Auto orbit angle
+    local angle = 0
+    local CLOSE_DIST = 12  -- how close the camera stays
+    local HEIGHT = 5       -- camera height above entity
+    local ORBIT_SPEED = 0.3 -- slow auto-rotate
 
-    local char = LocalPlayer.Character
-    local myR = char and char:FindFirstChild("HumanoidRootPart")
-    if myR then
-        orbitDist = math.clamp((myR.Position - root.Position).Magnitude * 0.8, 8, 80)
-    end
-
-    local MIN_V = math.rad(-70)
-    local MAX_V = math.rad(70)
-
-    local mouseDownConn = UserInputService.InputBegan:Connect(function(inp, gpe)
-        if gpe then return end
-        if inp.UserInputType == Enum.UserInputType.MouseButton2 then
-            dragging = true
-            lastMousePos = UserInputService:GetMouseLocation()
-        end
-    end)
-    table.insert(viewEntityInputConns, mouseDownConn)
-
-    local mouseUpConn = UserInputService.InputEnded:Connect(function(inp)
-        if inp.UserInputType == Enum.UserInputType.MouseButton2 then
-            dragging = false
-            lastMousePos = nil
-        end
-    end)
-    table.insert(viewEntityInputConns, mouseUpConn)
-
-    local scrollConn = UserInputService.InputChanged:Connect(function(inp)
-        if inp.UserInputType == Enum.UserInputType.MouseWheel then
-            orbitDist = math.clamp(orbitDist - inp.Position.Z * 3, 4, 120)
-        end
-    end)
-    table.insert(viewEntityInputConns, scrollConn)
-
-    viewEntityConn = RunService.Heartbeat:Connect(function()
+    viewEntityConn = RunService.Heartbeat:Connect(function(dt)
         if not viewingEntity or not entity or not entity.Parent then
             stopViewEntity()
             return
@@ -591,27 +541,27 @@ local function startViewEntity(entity)
             if not root then stopViewEntity(); return end
         end
 
-        if dragging and lastMousePos then
-            local curPos = UserInputService:GetMouseLocation()
-            local delta = curPos - lastMousePos
-            orbitAngleH = orbitAngleH - delta.X * sensitivity
-            orbitAngleV = math.clamp(orbitAngleV - delta.Y * sensitivity, MIN_V, MAX_V)
-            lastMousePos = curPos
-        end
+        -- Auto rotate around entity
+        angle = angle + dt * ORBIT_SPEED
 
         local targetPos = root.Position
-        local camOffset = Vector3.new(
-            math.cos(orbitAngleV) * math.sin(orbitAngleH),
-            math.sin(orbitAngleV),
-            math.cos(orbitAngleV) * math.cos(orbitAngleH)
-        ) * orbitDist
+        local camPos = targetPos + Vector3.new(
+            math.sin(angle) * CLOSE_DIST,
+            HEIGHT,
+            math.cos(angle) * CLOSE_DIST
+        )
 
-        Camera.CFrame = CFrame.lookAt(targetPos + camOffset, targetPos)
+        -- Smooth camera
+        Camera.CFrame = Camera.CFrame:Lerp(
+            CFrame.lookAt(camPos, targetPos),
+            0.08
+        )
 
-        local char2 = LocalPlayer.Character
-        local myR2 = char2 and char2:FindFirstChild("HumanoidRootPart")
-        if myR2 then
-            local dist = math.floor((myR2.Position - root.Position).Magnitude)
+        -- Update distance label
+        local char = LocalPlayer.Character
+        local myR = char and char:FindFirstChild("HumanoidRootPart")
+        if myR then
+            local dist = math.floor((myR.Position - root.Position).Magnitude)
             VEL.Text = "🎥 " .. entity.Name .. " | " .. dist .. "s"
         end
     end)
@@ -743,7 +693,6 @@ local function track(entity)
     local color = getEntityColor(entity.Name)
     local d = {}
 
-    -- Highlight
     local canHighlight = entity:IsA("Model") or entity:IsA("BasePart")
     if canHighlight then
         local hl = Instance.new("Highlight")
@@ -802,11 +751,8 @@ local function track(entity)
         d.distLabel = dt
     end
 
-    if root then
-        setupBillboard(root)
-    end
+    if root then setupBillboard(root) end
 
-    -- Watch for late parts
     if not entity:IsA("BasePart") then
         d.childConn = entity.ChildAdded:Connect(function(child)
             if child:IsA("BasePart") and not d.targetPart then
@@ -828,7 +774,6 @@ local function track(entity)
         end)
     end
 
-    -- Sorting
     local num = getEntityNumber(entity.Name)
     local prefix = getEntityPrefix(entity.Name)
     local sortVal = 0
@@ -837,7 +782,6 @@ local function track(entity)
     end
     sortVal = sortVal + num
 
-    -- List entry
     local entry = Instance.new("Frame")
     entry.Size = UDim2.new(1, -4, 0, 30)
     entry.BackgroundColor3 = Color3.fromRGB(16, 16, 34)
@@ -962,7 +906,7 @@ local function track(entity)
     CL.TextColor3 = Color3.fromRGB(255, 50, 50)
     EL.Visible = false
 
-    print("[Entity Scanner] ✅ Tracked: " .. entity.Name .. " [" .. entity.ClassName .. "] " .. entity:GetFullName())
+    print("[Entity Scanner] ✅ Tracked: " .. entity.Name .. " [" .. entity.ClassName .. "]")
 end
 
 -- ============================================
@@ -982,15 +926,9 @@ end
 workspace.DescendantAdded:Connect(function(obj)
     if not active then return end
 
-    if obj.Name:match("%-%d") then
-        print("[Scanner Live] Added: '" .. obj.Name .. "' [" .. obj.ClassName .. "]")
-    end
-
-    -- Direct match
     if matchesEntityPattern(obj.Name) and not playerChars[obj] then
         task.defer(function()
-            if not obj.Parent then return end
-            if tracked[obj] then return end
+            if not obj.Parent or tracked[obj] then return end
             if obj:IsA("Model") then
                 local tries = 0
                 while tries < 15 do
@@ -1006,7 +944,6 @@ workspace.DescendantAdded:Connect(function(obj)
         end)
     end
 
-    -- BasePart: check parent + grandparent
     if obj:IsA("BasePart") then
         task.defer(function()
             if not obj.Parent then return end
@@ -1021,7 +958,6 @@ workspace.DescendantAdded:Connect(function(obj)
         end)
     end
 
-    -- Container: check children
     if obj:IsA("Model") or obj:IsA("Folder") then
         task.defer(function()
             if not obj.Parent then return end
@@ -1214,5 +1150,5 @@ end)
 
 initialScan()
 runDebug()
-print("[Entity Scanner] Loaded - ï pattern support")
-print("[Entity Scanner] Press Debug to see raw byte data")
+print("[Entity Scanner] Loaded")
+print("[Entity Scanner] 🎥 View Entity = auto orbit, close-up, no click needed")
