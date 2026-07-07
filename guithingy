@@ -5,6 +5,7 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
@@ -192,7 +193,7 @@ PL.TextXAlignment = Enum.TextXAlignment.Left
 PL.Parent = MainFrame
 
 -- ============================================
--- TOGGLE BUTTONS ROW 1: ESP | Names | 👁 View
+-- ROW 1: ESP | Names | View
 -- ============================================
 
 local TF = Instance.new("Frame")
@@ -221,7 +222,7 @@ local NameBtn = mkBtn(TF, "Names: ON", Color3.fromRGB(0, 95, 160),  0.333, 0.333
 local ViewBtn = mkBtn(TF, "👁 View",   Color3.fromRGB(70, 0, 150),  0.666, 0.334)
 
 -- ============================================
--- TOGGLE BUTTONS ROW 2: View Entity (full width)
+-- ROW 2: View Entity
 -- ============================================
 
 local TF2 = Instance.new("Frame")
@@ -233,10 +234,9 @@ TF2.Parent = MainFrame
 local VEBtn = mkBtn(TF2, "🎥 View Entity: OFF", Color3.fromRGB(30, 60, 30), 0, 1)
 
 -- ============================================
--- STATUS PANELS
+-- VIEW HUD PANEL
 -- ============================================
 
--- View HUD panel
 local VP = Instance.new("Frame")
 VP.Size = UDim2.new(1, -12, 0, 26)
 VP.Position = UDim2.new(0, 6, 0, 166)
@@ -275,7 +275,10 @@ SVBtn.BorderSizePixel = 0
 SVBtn.Parent = VP
 Instance.new("UICorner", SVBtn).CornerRadius = UDim.new(0, 3)
 
--- View Entity panel
+-- ============================================
+-- VIEW ENTITY PANEL
+-- ============================================
+
 local VEP = Instance.new("Frame")
 VEP.Size = UDim2.new(1, -12, 0, 26)
 VEP.Position = UDim2.new(0, 6, 0, 196)
@@ -346,16 +349,16 @@ Scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
 Scroll.Parent = MainFrame
 Instance.new("UICorner", Scroll).CornerRadius = UDim.new(0, 4)
 
-local LL = Instance.new("UIListLayout")
-LL.SortOrder = Enum.SortOrder.LayoutOrder
-LL.Padding = UDim.new(0, 2)
-LL.Parent = Scroll
+local ListLayout = Instance.new("UIListLayout")
+ListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+ListLayout.Padding = UDim.new(0, 2)
+ListLayout.Parent = Scroll
 
-local LP = Instance.new("UIPadding")
-LP.PaddingTop = UDim.new(0, 2)
-LP.PaddingLeft = UDim.new(0, 2)
-LP.PaddingRight = UDim.new(0, 2)
-LP.Parent = Scroll
+local ListPad = Instance.new("UIPadding")
+ListPad.PaddingTop = UDim.new(0, 2)
+ListPad.PaddingLeft = UDim.new(0, 2)
+ListPad.PaddingRight = UDim.new(0, 2)
+ListPad.Parent = Scroll
 
 local EL = Instance.new("TextLabel")
 EL.Name = "Empty"
@@ -378,27 +381,27 @@ PBar.Parent = MainFrame
 -- STATE
 -- ============================================
 
-local active      = true
-local espOn       = true
-local namesOn     = true
+local active = true
+local espOn = true
+local namesOn = true
 
--- View HUD state (free movement, HUD overlay)
-local viewing     = false
-local viewTarget  = nil
-local viewConn    = nil
+-- View HUD
+local viewing = false
+local viewTarget = nil
+local viewConn = nil
 local viewIndicator = nil
 
--- View Entity state (camera orbits entity)
-local viewingEntity    = false
+-- View Entity
+local viewingEntity = false
 local viewEntityTarget = nil
-local viewEntityConn   = nil
-local savedCameraType  = nil
+local viewEntityConn = nil
+local viewEntityInputConns = {}
+local savedCameraType = nil
 
--- Shared
-local tracked  = {}
+local tracked = {}
 local entCount = 0
 local DIST_SKIP = 10
-local dFrame   = 0
+local dFrame = 0
 
 -- ============================================
 -- STOP VIEW HUD
@@ -428,8 +431,11 @@ end
 local function stopViewEntity()
     viewingEntity = false
     if viewEntityConn then viewEntityConn:Disconnect(); viewEntityConn = nil end
+    for _, conn in ipairs(viewEntityInputConns) do
+        pcall(function() conn:Disconnect() end)
+    end
+    viewEntityInputConns = {}
 
-    -- Restore camera
     if savedCameraType then
         Camera.CameraType = savedCameraType
         savedCameraType = nil
@@ -449,10 +455,7 @@ local function stopViewEntity()
 end
 
 -- ============================================
--- START VIEW ENTITY
--- Camera smoothly orbits/looks at entity
--- Mouse left/right rotates orbit angle
--- Mouse up/down changes elevation
+-- START VIEW ENTITY (camera orbit)
 -- ============================================
 
 local function startViewEntity(entity)
@@ -468,7 +471,6 @@ local function startViewEntity(entity)
     end
     if not root then return end
 
-    -- Stop HUD view if active
     if viewing then stopView() end
 
     viewingEntity = true
@@ -479,58 +481,51 @@ local function startViewEntity(entity)
     VEBtn.Text = "🎥 View Entity: ON"
     VEBtn.BackgroundColor3 = Color3.fromRGB(0, 140, 50)
 
-    -- Save and override camera
     savedCameraType = Camera.CameraType
     Camera.CameraType = Enum.CameraType.Scriptable
 
-    -- Orbit state
-    local orbitAngleH = 0   -- horizontal angle (radians)
-    local orbitAngleV = 0.3 -- vertical angle (radians), slight elevation
-    local orbitDist   = 20  -- distance from entity
+    local orbitAngleH = 0
+    local orbitAngleV = 0.3
+    local orbitDist = 20
     local lastMousePos = nil
     local sensitivity = 0.005
+    local dragging = false
 
-    -- Distance from player to entity for initial orbit dist
     local char = LocalPlayer.Character
     local myR = char and char:FindFirstChild("HumanoidRootPart")
     if myR then
         orbitDist = math.clamp((myR.Position - root.Position).Magnitude * 0.8, 8, 80)
     end
 
-    -- Clamp vertical angle
     local MIN_V = math.rad(-70)
     local MAX_V = math.rad(70)
 
-    -- Mouse input tracking
-    local UIS = game:GetService("UserInputService")
-    local dragging = false
-
-    local mouseDownConn = UIS.InputBegan:Connect(function(inp)
+    local mouseDownConn = UserInputService.InputBegan:Connect(function(inp, gpe)
+        if gpe then return end
         if inp.UserInputType == Enum.UserInputType.MouseButton2 then
             dragging = true
-            lastMousePos = UIS:GetMouseLocation()
+            lastMousePos = UserInputService:GetMouseLocation()
         end
     end)
+    table.insert(viewEntityInputConns, mouseDownConn)
 
-    local mouseUpConn = UIS.InputEnded:Connect(function(inp)
+    local mouseUpConn = UserInputService.InputEnded:Connect(function(inp)
         if inp.UserInputType == Enum.UserInputType.MouseButton2 then
             dragging = false
             lastMousePos = nil
         end
     end)
+    table.insert(viewEntityInputConns, mouseUpConn)
 
-    -- Scroll to zoom
-    local scrollConn = UIS.InputChanged:Connect(function(inp)
+    local scrollConn = UserInputService.InputChanged:Connect(function(inp)
         if inp.UserInputType == Enum.UserInputType.MouseWheel then
             orbitDist = math.clamp(orbitDist - inp.Position.Z * 3, 4, 120)
         end
     end)
+    table.insert(viewEntityInputConns, scrollConn)
 
     viewEntityConn = RunService.Heartbeat:Connect(function()
         if not viewingEntity or not entity or not entity.Parent then
-            mouseDownConn:Disconnect()
-            mouseUpConn:Disconnect()
-            scrollConn:Disconnect()
             stopViewEntity()
             return
         end
@@ -538,25 +533,17 @@ local function startViewEntity(entity)
         if not root or not root.Parent then
             root = entity:FindFirstChildWhichIsA("BasePart")
             data.targetPart = root
-            if not root then
-                mouseDownConn:Disconnect()
-                mouseUpConn:Disconnect()
-                scrollConn:Disconnect()
-                stopViewEntity()
-                return
-            end
+            if not root then stopViewEntity(); return end
         end
 
-        -- Mouse drag to orbit
         if dragging and lastMousePos then
-            local curPos = UIS:GetMouseLocation()
+            local curPos = UserInputService:GetMouseLocation()
             local delta = curPos - lastMousePos
             orbitAngleH = orbitAngleH - delta.X * sensitivity
             orbitAngleV = math.clamp(orbitAngleV - delta.Y * sensitivity, MIN_V, MAX_V)
             lastMousePos = curPos
         end
 
-        -- Calculate camera position orbiting entity
         local targetPos = root.Position
         local camOffset = Vector3.new(
             math.cos(orbitAngleV) * math.sin(orbitAngleH),
@@ -564,12 +551,8 @@ local function startViewEntity(entity)
             math.cos(orbitAngleV) * math.cos(orbitAngleH)
         ) * orbitDist
 
-        local camPos = targetPos + camOffset
+        Camera.CFrame = CFrame.lookAt(targetPos + camOffset, targetPos)
 
-        -- Smooth camera
-        Camera.CFrame = CFrame.lookAt(camPos, targetPos)
-
-        -- Update panel label distance
         local char2 = LocalPlayer.Character
         local myR2 = char2 and char2:FindFirstChild("HumanoidRootPart")
         if myR2 then
@@ -596,7 +579,6 @@ local function startView(entity)
     end
     if not root then return end
 
-    -- Stop View Entity if active
     if viewingEntity then stopViewEntity() end
 
     viewing = true
@@ -688,6 +670,7 @@ local function untrack(entity)
     pcall(function() if d.highlight then d.highlight:Destroy() end end)
     pcall(function() if d.billboard then d.billboard:Destroy() end end)
     if d.destroyConn then d.destroyConn:Disconnect() end
+    if d.childConn then d.childConn:Disconnect() end
     pcall(function() if d.entry then d.entry:Destroy() end end)
     tracked[entity] = nil
     entCount = math.max(0, entCount - 1)
@@ -700,6 +683,7 @@ end
 
 local function track(entity)
     if tracked[entity] then return end
+    if not entity.Parent then return end
 
     local color = getEntityColor(entity.Name)
     local d = {}
@@ -724,16 +708,17 @@ local function track(entity)
         or entity:FindFirstChildWhichIsA("BasePart")
     d.targetPart = root
 
-    -- Billboard
-    if root then
+    -- Billboard (create now or when part arrives)
+    local function setupBillboard(part)
+        if d.billboard then return end
         local bb = Instance.new("BillboardGui")
-        bb.Adornee = root
+        bb.Adornee = part
         bb.Size = UDim2.new(0, 120, 0, 38)
         bb.StudsOffset = Vector3.new(0, 3.5, 0)
         bb.AlwaysOnTop = true
         bb.MaxDistance = 600
         bb.Enabled = namesOn
-        bb.Parent = root
+        bb.Parent = part
 
         local nt = Instance.new("TextLabel")
         nt.Size = UDim2.new(1, 0, 0.55, 0)
@@ -762,6 +747,18 @@ local function track(entity)
         d.billboard = bb
         d.distLabel = dt
     end
+
+    if root then
+        setupBillboard(root)
+    end
+
+    -- Watch for parts being added later (late-loading fix)
+    d.childConn = entity.ChildAdded:Connect(function(child)
+        if child:IsA("BasePart") and not d.targetPart then
+            d.targetPart = child
+            setupBillboard(child)
+        end
+    end)
 
     -- Sorting
     local num = getEntityNumber(entity.Name)
@@ -847,7 +844,6 @@ local function track(entity)
     veb.Parent = entry
     Instance.new("UICorner", veb).CornerRadius = UDim.new(0, 3)
 
-    -- VB click: HUD overlay
     vb.MouseButton1Click:Connect(function()
         if viewTarget == entity then
             stopView()
@@ -862,7 +858,6 @@ local function track(entity)
         end
     end)
 
-    -- VEB click: Camera orbit
     veb.MouseButton1Click:Connect(function()
         if viewEntityTarget == entity then
             stopViewEntity()
@@ -902,16 +897,44 @@ local function initialScan()
 end
 
 -- ============================================
--- LIVE DETECTION
+-- LIVE DETECTION (dual trigger)
 -- ============================================
 
 workspace.DescendantAdded:Connect(function(obj)
-    if not active or not obj:IsA("Model") then return end
-    task.defer(function()
-        if obj.Parent and isEntity(obj) and not tracked[obj] then
-            track(obj)
-        end
-    end)
+    if not active then return end
+
+    -- Trigger 1: Model added
+    if obj:IsA("Model") then
+        task.defer(function()
+            if not obj.Parent then return end
+            if isEntity(obj) and not tracked[obj] then
+                -- Wait for parts to load
+                local tries = 0
+                while tries < 15 do
+                    if obj:FindFirstChildWhichIsA("BasePart") then
+                        break
+                    end
+                    tries += 1
+                    task.wait(0.2)
+                    if not obj.Parent then return end
+                end
+                if obj.Parent and isEntity(obj) and not tracked[obj] then
+                    track(obj)
+                end
+            end
+        end)
+    end
+
+    -- Trigger 2: BasePart added (check parent)
+    if obj:IsA("BasePart") then
+        task.defer(function()
+            if not obj.Parent then return end
+            local model = obj.Parent
+            if model:IsA("Model") and isEntity(model) and not tracked[model] then
+                track(model)
+            end
+        end)
+    end
 end)
 
 workspace.DescendantRemoving:Connect(function(obj)
@@ -973,7 +996,6 @@ NameBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- 👁 View: nearest entity HUD
 ViewBtn.MouseButton1Click:Connect(function()
     if viewing then stopView(); return end
     local char = LocalPlayer.Character
@@ -1008,7 +1030,6 @@ ViewBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- 🎥 View Entity: nearest entity camera orbit
 VEBtn.MouseButton1Click:Connect(function()
     if viewingEntity then stopViewEntity(); return end
     local char = LocalPlayer.Character
@@ -1065,12 +1086,8 @@ task.spawn(function()
         if pP >= 0.84 then pD = -1 elseif pP <= 0 then pD = 1 end
         PBar.Position = UDim2.new(pP, 0, 1, -2)
         SIcon.TextTransparency = ((math.sin(tick() * 2) + 1) / 2) * 0.35
-        if viewingEntity then
-            VESt.Transparency = ((math.sin(tick() * 3) + 1) / 2) * 0.3
-        end
-        if viewing then
-            VSt.Transparency = ((math.sin(tick() * 3) + 1) / 2) * 0.3
-        end
+        if viewingEntity then VESt.Transparency = ((math.sin(tick() * 3) + 1) / 2) * 0.3 end
+        if viewing then VSt.Transparency = ((math.sin(tick() * 3) + 1) / 2) * 0.3 end
         task.wait(0.066)
     end
 end)
@@ -1083,4 +1100,4 @@ initialScan()
 print("[Entity Scanner] Loaded")
 print("[Entity Scanner] 👁 View = HUD overlay, free movement")
 print("[Entity Scanner] 🎥 View Entity = camera orbits entity")
-print("[Entity Scanner] Right-click drag = rotate | Scroll = zoom")
+print("[Entity Scanner] Live detection: dual trigger (Model + BasePart)")
