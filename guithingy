@@ -164,7 +164,7 @@ Instance.new("UICorner", spPanel).CornerRadius = UDim.new(0, 6)
 local spSt2 = Instance.new("UIStroke"); spSt2.Color = Color3.fromRGB(200, 140, 0); spSt2.Thickness = 1; spSt2.Parent = spPanel
 
 local spTit = Instance.new("TextLabel"); spTit.Size = UDim2.new(1, 0, 0, 14); spTit.Position = UDim2.new(0, 5, 0, 2)
-spTit.BackgroundTransparency = 1; spTit.Text = "⚡ Block Speed (1-1000)"; spTit.TextColor3 = Color3.fromRGB(255, 200, 80)
+spTit.BackgroundTransparency = 1; spTit.Text = "⚡ Block Speed (-100-10000)"; spTit.TextColor3 = Color3.fromRGB(255, 200, 80)
 spTit.TextSize = 8; spTit.Font = Enum.Font.GothamBold; spTit.TextXAlignment = Enum.TextXAlignment.Left; spTit.Parent = spPanel
 
 local slBG = Instance.new("Frame"); slBG.Size = UDim2.new(0.58, 0, 0, 10); slBG.Position = UDim2.new(0.03, 0, 0, 20)
@@ -199,7 +199,7 @@ for i, info in ipairs(qBtns) do
     qb.MouseButton1Click:Connect(function() selSpeed = math.clamp(selSpeed+info[3], 1, 1000); updateSpUI() end)
 end
 
-local presets = {{" 1 ",1},{"100",100},{"500",500},{"MAX",1000}}
+local presets = {{" -100 ",-100},{"0",0},{"1000",1000},{"MAX",100000}}
 for i, info in ipairs(presets) do
     local pb = Instance.new("TextButton"); pb.Size = UDim2.new(0, 26, 0, 13); pb.Position = UDim2.new(0, 125+(i-1)*30, 0, 38)
     pb.BackgroundColor3 = i==4 and Color3.fromRGB(140,0,0) or Color3.fromRGB(60,60,80)
