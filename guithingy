@@ -1,8 +1,10 @@
--- Entity Scanner GUI
+-- Entity Scanner GUI with VIEW feature
 -- Place in StarterPlayerScripts or execute via executor
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
@@ -10,7 +12,6 @@ local Camera = workspace.CurrentCamera
 -- GUI CREATION
 -- ============================================
 
--- Remove old GUI if exists
 if LocalPlayer.PlayerGui:FindFirstChild("EntityScannerGui") then
     LocalPlayer.PlayerGui:FindFirstChild("EntityScannerGui"):Destroy()
 end
@@ -24,8 +25,8 @@ ScreenGui.Parent = LocalPlayer.PlayerGui
 -- Main Frame
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 320, 0, 400)
-MainFrame.Position = UDim2.new(0, 20, 0.5, -200)
+MainFrame.Size = UDim2.new(0, 340, 0, 440)
+MainFrame.Position = UDim2.new(0, 20, 0.5, -220)
 MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
@@ -54,7 +55,6 @@ local TitleCorner = Instance.new("UICorner")
 TitleCorner.CornerRadius = UDim.new(0, 10)
 TitleCorner.Parent = TitleBar
 
--- Fix bottom corners of title bar
 local TitleFix = Instance.new("Frame")
 TitleFix.Size = UDim2.new(1, 0, 0, 15)
 TitleFix.Position = UDim2.new(0, 0, 1, -15)
@@ -62,7 +62,6 @@ TitleFix.BackgroundColor3 = Color3.fromRGB(0, 120, 200)
 TitleFix.BorderSizePixel = 0
 TitleFix.Parent = TitleBar
 
--- Scanner Icon
 local ScannerIcon = Instance.new("TextLabel")
 ScannerIcon.Size = UDim2.new(0, 35, 0, 35)
 ScannerIcon.Position = UDim2.new(0, 8, 0.5, -17)
@@ -73,7 +72,6 @@ ScannerIcon.TextSize = 24
 ScannerIcon.Font = Enum.Font.GothamBold
 ScannerIcon.Parent = TitleBar
 
--- Title Text
 local TitleLabel = Instance.new("TextLabel")
 TitleLabel.Name = "Title"
 TitleLabel.Size = UDim2.new(1, -90, 1, 0)
@@ -86,7 +84,6 @@ TitleLabel.Font = Enum.Font.GothamBold
 TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
 TitleLabel.Parent = TitleBar
 
--- Close Button
 local CloseButton = Instance.new("TextButton")
 CloseButton.Name = "CloseBtn"
 CloseButton.Size = UDim2.new(0, 30, 0, 30)
@@ -121,7 +118,7 @@ RoomLabel.Name = "RoomLabel"
 RoomLabel.Size = UDim2.new(1, -16, 0, 22)
 RoomLabel.Position = UDim2.new(0, 8, 0, 5)
 RoomLabel.BackgroundTransparency = 1
-RoomLabel.Text = "Rooms: Established ✔"
+RoomLabel.Text = "Rooms: Es-stablished ✔"
 RoomLabel.TextColor3 = Color3.fromRGB(0, 255, 100)
 RoomLabel.TextSize = 15
 RoomLabel.Font = Enum.Font.GothamSemibold
@@ -143,7 +140,7 @@ EntityCountLabel.Parent = StatusFrame
 -- Toggle Buttons Section
 local ToggleFrame = Instance.new("Frame")
 ToggleFrame.Name = "ToggleFrame"
-ToggleFrame.Size = UDim2.new(1, -20, 0, 40)
+ToggleFrame.Size = UDim2.new(1, -20, 0, 38)
 ToggleFrame.Position = UDim2.new(0, 10, 0, 118)
 ToggleFrame.BackgroundTransparency = 1
 ToggleFrame.Parent = MainFrame
@@ -151,11 +148,12 @@ ToggleFrame.Parent = MainFrame
 -- ESP Toggle
 local ESPToggle = Instance.new("TextButton")
 ESPToggle.Name = "ESPToggle"
-ESPToggle.Size = UDim2.new(0.48, 0, 1, 0)
+ESPToggle.Size = UDim2.new(0.31, -2, 1, 0)
+ESPToggle.Position = UDim2.new(0, 0, 0, 0)
 ESPToggle.BackgroundColor3 = Color3.fromRGB(0, 170, 80)
 ESPToggle.Text = "ESP: ON"
 ESPToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
-ESPToggle.TextSize = 14
+ESPToggle.TextSize = 13
 ESPToggle.Font = Enum.Font.GothamBold
 ESPToggle.BorderSizePixel = 0
 ESPToggle.Parent = ToggleFrame
@@ -167,12 +165,12 @@ ESPCorner.Parent = ESPToggle
 -- Names Toggle
 local NamesToggle = Instance.new("TextButton")
 NamesToggle.Name = "NamesToggle"
-NamesToggle.Size = UDim2.new(0.48, 0, 1, 0)
-NamesToggle.Position = UDim2.new(0.52, 0, 0, 0)
+NamesToggle.Size = UDim2.new(0.31, -2, 1, 0)
+NamesToggle.Position = UDim2.new(0.345, 0, 0, 0)
 NamesToggle.BackgroundColor3 = Color3.fromRGB(0, 170, 80)
 NamesToggle.Text = "Names: ON"
 NamesToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
-NamesToggle.TextSize = 14
+NamesToggle.TextSize = 13
 NamesToggle.Font = Enum.Font.GothamBold
 NamesToggle.BorderSizePixel = 0
 NamesToggle.Parent = ToggleFrame
@@ -181,22 +179,87 @@ local NamesCorner = Instance.new("UICorner")
 NamesCorner.CornerRadius = UDim.new(0, 6)
 NamesCorner.Parent = NamesToggle
 
+-- View Toggle
+local ViewModeToggle = Instance.new("TextButton")
+ViewModeToggle.Name = "ViewModeToggle"
+ViewModeToggle.Size = UDim2.new(0.31, -2, 1, 0)
+ViewModeToggle.Position = UDim2.new(0.69, 0, 0, 0)
+ViewModeToggle.BackgroundColor3 = Color3.fromRGB(80, 0, 180)
+ViewModeToggle.Text = "👁 View"
+ViewModeToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+ViewModeToggle.TextSize = 13
+ViewModeToggle.Font = Enum.Font.GothamBold
+ViewModeToggle.BorderSizePixel = 0
+ViewModeToggle.Parent = ToggleFrame
+
+local ViewCorner = Instance.new("UICorner")
+ViewCorner.CornerRadius = UDim.new(0, 6)
+ViewCorner.Parent = ViewModeToggle
+
+-- VIEW MODE PANEL (shows when viewing an entity)
+local ViewPanel = Instance.new("Frame")
+ViewPanel.Name = "ViewPanel"
+ViewPanel.Size = UDim2.new(1, -20, 0, 38)
+ViewPanel.Position = UDim2.new(0, 10, 0, 162)
+ViewPanel.BackgroundColor3 = Color3.fromRGB(40, 0, 80)
+ViewPanel.BorderSizePixel = 0
+ViewPanel.Visible = false
+ViewPanel.Parent = MainFrame
+
+local ViewPanelCorner = Instance.new("UICorner")
+ViewPanelCorner.CornerRadius = UDim.new(0, 6)
+ViewPanelCorner.Parent = ViewPanel
+
+local ViewPanelStroke = Instance.new("UIStroke")
+ViewPanelStroke.Color = Color3.fromRGB(150, 0, 255)
+ViewPanelStroke.Thickness = 1.5
+ViewPanelStroke.Parent = ViewPanel
+
+local ViewingLabel = Instance.new("TextLabel")
+ViewingLabel.Name = "ViewingLabel"
+ViewingLabel.Size = UDim2.new(0.65, -8, 1, 0)
+ViewingLabel.Position = UDim2.new(0, 8, 0, 0)
+ViewingLabel.BackgroundTransparency = 1
+ViewingLabel.Text = "👁 Viewing: None"
+ViewingLabel.TextColor3 = Color3.fromRGB(200, 150, 255)
+ViewingLabel.TextSize = 12
+ViewingLabel.Font = Enum.Font.GothamSemibold
+ViewingLabel.TextXAlignment = Enum.TextXAlignment.Left
+ViewingLabel.TextTruncate = Enum.TextTruncate.AtEnd
+ViewingLabel.Parent = ViewPanel
+
+local StopViewBtn = Instance.new("TextButton")
+StopViewBtn.Name = "StopViewBtn"
+StopViewBtn.Size = UDim2.new(0.33, -6, 0, 26)
+StopViewBtn.Position = UDim2.new(0.67, 0, 0.5, -13)
+StopViewBtn.BackgroundColor3 = Color3.fromRGB(180, 30, 30)
+StopViewBtn.Text = "✕ Stop"
+StopViewBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+StopViewBtn.TextSize = 12
+StopViewBtn.Font = Enum.Font.GothamBold
+StopViewBtn.BorderSizePixel = 0
+StopViewBtn.Parent = ViewPanel
+
+local StopViewCorner = Instance.new("UICorner")
+StopViewCorner.CornerRadius = UDim.new(0, 5)
+StopViewCorner.Parent = StopViewBtn
+
 -- Divider
 local Divider = Instance.new("Frame")
 Divider.Size = UDim2.new(1, -30, 0, 1)
-Divider.Position = UDim2.new(0, 15, 0, 165)
+Divider.Position = UDim2.new(0, 15, 0, 207)
 Divider.BackgroundColor3 = Color3.fromRGB(60, 60, 90)
 Divider.BorderSizePixel = 0
 Divider.Parent = MainFrame
 
 -- Entity List Header
 local ListHeader = Instance.new("TextLabel")
-ListHeader.Size = UDim2.new(1, -20, 0, 25)
-ListHeader.Position = UDim2.new(0, 10, 0, 170)
+ListHeader.Size = UDim2.new(1, -20, 0, 22)
+ListHeader.Position = UDim2.new(0, 10, 0, 212)
 ListHeader.BackgroundTransparency = 1
 ListHeader.Text = "⚡ Detected Entities:"
 ListHeader.TextColor3 = Color3.fromRGB(180, 180, 220)
-ListHeader.TextSize = 14
+ListHeader.TextSize = 13
 ListHeader.Font = Enum.Font.GothamSemibold
 ListHeader.TextXAlignment = Enum.TextXAlignment.Left
 ListHeader.Parent = MainFrame
@@ -204,8 +267,8 @@ ListHeader.Parent = MainFrame
 -- Scrolling Entity List
 local ScrollFrame = Instance.new("ScrollingFrame")
 ScrollFrame.Name = "EntityList"
-ScrollFrame.Size = UDim2.new(1, -20, 1, -205)
-ScrollFrame.Position = UDim2.new(0, 10, 0, 198)
+ScrollFrame.Size = UDim2.new(1, -20, 1, -242)
+ScrollFrame.Position = UDim2.new(0, 10, 0, 237)
 ScrollFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 35)
 ScrollFrame.BorderSizePixel = 0
 ScrollFrame.ScrollBarThickness = 4
@@ -229,7 +292,7 @@ ListPadding.PaddingLeft = UDim.new(0, 4)
 ListPadding.PaddingRight = UDim.new(0, 4)
 ListPadding.Parent = ScrollFrame
 
--- Scan Pulse Animation (bottom bar)
+-- Pulse Bar
 local PulseBar = Instance.new("Frame")
 PulseBar.Size = UDim2.new(0.3, 0, 0, 3)
 PulseBar.Position = UDim2.new(0, 0, 1, -3)
@@ -243,24 +306,26 @@ PulseBar.Parent = MainFrame
 
 local espEnabled = true
 local namesEnabled = true
-local entityESPObjects = {} -- {model = {highlight, billboard, connection}}
+local viewModeActive = false
+local currentlyViewing = nil
+local viewConnection = nil
+local entityESPObjects = {}
 local scannerActive = true
 
--- Entity color mapping
+-- Entity colors
 local ENTITY_COLORS = {
-    -- Doors-style entities
     ["Rush"] = Color3.fromRGB(255, 0, 0),
-    ["Ambush"] = Color3.fromRGB(255, 50, 0),
+    ["Ambush"] = Color3.fromRGB(255, 80, 0),
     ["Screech"] = Color3.fromRGB(200, 0, 200),
     ["Halt"] = Color3.fromRGB(255, 255, 0),
     ["Eyes"] = Color3.fromRGB(150, 0, 255),
-    ["Seek"] = Color3.fromRGB(0, 0, 0),
+    ["Seek"] = Color3.fromRGB(20, 20, 20),
     ["Figure"] = Color3.fromRGB(100, 0, 0),
     ["Glitch"] = Color3.fromRGB(0, 255, 100),
     ["Jack"] = Color3.fromRGB(255, 150, 0),
     ["Timothy"] = Color3.fromRGB(139, 90, 43),
-    ["Shadow"] = Color3.fromRGB(50, 50, 50),
-    ["Snare"] = Color3.fromRGB(0, 100, 0),
+    ["Shadow"] = Color3.fromRGB(80, 80, 120),
+    ["Snare"] = Color3.fromRGB(0, 160, 0),
     ["Dupe"] = Color3.fromRGB(180, 0, 180),
     ["A-60"] = Color3.fromRGB(255, 30, 30),
     ["A-90"] = Color3.fromRGB(255, 60, 60),
@@ -270,7 +335,6 @@ local ENTITY_COLORS = {
     ["Default"] = Color3.fromRGB(255, 80, 80),
 }
 
--- Known entity name patterns to detect
 local ENTITY_PATTERNS = {
     "Rush", "Ambush", "Screech", "Halt", "Eyes", "Seek", "Figure",
     "Glitch", "Jack", "Timothy", "Shadow", "Snare", "Dupe",
@@ -289,37 +353,23 @@ end
 
 local function isEntity(obj)
     local name = obj.Name:lower()
-
-    -- Check against known patterns
     for _, pattern in ipairs(ENTITY_PATTERNS) do
         if string.find(name, pattern:lower()) then
             return true
         end
     end
-
-    -- Check if it's a model with humanoid-like properties but not a player
     if obj:IsA("Model") then
-        -- Not a player character
         for _, player in pairs(Players:GetPlayers()) do
-            if player.Character == obj then
-                return false
-            end
+            if player.Character == obj then return false end
         end
-
-        -- Has a primary part or humanoidrootpart
         local hasPart = obj:FindFirstChild("HumanoidRootPart")
             or obj:FindFirstChild("Head")
             or obj:FindFirstChild("Torso")
             or obj.PrimaryPart
-
-        -- Check various entity indicators
         if hasPart then
-            -- Check if it has entity-like attributes
             local hasHumanoid = obj:FindFirstChildOfClass("Humanoid")
             local hasAnimController = obj:FindFirstChildOfClass("AnimationController")
-
             if hasHumanoid or hasAnimController then
-                -- Make sure it's not a player
                 local isPlayer = false
                 for _, player in pairs(Players:GetPlayers()) do
                     if player.Character == obj then
@@ -327,21 +377,15 @@ local function isEntity(obj)
                         break
                     end
                 end
-                if not isPlayer then
-                    return true
-                end
+                if not isPlayer then return true end
             end
         end
     end
-
     return false
 end
 
--- Broader scan: check specific Rooms/Doors game folders
 local function getEntityContainers()
     local containers = {}
-
-    -- Common entity locations in Rooms/Doors-style games
     local possiblePaths = {
         workspace,
         workspace:FindFirstChild("Entities"),
@@ -351,25 +395,133 @@ local function getEntityContainers()
         workspace:FindFirstChild("Rooms"),
         workspace:FindFirstChild("Map"),
     }
-
     for _, container in pairs(possiblePaths) do
         if container then
             table.insert(containers, container)
         end
     end
-
     return containers
 end
+
+-- ============================================
+-- VIEW MODE FUNCTIONS
+-- ============================================
+
+local originalCameraType = Enum.CameraType.Custom
+local originalCameraCFrame = CFrame.new()
+
+local function stopViewMode()
+    viewModeActive = false
+    currentlyViewing = nil
+
+    if viewConnection then
+        viewConnection:Disconnect()
+        viewConnection = nil
+    end
+
+    -- Restore camera
+    Camera.CameraType = Enum.CameraType.Custom
+    local character = LocalPlayer.Character
+    if character then
+        local humanoid = character:FindFirstChildOfClass("Humanoid")
+        if humanoid then
+            Camera.CameraSubject = humanoid
+        end
+    end
+
+    ViewPanel.Visible = false
+    ViewModeToggle.BackgroundColor3 = Color3.fromRGB(80, 0, 180)
+    ViewModeToggle.Text = "👁 View"
+
+    print("[Entity Scanner] View mode stopped.")
+end
+
+local function startViewMode(entity)
+    if viewModeActive then
+        stopViewMode()
+    end
+
+    local targetPart = entity:FindFirstChild("HumanoidRootPart")
+        or entity:FindFirstChild("Head")
+        or entity:FindFirstChild("Torso")
+        or entity.PrimaryPart
+        or (entity:IsA("Model") and entity:FindFirstChildWhichIsA("BasePart"))
+
+    if not targetPart then
+        warn("[Entity Scanner] Could not find a part to view on: " .. entity.Name)
+        return
+    end
+
+    viewModeActive = true
+    currentlyViewing = entity
+
+    -- Update UI
+    ViewPanel.Visible = true
+    ViewingLabel.Text = "👁 Viewing: " .. entity.Name
+    ViewModeToggle.BackgroundColor3 = Color3.fromRGB(160, 0, 255)
+    ViewModeToggle.Text = "👁 Viewing..."
+
+    -- Switch camera to scriptable and follow entity
+    originalCameraType = Camera.CameraType
+    Camera.CameraType = Enum.CameraType.Scriptable
+
+    -- Smooth tween to entity first
+    local startCF = Camera.CFrame
+    local targetCF = CFrame.new(
+        targetPart.Position + Vector3.new(0, 8, 16),
+        targetPart.Position
+    )
+
+    local tweenInfo = TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    local tween = TweenService:Create(Camera, tweenInfo, {CFrame = targetCF})
+    tween:Play()
+
+    -- After tween, start live follow
+    tween.Completed:Connect(function()
+        if not viewModeActive or currentlyViewing ~= entity then return end
+
+        -- Follow camera loop
+        viewConnection = RunService.RenderStepped:Connect(function()
+            if not viewModeActive or not entity or not entity.Parent then
+                stopViewMode()
+                return
+            end
+
+            if not targetPart or not targetPart.Parent then
+                targetPart = entity:FindFirstChild("HumanoidRootPart")
+                    or entity:FindFirstChild("Head")
+                    or entity:FindFirstChild("Torso")
+                    or entity.PrimaryPart
+                    or (entity:IsA("Model") and entity:FindFirstChildWhichIsA("BasePart"))
+                if not targetPart then
+                    stopViewMode()
+                    return
+                end
+            end
+
+            -- Smooth follow behind/above entity
+            local desiredCF = CFrame.new(
+                targetPart.Position + Vector3.new(0, 8, 16),
+                targetPart.Position
+            )
+            Camera.CFrame = Camera.CFrame:Lerp(desiredCF, 0.15)
+        end)
+    end)
+
+    print("[Entity Scanner] Now viewing: " .. entity.Name)
+end
+
+-- ============================================
+-- ESP CREATION
+-- ============================================
 
 local function createESP(entity)
     if entityESPObjects[entity] then return end
 
     local entityName = entity.Name
     local color = getEntityColor(entityName)
-
     local espData = {}
 
-    -- Create Highlight
     if espEnabled then
         local highlight = Instance.new("Highlight")
         highlight.Name = "EntityESP"
@@ -383,57 +535,51 @@ local function createESP(entity)
         espData.highlight = highlight
     end
 
-    -- Create Billboard for name
-    if namesEnabled then
-        local targetPart = entity:FindFirstChild("HumanoidRootPart")
-            or entity:FindFirstChild("Head")
-            or entity:FindFirstChild("Torso")
-            or entity.PrimaryPart
-            or (entity:IsA("Model") and entity:FindFirstChildWhichIsA("BasePart"))
+    local targetPart = entity:FindFirstChild("HumanoidRootPart")
+        or entity:FindFirstChild("Head")
+        or entity:FindFirstChild("Torso")
+        or entity.PrimaryPart
+        or (entity:IsA("Model") and entity:FindFirstChildWhichIsA("BasePart"))
 
-        if targetPart then
-            local billboard = Instance.new("BillboardGui")
-            billboard.Name = "EntityNameESP"
-            billboard.Adornee = targetPart
-            billboard.Size = UDim2.new(0, 200, 0, 60)
-            billboard.StudsOffset = Vector3.new(0, 4, 0)
-            billboard.AlwaysOnTop = true
-            billboard.MaxDistance = math.huge
-            billboard.Parent = targetPart
+    if namesEnabled and targetPart then
+        local billboard = Instance.new("BillboardGui")
+        billboard.Name = "EntityNameESP"
+        billboard.Adornee = targetPart
+        billboard.Size = UDim2.new(0, 200, 0, 60)
+        billboard.StudsOffset = Vector3.new(0, 5, 0)
+        billboard.AlwaysOnTop = true
+        billboard.MaxDistance = math.huge
+        billboard.Parent = targetPart
 
-            -- Entity Name Label
-            local nameLabel = Instance.new("TextLabel")
-            nameLabel.Size = UDim2.new(1, 0, 0.5, 0)
-            nameLabel.BackgroundTransparency = 1
-            nameLabel.Text = "⚠ " .. entityName
-            nameLabel.TextColor3 = color
-            nameLabel.TextSize = 18
-            nameLabel.Font = Enum.Font.GothamBold
-            nameLabel.TextStrokeTransparency = 0.3
-            nameLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-            nameLabel.Parent = billboard
+        local nameLabel = Instance.new("TextLabel")
+        nameLabel.Size = UDim2.new(1, 0, 0.55, 0)
+        nameLabel.BackgroundTransparency = 1
+        nameLabel.Text = "⚠ " .. entityName
+        nameLabel.TextColor3 = color
+        nameLabel.TextSize = 18
+        nameLabel.Font = Enum.Font.GothamBold
+        nameLabel.TextStrokeTransparency = 0.2
+        nameLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+        nameLabel.Parent = billboard
 
-            -- Distance Label
-            local distLabel = Instance.new("TextLabel")
-            distLabel.Name = "DistLabel"
-            distLabel.Size = UDim2.new(1, 0, 0.4, 0)
-            distLabel.Position = UDim2.new(0, 0, 0.5, 0)
-            distLabel.BackgroundTransparency = 1
-            distLabel.Text = "0 studs"
-            distLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-            distLabel.TextSize = 14
-            distLabel.Font = Enum.Font.GothamSemibold
-            distLabel.TextStrokeTransparency = 0.5
-            distLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-            distLabel.Parent = billboard
+        local distLabel = Instance.new("TextLabel")
+        distLabel.Name = "DistLabel"
+        distLabel.Size = UDim2.new(1, 0, 0.4, 0)
+        distLabel.Position = UDim2.new(0, 0, 0.55, 0)
+        distLabel.BackgroundTransparency = 1
+        distLabel.Text = "0 studs"
+        distLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+        distLabel.TextSize = 13
+        distLabel.Font = Enum.Font.GothamSemibold
+        distLabel.TextStrokeTransparency = 0.4
+        distLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+        distLabel.Parent = billboard
 
-            espData.billboard = billboard
-            espData.distLabel = distLabel
-            espData.targetPart = targetPart
-        end
+        espData.billboard = billboard
+        espData.distLabel = distLabel
+        espData.targetPart = targetPart
     end
 
-    -- Track destruction
     espData.destroyConnection = entity.AncestryChanged:Connect(function(_, parent)
         if not parent then
             removeESP(entity)
@@ -446,16 +592,14 @@ end
 function removeESP(entity)
     local data = entityESPObjects[entity]
     if data then
-        if data.highlight then
-            data.highlight:Destroy()
-        end
-        if data.billboard then
-            data.billboard:Destroy()
-        end
-        if data.destroyConnection then
-            data.destroyConnection:Disconnect()
-        end
+        if data.highlight then pcall(function() data.highlight:Destroy() end) end
+        if data.billboard then pcall(function() data.billboard:Destroy() end) end
+        if data.destroyConnection then data.destroyConnection:Disconnect() end
         entityESPObjects[entity] = nil
+    end
+
+    if currentlyViewing == entity then
+        stopViewMode()
     end
 end
 
@@ -466,24 +610,42 @@ local function clearAllESP()
     entityESPObjects = {}
 end
 
+-- ============================================
+-- ENTITY LIST ENTRIES WITH VIEW BUTTON
+-- ============================================
+
+local entryMap = {} -- entity -> frame
+
+local function removeEntityListEntry(entity)
+    if entryMap[entity] then
+        pcall(function() entryMap[entity]:Destroy() end)
+        entryMap[entity] = nil
+    end
+end
+
 local function createEntityListEntry(entity, color)
-    local existingEntry = ScrollFrame:FindFirstChild("Entry_" .. entity.Name .. "_" .. tostring(entity:GetDebugId()))
-    if existingEntry then return end
+    if entryMap[entity] then return end
 
     local entry = Instance.new("Frame")
-    entry.Name = "Entry_" .. entity.Name .. "_" .. tostring(entity:GetDebugId())
-    entry.Size = UDim2.new(1, -8, 0, 30)
-    entry.BackgroundColor3 = Color3.fromRGB(30, 30, 50)
+    entry.Name = "Entry_" .. entity.Name
+    entry.Size = UDim2.new(1, -8, 0, 36)
+    entry.BackgroundColor3 = Color3.fromRGB(28, 28, 48)
     entry.BorderSizePixel = 0
     entry.Parent = ScrollFrame
 
     local entryCorner = Instance.new("UICorner")
-    entryCorner.CornerRadius = UDim.new(0, 5)
+    entryCorner.CornerRadius = UDim.new(0, 6)
     entryCorner.Parent = entry
 
-    -- Color indicator
+    local entryStroke = Instance.new("UIStroke")
+    entryStroke.Color = color
+    entryStroke.Thickness = 1
+    entryStroke.Transparency = 0.6
+    entryStroke.Parent = entry
+
+    -- Color dot
     local colorDot = Instance.new("Frame")
-    colorDot.Size = UDim2.new(0, 8, 0, 8)
+    colorDot.Size = UDim2.new(0, 9, 0, 9)
     colorDot.Position = UDim2.new(0, 8, 0.5, -4)
     colorDot.BackgroundColor3 = color
     colorDot.BorderSizePixel = 0
@@ -493,10 +655,10 @@ local function createEntityListEntry(entity, color)
     dotCorner.CornerRadius = UDim.new(1, 0)
     dotCorner.Parent = colorDot
 
-    -- Entity name
+    -- Entity Name
     local entryName = Instance.new("TextLabel")
-    entryName.Size = UDim2.new(0.6, -25, 1, 0)
-    entryName.Position = UDim2.new(0, 22, 0, 0)
+    entryName.Size = UDim2.new(0.42, -24, 0.5, 0)
+    entryName.Position = UDim2.new(0, 22, 0, 2)
     entryName.BackgroundTransparency = 1
     entryName.Text = entity.Name
     entryName.TextColor3 = color
@@ -506,34 +668,91 @@ local function createEntityListEntry(entity, color)
     entryName.TextTruncate = Enum.TextTruncate.AtEnd
     entryName.Parent = entry
 
-    -- Distance
+    -- Distance label
     local entryDist = Instance.new("TextLabel")
     entryDist.Name = "Distance"
-    entryDist.Size = UDim2.new(0.35, 0, 1, 0)
-    entryDist.Position = UDim2.new(0.65, 0, 0, 0)
+    entryDist.Size = UDim2.new(0.42, -24, 0.5, 0)
+    entryDist.Position = UDim2.new(0, 22, 0.5, -2)
     entryDist.BackgroundTransparency = 1
-    entryDist.Text = "? studs"
-    entryDist.TextColor3 = Color3.fromRGB(150, 150, 150)
-    entryDist.TextSize = 11
+    entryDist.Text = "Calculating..."
+    entryDist.TextColor3 = Color3.fromRGB(130, 130, 150)
+    entryDist.TextSize = 10
     entryDist.Font = Enum.Font.Gotham
-    entryDist.TextXAlignment = Enum.TextXAlignment.Right
+    entryDist.TextXAlignment = Enum.TextXAlignment.Left
     entryDist.Parent = entry
 
+    -- View Button
+    local viewBtn = Instance.new("TextButton")
+    viewBtn.Name = "ViewBtn"
+    viewBtn.Size = UDim2.new(0, 60, 0, 24)
+    viewBtn.Position = UDim2.new(1, -68, 0.5, -12)
+    viewBtn.BackgroundColor3 = Color3.fromRGB(80, 0, 180)
+    viewBtn.Text = "👁 View"
+    viewBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    viewBtn.TextSize = 11
+    viewBtn.Font = Enum.Font.GothamBold
+    viewBtn.BorderSizePixel = 0
+    viewBtn.Parent = entry
+
+    local viewBtnCorner = Instance.new("UICorner")
+    viewBtnCorner.CornerRadius = UDim.new(0, 5)
+    viewBtnCorner.Parent = viewBtn
+
+    -- View button hover effects
+    viewBtn.MouseEnter:Connect(function()
+        TweenService:Create(viewBtn, TweenInfo.new(0.15), {
+            BackgroundColor3 = Color3.fromRGB(120, 0, 255)
+        }):Play()
+    end)
+
+    viewBtn.MouseLeave:Connect(function()
+        if currentlyViewing ~= entity then
+            TweenService:Create(viewBtn, TweenInfo.new(0.15), {
+                BackgroundColor3 = Color3.fromRGB(80, 0, 180)
+            }):Play()
+        end
+    end)
+
+    -- View button click
+    viewBtn.MouseButton1Click:Connect(function()
+        if currentlyViewing == entity then
+            -- Toggle off
+            stopViewMode()
+            viewBtn.Text = "👁 View"
+            viewBtn.BackgroundColor3 = Color3.fromRGB(80, 0, 180)
+        else
+            -- Stop current view first
+            if currentlyViewing then
+                -- Reset old button
+                for ent, frame in pairs(entryMap) do
+                    if ent == currentlyViewing then
+                        local oldBtn = frame:FindFirstChild("ViewBtn")
+                        if oldBtn then
+                            oldBtn.Text = "👁 View"
+                            oldBtn.BackgroundColor3 = Color3.fromRGB(80, 0, 180)
+                        end
+                    end
+                end
+            end
+
+            -- Start new view
+            startViewMode(entity)
+            viewBtn.Text = "✔ Viewing"
+            viewBtn.BackgroundColor3 = Color3.fromRGB(160, 0, 255)
+        end
+    end)
+
+    entryMap[entity] = entry
     return entry
 end
 
-local function removeEntityListEntry(entity)
-    for _, child in pairs(ScrollFrame:GetChildren()) do
-        if child:IsA("Frame") and string.find(child.Name, tostring(entity:GetDebugId()) or "") then
-            child:Destroy()
-        end
-    end
-end
+-- ============================================
+-- SCANNER + DISTANCE UPDATE
+-- ============================================
 
 local function scanForEntities()
     local foundEntities = {}
     local containers = getEntityContainers()
-
     for _, container in pairs(containers) do
         if container then
             for _, descendant in pairs(container:GetDescendants()) do
@@ -543,33 +762,23 @@ local function scanForEntities()
             end
         end
     end
-
     return foundEntities
 end
 
--- ============================================
--- UPDATE LOOP
--- ============================================
-
 local function updateScanner()
     if not scannerActive then return end
-
     local entities = scanForEntities()
     local currentEntitySet = {}
 
-    -- Process found entities
     for _, entity in pairs(entities) do
         currentEntitySet[entity] = true
-
         if not entityESPObjects[entity] then
-            -- New entity found
             createESP(entity)
             local color = getEntityColor(entity.Name)
             createEntityListEntry(entity, color)
         end
     end
 
-    -- Remove ESP for entities that no longer exist
     for entity, _ in pairs(entityESPObjects) do
         if not currentEntitySet[entity] or not entity.Parent then
             removeESP(entity)
@@ -577,11 +786,8 @@ local function updateScanner()
         end
     end
 
-    -- Update entity count
     local count = 0
-    for _ in pairs(entityESPObjects) do
-        count = count + 1
-    end
+    for _ in pairs(entityESPObjects) do count = count + 1 end
     EntityCountLabel.Text = "Entities Detected: " .. tostring(count)
 
     if count > 0 then
@@ -591,7 +797,6 @@ local function updateScanner()
     end
 end
 
--- Distance updater (runs more frequently)
 local function updateDistances()
     local character = LocalPlayer.Character
     if not character then return end
@@ -599,27 +804,45 @@ local function updateDistances()
     if not rootPart then return end
 
     for entity, data in pairs(entityESPObjects) do
-        if data.targetPart and data.distLabel then
-            local dist = math.floor((rootPart.Position - data.targetPart.Position).Magnitude)
-            data.distLabel.Text = tostring(dist) .. " studs"
-
-            -- Update color based on distance (closer = more red)
-            if dist < 30 then
-                data.distLabel.TextColor3 = Color3.fromRGB(255, 50, 50)
-            elseif dist < 60 then
-                data.distLabel.TextColor3 = Color3.fromRGB(255, 200, 50)
-            else
-                data.distLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-            end
+        local targetPart = data.targetPart
+        if not targetPart then
+            -- Try to re-find it
+            targetPart = entity:FindFirstChild("HumanoidRootPart")
+                or entity:FindFirstChild("Head")
+                or entity:FindFirstChild("Torso")
+                or entity.PrimaryPart
+                or (entity:IsA("Model") and entity:FindFirstChildWhichIsA("BasePart"))
+            data.targetPart = targetPart
         end
 
-        -- Update list entry distances
-        for _, child in pairs(ScrollFrame:GetChildren()) do
-            if child:IsA("Frame") and string.find(child.Name, tostring(entity:GetDebugId()) or "") then
-                local distLabel = child:FindFirstChild("Distance")
-                if distLabel and data.targetPart then
-                    local dist = math.floor((rootPart.Position - data.targetPart.Position).Magnitude)
-                    distLabel.Text = tostring(dist) .. " studs"
+        if targetPart and targetPart.Parent then
+            local dist = math.floor((rootPart.Position - targetPart.Position).Magnitude)
+
+            -- Update billboard dist
+            if data.distLabel then
+                data.distLabel.Text = tostring(dist) .. " studs"
+                if dist < 25 then
+                    data.distLabel.TextColor3 = Color3.fromRGB(255, 50, 50)
+                elseif dist < 60 then
+                    data.distLabel.TextColor3 = Color3.fromRGB(255, 200, 50)
+                else
+                    data.distLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+                end
+            end
+
+            -- Update list entry distance
+            local entryFrame = entryMap[entity]
+            if entryFrame then
+                local distLabel = entryFrame:FindFirstChild("Distance")
+                if distLabel then
+                    distLabel.Text = tostring(dist) .. " studs away"
+                    if dist < 25 then
+                        distLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
+                    elseif dist < 60 then
+                        distLabel.TextColor3 = Color3.fromRGB(255, 200, 50)
+                    else
+                        distLabel.TextColor3 = Color3.fromRGB(130, 130, 150)
+                    end
                 end
             end
         end
@@ -639,8 +862,6 @@ ESPToggle.MouseButton1Click:Connect(function()
         ESPToggle.Text = "ESP: OFF"
         ESPToggle.BackgroundColor3 = Color3.fromRGB(120, 50, 50)
     end
-
-    -- Update existing ESP
     for entity, data in pairs(entityESPObjects) do
         if data.highlight then
             data.highlight.Enabled = espEnabled
@@ -657,8 +878,6 @@ NamesToggle.MouseButton1Click:Connect(function()
         NamesToggle.Text = "Names: OFF"
         NamesToggle.BackgroundColor3 = Color3.fromRGB(120, 50, 50)
     end
-
-    -- Update existing billboards
     for entity, data in pairs(entityESPObjects) do
         if data.billboard then
             data.billboard.Enabled = namesEnabled
@@ -666,21 +885,87 @@ NamesToggle.MouseButton1Click:Connect(function()
     end
 end)
 
+ViewModeToggle.MouseButton1Click:Connect(function()
+    if viewModeActive then
+        -- Stop view, reset all view buttons
+        stopViewMode()
+        for ent, frame in pairs(entryMap) do
+            local btn = frame:FindFirstChild("ViewBtn")
+            if btn then
+                btn.Text = "👁 View"
+                btn.BackgroundColor3 = Color3.fromRGB(80, 0, 180)
+            end
+        end
+    else
+        -- View the nearest entity
+        local character = LocalPlayer.Character
+        local rootPart = character and character:FindFirstChild("HumanoidRootPart")
+        if not rootPart then return end
+
+        local nearestEntity = nil
+        local nearestDist = math.huge
+
+        for entity, data in pairs(entityESPObjects) do
+            local tp = data.targetPart
+            if tp and tp.Parent then
+                local dist = (rootPart.Position - tp.Position).Magnitude
+                if dist < nearestDist then
+                    nearestDist = dist
+                    nearestEntity = entity
+                end
+            end
+        end
+
+        if nearestEntity then
+            startViewMode(nearestEntity)
+            -- Highlight its button
+            local frame = entryMap[nearestEntity]
+            if frame then
+                local btn = frame:FindFirstChild("ViewBtn")
+                if btn then
+                    btn.Text = "✔ Viewing"
+                    btn.BackgroundColor3 = Color3.fromRGB(160, 0, 255)
+                end
+            end
+        else
+            -- Flash no entity warning
+            local orig = ViewModeToggle.Text
+            ViewModeToggle.Text = "No Entity!"
+            ViewModeToggle.BackgroundColor3 = Color3.fromRGB(180, 30, 30)
+            task.delay(1.5, function()
+                ViewModeToggle.Text = "👁 View"
+                ViewModeToggle.BackgroundColor3 = Color3.fromRGB(80, 0, 180)
+            end)
+        end
+    end
+end)
+
+StopViewBtn.MouseButton1Click:Connect(function()
+    stopViewMode()
+    for ent, frame in pairs(entryMap) do
+        local btn = frame:FindFirstChild("ViewBtn")
+        if btn then
+            btn.Text = "👁 View"
+            btn.BackgroundColor3 = Color3.fromRGB(80, 0, 180)
+        end
+    end
+end)
+
 CloseButton.MouseButton1Click:Connect(function()
     scannerActive = false
+    stopViewMode()
     clearAllESP()
     ScreenGui:Destroy()
 end)
 
 -- ============================================
--- WORKSPACE MONITORING (live detection)
+-- WORKSPACE MONITORING
 -- ============================================
 
--- Monitor for new entities being added
 local function monitorContainer(container)
     container.DescendantAdded:Connect(function(descendant)
         if not scannerActive then return end
-        task.wait(0.1) -- Small delay to let the entity fully load
+        task.wait(0.1)
         if descendant:IsA("Model") and isEntity(descendant) then
             createESP(descendant)
             local color = getEntityColor(descendant.Name)
@@ -711,16 +996,17 @@ local pulsePos = 0
 spawn(function()
     while scannerActive do
         pulsePos = pulsePos + (0.02 * pulseDirection)
-        if pulsePos >= 0.7 then
-            pulseDirection = -1
-        elseif pulsePos <= 0 then
-            pulseDirection = 1
-        end
-        PulseBar.Position = UDim2.new(pulsePos, 0, 1, -3)
+        if pulsePos >= 0.7 then pulseDirection = -1
+        elseif pulsePos <= 0 then pulseDirection = 1 end
 
-        -- Pulse the scanner icon
-        local alpha = (math.sin(tick() * 3) + 1) / 2
-        ScannerIcon.TextTransparency = alpha * 0.5
+        PulseBar.Position = UDim2.new(pulsePos, 0, 1, -3)
+        ScannerIcon.TextTransparency = ((math.sin(tick() * 3) + 1) / 2) * 0.5
+
+        -- Pulse view panel stroke when active
+        if viewModeActive then
+            local alpha = (math.sin(tick() * 4) + 1) / 2
+            ViewPanelStroke.Transparency = alpha * 0.5
+        end
 
         task.wait(0.03)
     end
@@ -730,7 +1016,6 @@ end)
 -- MAIN LOOPS
 -- ============================================
 
--- Entity scan loop (every 1 second)
 spawn(function()
     while scannerActive do
         updateScanner()
@@ -738,18 +1023,13 @@ spawn(function()
     end
 end)
 
--- Distance update loop (every frame via heartbeat)
-local distUpdateConnection = RunService.Heartbeat:Connect(function()
-    if not scannerActive then
-        distUpdateConnection:Disconnect()
-        return
-    end
+RunService.Heartbeat:Connect(function()
+    if not scannerActive then return end
     updateDistances()
 end)
 
 -- Initial scan
 updateScanner()
 
-print("[Entity Scanner] ✔ Loaded successfully!")
-print("[Entity Scanner] Rooms: Established")
-print("[Entity Scanner] Scanning for entities...")
+print("[Entity Scanner] ✔ Loaded — Rooms: Es-stablished")
+print("[Entity Scanner] View mode ready. Click 👁 View on any entity or use the View button for nearest.")
