@@ -428,22 +428,17 @@ local function startSpeedLoop(target)
     if speedApplyConn then speedApplyConn:Disconnect(); speedApplyConn = nil end
     speedApplyActive = true
 
-    -- Apply immediately with full force
+    -- Apply immediately
     forceSpeed(target, selSpeed)
 
-    -- Re-apply EVERY 3 FRAMES to overpower any script that tries to reset
-    -- This is 20x per second - fast enough to dominate, light enough to not lag
-    local frameCount = 0
+    -- LOOP: runs every frame, forces speed constantly
+    -- Entity script has ZERO chance to override
     speedApplyConn = RunService.Heartbeat:Connect(function(dt)
         if not active or not target or not target.Parent then stopSpeedApply(); return end
         local root = getPart(target)
         if not root or not root.Parent then stopSpeedApply(); return end
 
-        frameCount += 1
-        if frameCount < 3 then return end
-        frameCount = 0
-
-        -- FORCE APPLY every 3 frames
+        -- FORCE every single frame - no escape
         forceSpeed(target, selSpeed)
     end)
 end
