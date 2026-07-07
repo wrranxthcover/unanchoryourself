@@ -1,731 +1,755 @@
--- // ⚡ Rooms Helper V4 - Full Settings + Keybind Changer ⚡
--- // Fixed minimize, added settings, keybind changer
+-- Entity Scanner GUI
+-- Place in StarterPlayerScripts or execute via executor
 
-local player = game.Players.LocalPlayer
-local tweenService = game:GetService("TweenService")
-local UIS = game:GetService("UserInputService")
-local VIM = game:GetService("VirtualInputManager")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
 
--- Destroy old GUI
-if player.PlayerGui:FindFirstChild("UnanchorV4") then
-    player.PlayerGui:FindFirstChild("UnanchorV4"):Destroy()
+-- ============================================
+-- GUI CREATION
+-- ============================================
+
+-- Remove old GUI if exists
+if LocalPlayer.PlayerGui:FindFirstChild("EntityScannerGui") then
+    LocalPlayer.PlayerGui:FindFirstChild("EntityScannerGui"):Destroy()
 end
 
--- // SETTINGS (Default Keybinds)
-local settings = {
-    forceInteractKey = Enum.KeyCode.G,
-    toggleGUIKey = Enum.KeyCode.RightShift,
-    unanchorKey = Enum.KeyCode.H,
-}
-
-local autoDoorOn = false
-local autoUnanchorOn = false
-local doorBoostOn = false
-local minimized = false
-local settingsOpen = false
-local waitingForKey = nil -- which setting is waiting for a new keybind
-
--- // CREATE GUI
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "UnanchorV4"
-screenGui.ResetOnSpawn = false
-screenGui.Parent = player:WaitForChild("PlayerGui")
-
--- Toggle Button (always visible, used to show/hide GUI)
-local toggleBtn = Instance.new("TextButton")
-toggleBtn.Size = UDim2.new(0, 40, 0, 40)
-toggleBtn.Position = UDim2.new(0, 20, 0.5, -200)
-toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 100, 255)
-toggleBtn.Text = "⚡"
-toggleBtn.TextColor3 = Color3.new(1, 1, 1)
-toggleBtn.TextScaled = true
-toggleBtn.Font = Enum.Font.GothamBold
-toggleBtn.ZIndex = 10
-toggleBtn.Visible = false -- hidden by default (shows when minimized)
-toggleBtn.Parent = screenGui
-
-Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(0, 20)
-local toggleStroke = Instance.new("UIStroke")
-toggleStroke.Color = Color3.fromRGB(0, 200, 255)
-toggleStroke.Thickness = 2
-toggleStroke.Parent = toggleBtn
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "EntityScannerGui"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.Parent = LocalPlayer.PlayerGui
 
 -- Main Frame
-local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 280, 0, 340)
-frame.Position = UDim2.new(0, 20, 0.5, -170)
-frame.BackgroundColor3 = Color3.fromRGB(12, 12, 20)
-frame.BorderSizePixel = 0
-frame.Active = true
-frame.Draggable = true
-frame.ClipsDescendants = true
-frame.Visible = true
-frame.Parent = screenGui
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(0, 320, 0, 400)
+MainFrame.Position = UDim2.new(0, 20, 0.5, -200)
+MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
 
-local frameCorner = Instance.new("UICorner")
-frameCorner.CornerRadius = UDim.new(0, 14)
-frameCorner.Parent = frame
+local MainCorner = Instance.new("UICorner")
+MainCorner.CornerRadius = UDim.new(0, 10)
+MainCorner.Parent = MainFrame
 
-local frameStroke = Instance.new("UIStroke")
-frameStroke.Color = Color3.fromRGB(0, 170, 255)
-frameStroke.Thickness = 2
-frameStroke.Parent = frame
+local MainStroke = Instance.new("UIStroke")
+MainStroke.Color = Color3.fromRGB(0, 170, 255)
+MainStroke.Thickness = 2
+MainStroke.Transparency = 0.3
+MainStroke.Parent = MainFrame
 
--- Content holder (everything below title bar)
-local content = Instance.new("Frame")
-content.Size = UDim2.new(1, 0, 1, -42)
-content.Position = UDim2.new(0, 0, 0, 42)
-content.BackgroundTransparency = 1
-content.ClipsDescendants = true
-content.Parent = frame
+-- Title Bar
+local TitleBar = Instance.new("Frame")
+TitleBar.Name = "TitleBar"
+TitleBar.Size = UDim2.new(1, 0, 0, 45)
+TitleBar.BackgroundColor3 = Color3.fromRGB(0, 120, 200)
+TitleBar.BorderSizePixel = 0
+TitleBar.Parent = MainFrame
 
--- // TITLE BAR
-local titleBar = Instance.new("Frame")
-titleBar.Size = UDim2.new(1, 0, 0, 42)
-titleBar.BackgroundColor3 = Color3.fromRGB(0, 70, 180)
-titleBar.BorderSizePixel = 0
-titleBar.ZIndex = 5
-titleBar.Parent = frame
+local TitleCorner = Instance.new("UICorner")
+TitleCorner.CornerRadius = UDim.new(0, 10)
+TitleCorner.Parent = TitleBar
 
-local titleCorner = Instance.new("UICorner")
-titleCorner.CornerRadius = UDim.new(0, 14)
-titleCorner.Parent = titleBar
+-- Fix bottom corners of title bar
+local TitleFix = Instance.new("Frame")
+TitleFix.Size = UDim2.new(1, 0, 0, 15)
+TitleFix.Position = UDim2.new(0, 0, 1, -15)
+TitleFix.BackgroundColor3 = Color3.fromRGB(0, 120, 200)
+TitleFix.BorderSizePixel = 0
+TitleFix.Parent = TitleBar
 
-local titleFix = Instance.new("Frame")
-titleFix.Size = UDim2.new(1, 0, 0, 15)
-titleFix.Position = UDim2.new(0, 0, 1, -15)
-titleFix.BackgroundColor3 = Color3.fromRGB(0, 70, 180)
-titleFix.BorderSizePixel = 0
-titleFix.ZIndex = 5
-titleFix.Parent = titleBar
+-- Scanner Icon
+local ScannerIcon = Instance.new("TextLabel")
+ScannerIcon.Size = UDim2.new(0, 35, 0, 35)
+ScannerIcon.Position = UDim2.new(0, 8, 0.5, -17)
+ScannerIcon.BackgroundTransparency = 1
+ScannerIcon.Text = "◎"
+ScannerIcon.TextColor3 = Color3.fromRGB(255, 255, 255)
+ScannerIcon.TextSize = 24
+ScannerIcon.Font = Enum.Font.GothamBold
+ScannerIcon.Parent = TitleBar
 
-local titleGradient = Instance.new("UIGradient")
-titleGradient.Color = ColorSequence.new({
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 50, 200)),
-    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 140, 255)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 50, 200))
-})
-titleGradient.Parent = titleBar
+-- Title Text
+local TitleLabel = Instance.new("TextLabel")
+TitleLabel.Name = "Title"
+TitleLabel.Size = UDim2.new(1, -90, 1, 0)
+TitleLabel.Position = UDim2.new(0, 45, 0, 0)
+TitleLabel.BackgroundTransparency = 1
+TitleLabel.Text = "Entity Scanner"
+TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+TitleLabel.TextSize = 20
+TitleLabel.Font = Enum.Font.GothamBold
+TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+TitleLabel.Parent = TitleBar
 
-local title = Instance.new("TextLabel")
-title.Size = UDim2.new(0.55, 0, 1, 0)
-title.Position = UDim2.new(0, 12, 0, 0)
-title.BackgroundTransparency = 1
-title.Text = "⚡ ROOMS HELPER"
-title.TextColor3 = Color3.new(1, 1, 1)
-title.TextScaled = true
-title.Font = Enum.Font.GothamBlack
-title.TextXAlignment = Enum.TextXAlignment.Left
-title.ZIndex = 6
-title.Parent = titleBar
+-- Close Button
+local CloseButton = Instance.new("TextButton")
+CloseButton.Name = "CloseBtn"
+CloseButton.Size = UDim2.new(0, 30, 0, 30)
+CloseButton.Position = UDim2.new(1, -38, 0.5, -15)
+CloseButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+CloseButton.Text = "✕"
+CloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+CloseButton.TextSize = 16
+CloseButton.Font = Enum.Font.GothamBold
+CloseButton.BorderSizePixel = 0
+CloseButton.Parent = TitleBar
 
--- // TITLE BAR BUTTONS
+local CloseCorner = Instance.new("UICorner")
+CloseCorner.CornerRadius = UDim.new(0, 6)
+CloseCorner.Parent = CloseButton
 
-local function createTitleBtn(text, posFromRight, color)
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0, 32, 0, 32)
-    btn.Position = UDim2.new(1, posFromRight, 0, 5)
-    btn.BackgroundColor3 = color
-    btn.Text = text
-    btn.TextColor3 = Color3.new(1, 1, 1)
-    btn.TextScaled = true
-    btn.Font = Enum.Font.GothamBold
-    btn.ZIndex = 7
-    btn.Parent = titleBar
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
-    return btn
-end
+-- Status Section
+local StatusFrame = Instance.new("Frame")
+StatusFrame.Name = "StatusFrame"
+StatusFrame.Size = UDim2.new(1, -20, 0, 55)
+StatusFrame.Position = UDim2.new(0, 10, 0, 55)
+StatusFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 40)
+StatusFrame.BorderSizePixel = 0
+StatusFrame.Parent = MainFrame
 
-local closeBtn = createTitleBtn("X", -36, Color3.fromRGB(255, 50, 50))
-local minBtn = createTitleBtn("—", -72, Color3.fromRGB(255, 180, 0))
-local settingsBtn = createTitleBtn("⚙", -108, Color3.fromRGB(100, 100, 120))
+local StatusCorner = Instance.new("UICorner")
+StatusCorner.CornerRadius = UDim.new(0, 8)
+StatusCorner.Parent = StatusFrame
 
--- // STATUS LABEL
-local statusLabel = Instance.new("TextLabel")
-statusLabel.Size = UDim2.new(0.9, 0, 0, 18)
-statusLabel.Position = UDim2.new(0.05, 0, 0, 4)
-statusLabel.BackgroundTransparency = 1
-statusLabel.Text = "Status: ✅ Ready"
-statusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
-statusLabel.TextScaled = true
-statusLabel.Font = Enum.Font.GothamBold
-statusLabel.TextXAlignment = Enum.TextXAlignment.Left
-statusLabel.Parent = content
+local RoomLabel = Instance.new("TextLabel")
+RoomLabel.Name = "RoomLabel"
+RoomLabel.Size = UDim2.new(1, -16, 0, 22)
+RoomLabel.Position = UDim2.new(0, 8, 0, 5)
+RoomLabel.BackgroundTransparency = 1
+RoomLabel.Text = "Rooms: Established ✔"
+RoomLabel.TextColor3 = Color3.fromRGB(0, 255, 100)
+RoomLabel.TextSize = 15
+RoomLabel.Font = Enum.Font.GothamSemibold
+RoomLabel.TextXAlignment = Enum.TextXAlignment.Left
+RoomLabel.Parent = StatusFrame
 
--- // ===== MAIN PAGE ===== //
-local mainPage = Instance.new("Frame")
-mainPage.Size = UDim2.new(1, 0, 1, 0)
-mainPage.BackgroundTransparency = 1
-mainPage.Visible = true
-mainPage.Parent = content
+local EntityCountLabel = Instance.new("TextLabel")
+EntityCountLabel.Name = "EntityCount"
+EntityCountLabel.Size = UDim2.new(1, -16, 0, 22)
+EntityCountLabel.Position = UDim2.new(0, 8, 0, 28)
+EntityCountLabel.BackgroundTransparency = 1
+EntityCountLabel.Text = "Entities Detected: 0"
+EntityCountLabel.TextColor3 = Color3.fromRGB(255, 200, 50)
+EntityCountLabel.TextSize = 13
+EntityCountLabel.Font = Enum.Font.GothamSemibold
+EntityCountLabel.TextXAlignment = Enum.TextXAlignment.Left
+EntityCountLabel.Parent = StatusFrame
 
--- // ===== SETTINGS PAGE ===== //
-local settingsPage = Instance.new("ScrollingFrame")
-settingsPage.Size = UDim2.new(1, 0, 1, -22)
-settingsPage.Position = UDim2.new(0, 0, 0, 22)
-settingsPage.BackgroundTransparency = 1
-settingsPage.Visible = false
-settingsPage.CanvasSize = UDim2.new(0, 0, 0, 400)
-settingsPage.ScrollBarThickness = 4
-settingsPage.ScrollBarImageColor3 = Color3.fromRGB(0, 150, 255)
-settingsPage.BorderSizePixel = 0
-settingsPage.Parent = content
+-- Toggle Buttons Section
+local ToggleFrame = Instance.new("Frame")
+ToggleFrame.Name = "ToggleFrame"
+ToggleFrame.Size = UDim2.new(1, -20, 0, 40)
+ToggleFrame.Position = UDim2.new(0, 10, 0, 118)
+ToggleFrame.BackgroundTransparency = 1
+ToggleFrame.Parent = MainFrame
 
-local settingsTitle = Instance.new("TextLabel")
-settingsTitle.Size = UDim2.new(0.9, 0, 0, 20)
-settingsTitle.Position = UDim2.new(0.05, 0, 0, 4)
-settingsTitle.BackgroundTransparency = 1
-settingsTitle.Text = "⚙ SETTINGS - KEYBINDS"
-settingsTitle.TextColor3 = Color3.fromRGB(0, 200, 255)
-settingsTitle.TextScaled = true
-settingsTitle.Font = Enum.Font.GothamBlack
-settingsTitle.TextXAlignment = Enum.TextXAlignment.Left
-settingsTitle.Parent = settingsPage
+-- ESP Toggle
+local ESPToggle = Instance.new("TextButton")
+ESPToggle.Name = "ESPToggle"
+ESPToggle.Size = UDim2.new(0.48, 0, 1, 0)
+ESPToggle.BackgroundColor3 = Color3.fromRGB(0, 170, 80)
+ESPToggle.Text = "ESP: ON"
+ESPToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+ESPToggle.TextSize = 14
+ESPToggle.Font = Enum.Font.GothamBold
+ESPToggle.BorderSizePixel = 0
+ESPToggle.Parent = ToggleFrame
 
--- // BUTTON CREATOR
-local function createButton(parent, text, posY, color)
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0.9, 0, 0, 38)
-    btn.Position = UDim2.new(0.05, 0, 0, posY)
-    btn.BackgroundColor3 = color
-    btn.Text = text
-    btn.TextColor3 = Color3.new(1, 1, 1)
-    btn.TextScaled = true
-    btn.Font = Enum.Font.GothamBold
-    btn.Parent = parent
+local ESPCorner = Instance.new("UICorner")
+ESPCorner.CornerRadius = UDim.new(0, 6)
+ESPCorner.Parent = ESPToggle
 
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 10)
+-- Names Toggle
+local NamesToggle = Instance.new("TextButton")
+NamesToggle.Name = "NamesToggle"
+NamesToggle.Size = UDim2.new(0.48, 0, 1, 0)
+NamesToggle.Position = UDim2.new(0.52, 0, 0, 0)
+NamesToggle.BackgroundColor3 = Color3.fromRGB(0, 170, 80)
+NamesToggle.Text = "Names: ON"
+NamesToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+NamesToggle.TextSize = 14
+NamesToggle.Font = Enum.Font.GothamBold
+NamesToggle.BorderSizePixel = 0
+NamesToggle.Parent = ToggleFrame
 
-    local stroke = Instance.new("UIStroke")
-    stroke.Color = Color3.fromRGB(255, 255, 255)
-    stroke.Thickness = 1
-    stroke.Transparency = 0.7
-    stroke.Parent = btn
-
-    btn.MouseEnter:Connect(function()
-        tweenService:Create(btn, TweenInfo.new(0.2), {
-            BackgroundColor3 = Color3.new(
-                math.min(color.R + 0.15, 1),
-                math.min(color.G + 0.15, 1),
-                math.min(color.B + 0.15, 1)
-            )
-        }):Play()
-        tweenService:Create(stroke, TweenInfo.new(0.2), {Transparency = 0.3}):Play()
-    end)
-    btn.MouseLeave:Connect(function()
-        tweenService:Create(btn, TweenInfo.new(0.2), {
-            BackgroundColor3 = color
-        }):Play()
-        tweenService:Create(stroke, TweenInfo.new(0.2), {Transparency = 0.7}):Play()
-    end)
-
-    return btn
-end
-
--- // KEYBIND ROW CREATOR
-local function createKeybindRow(parent, labelText, settingKey, posY)
-    local row = Instance.new("Frame")
-    row.Size = UDim2.new(0.9, 0, 0, 45)
-    row.Position = UDim2.new(0.05, 0, 0, posY)
-    row.BackgroundColor3 = Color3.fromRGB(25, 25, 40)
-    row.BorderSizePixel = 0
-    row.Parent = parent
-
-    Instance.new("UICorner", row).CornerRadius = UDim.new(0, 10)
-
-    local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(0.55, 0, 1, 0)
-    label.Position = UDim2.new(0, 10, 0, 0)
-    label.BackgroundTransparency = 1
-    label.Text = labelText
-    label.TextColor3 = Color3.fromRGB(200, 200, 220)
-    label.TextScaled = true
-    label.Font = Enum.Font.GothamBold
-    label.TextXAlignment = Enum.TextXAlignment.Left
-    label.Parent = row
-
-    local keyBtn = Instance.new("TextButton")
-    keyBtn.Size = UDim2.new(0.38, 0, 0, 30)
-    keyBtn.Position = UDim2.new(0.58, 0, 0.5, -15)
-    keyBtn.BackgroundColor3 = Color3.fromRGB(0, 100, 255)
-    keyBtn.Text = "[" .. settings[settingKey].Name .. "]"
-    keyBtn.TextColor3 = Color3.new(1, 1, 1)
-    keyBtn.TextScaled = true
-    keyBtn.Font = Enum.Font.GothamBold
-    keyBtn.Parent = row
-
-    Instance.new("UICorner", keyBtn).CornerRadius = UDim.new(0, 8)
-
-    keyBtn.MouseButton1Click:Connect(function()
-        waitingForKey = {settingKey = settingKey, button = keyBtn}
-        keyBtn.Text = "[ ... ]"
-        keyBtn.BackgroundColor3 = Color3.fromRGB(255, 100, 0)
-
-        statusLabel.Text = "Status: ⌨️ Press any key..."
-        statusLabel.TextColor3 = Color3.fromRGB(255, 200, 0)
-    end)
-
-    return keyBtn
-end
-
--- // MAIN PAGE BUTTONS
-local unanchorBtn = createButton(mainPage, "🔓 UNANCHOR YOURSELF", 26, Color3.fromRGB(0, 100, 255))
-local autoDoorBtn = createButton(mainPage, "🚪 Auto Open Doors: OFF", 70, Color3.fromRGB(40, 40, 60))
-local autoUnanchorBtn = createButton(mainPage, "🔄 Auto Unanchor: OFF", 114, Color3.fromRGB(40, 40, 60))
-local doorBoostBtn = createButton(mainPage, "⚡ Door Booster: OFF", 158, Color3.fromRGB(40, 40, 60))
-local interactBtn = createButton(mainPage, "🖐️ Force Open Nearest Door", 202, Color3.fromRGB(130, 0, 200))
-
--- Keybind hint
-local keybindHint = Instance.new("TextLabel")
-keybindHint.Size = UDim2.new(0.9, 0, 0, 35)
-keybindHint.Position = UDim2.new(0.05, 0, 0, 248)
-keybindHint.BackgroundColor3 = Color3.fromRGB(20, 20, 35)
-keybindHint.Text = ""
-keybindHint.TextColor3 = Color3.fromRGB(150, 150, 180)
-keybindHint.TextScaled = true
-keybindHint.Font = Enum.Font.Gotham
-keybindHint.Parent = mainPage
-
-Instance.new("UICorner", keybindHint).CornerRadius = UDim.new(0, 8)
-
-local function updateHintText()
-    keybindHint.Text = string.format(
-        "[%s] Open Door  |  [%s] Unanchor  |  [%s] Hide GUI",
-        settings.forceInteractKey.Name,
-        settings.unanchorKey.Name,
-        settings.toggleGUIKey.Name
-    )
-end
-updateHintText()
-
--- // SETTINGS PAGE KEYBIND ROWS
-local sep1 = Instance.new("TextLabel")
-sep1.Size = UDim2.new(0.9, 0, 0, 20)
-sep1.Position = UDim2.new(0.05, 0, 0, 30)
-sep1.BackgroundTransparency = 1
-sep1.Text = "Click a keybind to change it:"
-sep1.TextColor3 = Color3.fromRGB(150, 150, 180)
-sep1.TextScaled = true
-sep1.Font = Enum.Font.Gotham
-sep1.TextXAlignment = Enum.TextXAlignment.Left
-sep1.Parent = settingsPage
-
-local keyBtn1 = createKeybindRow(settingsPage, "🖐️ Force Interact", "forceInteractKey", 55)
-local keyBtn2 = createKeybindRow(settingsPage, "🔓 Unanchor", "unanchorKey", 108)
-local keyBtn3 = createKeybindRow(settingsPage, "👁️ Toggle GUI", "toggleGUIKey", 161)
+local NamesCorner = Instance.new("UICorner")
+NamesCorner.CornerRadius = UDim.new(0, 6)
+NamesCorner.Parent = NamesToggle
 
 -- Divider
-local divider = Instance.new("Frame")
-divider.Size = UDim2.new(0.8, 0, 0, 2)
-divider.Position = UDim2.new(0.1, 0, 0, 220)
-divider.BackgroundColor3 = Color3.fromRGB(50, 50, 80)
-divider.BorderSizePixel = 0
-divider.Parent = settingsPage
+local Divider = Instance.new("Frame")
+Divider.Size = UDim2.new(1, -30, 0, 1)
+Divider.Position = UDim2.new(0, 15, 0, 165)
+Divider.BackgroundColor3 = Color3.fromRGB(60, 60, 90)
+Divider.BorderSizePixel = 0
+Divider.Parent = MainFrame
 
--- Reset Keybinds Button
-local resetBtn = createButton(settingsPage, "🔃 Reset All Keybinds", 235, Color3.fromRGB(200, 50, 50))
+-- Entity List Header
+local ListHeader = Instance.new("TextLabel")
+ListHeader.Size = UDim2.new(1, -20, 0, 25)
+ListHeader.Position = UDim2.new(0, 10, 0, 170)
+ListHeader.BackgroundTransparency = 1
+ListHeader.Text = "⚡ Detected Entities:"
+ListHeader.TextColor3 = Color3.fromRGB(180, 180, 220)
+ListHeader.TextSize = 14
+ListHeader.Font = Enum.Font.GothamSemibold
+ListHeader.TextXAlignment = Enum.TextXAlignment.Left
+ListHeader.Parent = MainFrame
 
--- Credits
-local credits = Instance.new("TextLabel")
-credits.Size = UDim2.new(0.9, 0, 0, 40)
-credits.Position = UDim2.new(0.05, 0, 0, 285)
-credits.BackgroundTransparency = 1
-credits.Text = "Rooms Helper V4\nMade for Rooms Re-established"
-credits.TextColor3 = Color3.fromRGB(80, 80, 100)
-credits.TextScaled = true
-credits.Font = Enum.Font.Gotham
-credits.Parent = settingsPage
+-- Scrolling Entity List
+local ScrollFrame = Instance.new("ScrollingFrame")
+ScrollFrame.Name = "EntityList"
+ScrollFrame.Size = UDim2.new(1, -20, 1, -205)
+ScrollFrame.Position = UDim2.new(0, 10, 0, 198)
+ScrollFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 35)
+ScrollFrame.BorderSizePixel = 0
+ScrollFrame.ScrollBarThickness = 4
+ScrollFrame.ScrollBarImageColor3 = Color3.fromRGB(0, 150, 255)
+ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+ScrollFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+ScrollFrame.Parent = MainFrame
 
--- // ===== CORE FUNCTIONS ===== //
+local ScrollCorner = Instance.new("UICorner")
+ScrollCorner.CornerRadius = UDim.new(0, 6)
+ScrollCorner.Parent = ScrollFrame
 
-local function getCharacter()
-    return player.Character or player.CharacterAdded:Wait()
+local ListLayout = Instance.new("UIListLayout")
+ListLayout.SortOrder = Enum.SortOrder.Name
+ListLayout.Padding = UDim.new(0, 3)
+ListLayout.Parent = ScrollFrame
+
+local ListPadding = Instance.new("UIPadding")
+ListPadding.PaddingTop = UDim.new(0, 4)
+ListPadding.PaddingLeft = UDim.new(0, 4)
+ListPadding.PaddingRight = UDim.new(0, 4)
+ListPadding.Parent = ScrollFrame
+
+-- Scan Pulse Animation (bottom bar)
+local PulseBar = Instance.new("Frame")
+PulseBar.Size = UDim2.new(0.3, 0, 0, 3)
+PulseBar.Position = UDim2.new(0, 0, 1, -3)
+PulseBar.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
+PulseBar.BorderSizePixel = 0
+PulseBar.Parent = MainFrame
+
+-- ============================================
+-- ENTITY SCANNER LOGIC
+-- ============================================
+
+local espEnabled = true
+local namesEnabled = true
+local entityESPObjects = {} -- {model = {highlight, billboard, connection}}
+local scannerActive = true
+
+-- Entity color mapping
+local ENTITY_COLORS = {
+    -- Doors-style entities
+    ["Rush"] = Color3.fromRGB(255, 0, 0),
+    ["Ambush"] = Color3.fromRGB(255, 50, 0),
+    ["Screech"] = Color3.fromRGB(200, 0, 200),
+    ["Halt"] = Color3.fromRGB(255, 255, 0),
+    ["Eyes"] = Color3.fromRGB(150, 0, 255),
+    ["Seek"] = Color3.fromRGB(0, 0, 0),
+    ["Figure"] = Color3.fromRGB(100, 0, 0),
+    ["Glitch"] = Color3.fromRGB(0, 255, 100),
+    ["Jack"] = Color3.fromRGB(255, 150, 0),
+    ["Timothy"] = Color3.fromRGB(139, 90, 43),
+    ["Shadow"] = Color3.fromRGB(50, 50, 50),
+    ["Snare"] = Color3.fromRGB(0, 100, 0),
+    ["Dupe"] = Color3.fromRGB(180, 0, 180),
+    ["A-60"] = Color3.fromRGB(255, 30, 30),
+    ["A-90"] = Color3.fromRGB(255, 60, 60),
+    ["A-120"] = Color3.fromRGB(255, 90, 90),
+    ["RushMoving"] = Color3.fromRGB(255, 0, 0),
+    ["AmbushMoving"] = Color3.fromRGB(255, 50, 0),
+    ["Default"] = Color3.fromRGB(255, 80, 80),
+}
+
+-- Known entity name patterns to detect
+local ENTITY_PATTERNS = {
+    "Rush", "Ambush", "Screech", "Halt", "Eyes", "Seek", "Figure",
+    "Glitch", "Jack", "Timothy", "Shadow", "Snare", "Dupe",
+    "A-60", "A-90", "A-120", "RushMoving", "AmbushMoving",
+    "Entity", "Monster", "Creature", "Ghost", "Demon"
+}
+
+local function getEntityColor(name)
+    for key, color in pairs(ENTITY_COLORS) do
+        if string.find(name:lower(), key:lower()) then
+            return color
+        end
+    end
+    return ENTITY_COLORS["Default"]
 end
 
-local function getHRP()
-    local char = getCharacter()
-    return char and char:FindFirstChild("HumanoidRootPart")
-end
+local function isEntity(obj)
+    local name = obj.Name:lower()
 
-local function unanchor()
-    local character = getCharacter()
-    local count = 0
-
-    for _, part in pairs(character:GetDescendants()) do
-        if part:IsA("BasePart") and part.Anchored then
-            part.Anchored = false
-            count = count + 1
+    -- Check against known patterns
+    for _, pattern in ipairs(ENTITY_PATTERNS) do
+        if string.find(name, pattern:lower()) then
+            return true
         end
     end
 
-    pcall(function()
-        if character:FindFirstChild("Humanoid") then
-            character.Humanoid:ChangeState(Enum.HumanoidStateType.Running)
+    -- Check if it's a model with humanoid-like properties but not a player
+    if obj:IsA("Model") then
+        -- Not a player character
+        for _, player in pairs(Players:GetPlayers()) do
+            if player.Character == obj then
+                return false
+            end
         end
-        if character:FindFirstChild("HumanoidRootPart") then
-            character.HumanoidRootPart.Velocity = Vector3.new(0, 10, 0)
+
+        -- Has a primary part or humanoidrootpart
+        local hasPart = obj:FindFirstChild("HumanoidRootPart")
+            or obj:FindFirstChild("Head")
+            or obj:FindFirstChild("Torso")
+            or obj.PrimaryPart
+
+        -- Check various entity indicators
+        if hasPart then
+            -- Check if it has entity-like attributes
+            local hasHumanoid = obj:FindFirstChildOfClass("Humanoid")
+            local hasAnimController = obj:FindFirstChildOfClass("AnimationController")
+
+            if hasHumanoid or hasAnimController then
+                -- Make sure it's not a player
+                local isPlayer = false
+                for _, player in pairs(Players:GetPlayers()) do
+                    if player.Character == obj then
+                        isPlayer = true
+                        break
+                    end
+                end
+                if not isPlayer then
+                    return true
+                end
+            end
+        end
+    end
+
+    return false
+end
+
+-- Broader scan: check specific Rooms/Doors game folders
+local function getEntityContainers()
+    local containers = {}
+
+    -- Common entity locations in Rooms/Doors-style games
+    local possiblePaths = {
+        workspace,
+        workspace:FindFirstChild("Entities"),
+        workspace:FindFirstChild("Entity"),
+        workspace:FindFirstChild("Monsters"),
+        workspace:FindFirstChild("CurrentRooms"),
+        workspace:FindFirstChild("Rooms"),
+        workspace:FindFirstChild("Map"),
+    }
+
+    for _, container in pairs(possiblePaths) do
+        if container then
+            table.insert(containers, container)
+        end
+    end
+
+    return containers
+end
+
+local function createESP(entity)
+    if entityESPObjects[entity] then return end
+
+    local entityName = entity.Name
+    local color = getEntityColor(entityName)
+
+    local espData = {}
+
+    -- Create Highlight
+    if espEnabled then
+        local highlight = Instance.new("Highlight")
+        highlight.Name = "EntityESP"
+        highlight.Adornee = entity
+        highlight.FillColor = color
+        highlight.FillTransparency = 0.7
+        highlight.OutlineColor = color
+        highlight.OutlineTransparency = 0.1
+        highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+        highlight.Parent = entity
+        espData.highlight = highlight
+    end
+
+    -- Create Billboard for name
+    if namesEnabled then
+        local targetPart = entity:FindFirstChild("HumanoidRootPart")
+            or entity:FindFirstChild("Head")
+            or entity:FindFirstChild("Torso")
+            or entity.PrimaryPart
+            or (entity:IsA("Model") and entity:FindFirstChildWhichIsA("BasePart"))
+
+        if targetPart then
+            local billboard = Instance.new("BillboardGui")
+            billboard.Name = "EntityNameESP"
+            billboard.Adornee = targetPart
+            billboard.Size = UDim2.new(0, 200, 0, 60)
+            billboard.StudsOffset = Vector3.new(0, 4, 0)
+            billboard.AlwaysOnTop = true
+            billboard.MaxDistance = math.huge
+            billboard.Parent = targetPart
+
+            -- Entity Name Label
+            local nameLabel = Instance.new("TextLabel")
+            nameLabel.Size = UDim2.new(1, 0, 0.5, 0)
+            nameLabel.BackgroundTransparency = 1
+            nameLabel.Text = "⚠ " .. entityName
+            nameLabel.TextColor3 = color
+            nameLabel.TextSize = 18
+            nameLabel.Font = Enum.Font.GothamBold
+            nameLabel.TextStrokeTransparency = 0.3
+            nameLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+            nameLabel.Parent = billboard
+
+            -- Distance Label
+            local distLabel = Instance.new("TextLabel")
+            distLabel.Name = "DistLabel"
+            distLabel.Size = UDim2.new(1, 0, 0.4, 0)
+            distLabel.Position = UDim2.new(0, 0, 0.5, 0)
+            distLabel.BackgroundTransparency = 1
+            distLabel.Text = "0 studs"
+            distLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+            distLabel.TextSize = 14
+            distLabel.Font = Enum.Font.GothamSemibold
+            distLabel.TextStrokeTransparency = 0.5
+            distLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+            distLabel.Parent = billboard
+
+            espData.billboard = billboard
+            espData.distLabel = distLabel
+            espData.targetPart = targetPart
+        end
+    end
+
+    -- Track destruction
+    espData.destroyConnection = entity.AncestryChanged:Connect(function(_, parent)
+        if not parent then
+            removeESP(entity)
         end
     end)
+
+    entityESPObjects[entity] = espData
+end
+
+function removeESP(entity)
+    local data = entityESPObjects[entity]
+    if data then
+        if data.highlight then
+            data.highlight:Destroy()
+        end
+        if data.billboard then
+            data.billboard:Destroy()
+        end
+        if data.destroyConnection then
+            data.destroyConnection:Disconnect()
+        end
+        entityESPObjects[entity] = nil
+    end
+end
+
+local function clearAllESP()
+    for entity, _ in pairs(entityESPObjects) do
+        removeESP(entity)
+    end
+    entityESPObjects = {}
+end
+
+local function createEntityListEntry(entity, color)
+    local existingEntry = ScrollFrame:FindFirstChild("Entry_" .. entity.Name .. "_" .. tostring(entity:GetDebugId()))
+    if existingEntry then return end
+
+    local entry = Instance.new("Frame")
+    entry.Name = "Entry_" .. entity.Name .. "_" .. tostring(entity:GetDebugId())
+    entry.Size = UDim2.new(1, -8, 0, 30)
+    entry.BackgroundColor3 = Color3.fromRGB(30, 30, 50)
+    entry.BorderSizePixel = 0
+    entry.Parent = ScrollFrame
+
+    local entryCorner = Instance.new("UICorner")
+    entryCorner.CornerRadius = UDim.new(0, 5)
+    entryCorner.Parent = entry
+
+    -- Color indicator
+    local colorDot = Instance.new("Frame")
+    colorDot.Size = UDim2.new(0, 8, 0, 8)
+    colorDot.Position = UDim2.new(0, 8, 0.5, -4)
+    colorDot.BackgroundColor3 = color
+    colorDot.BorderSizePixel = 0
+    colorDot.Parent = entry
+
+    local dotCorner = Instance.new("UICorner")
+    dotCorner.CornerRadius = UDim.new(1, 0)
+    dotCorner.Parent = colorDot
+
+    -- Entity name
+    local entryName = Instance.new("TextLabel")
+    entryName.Size = UDim2.new(0.6, -25, 1, 0)
+    entryName.Position = UDim2.new(0, 22, 0, 0)
+    entryName.BackgroundTransparency = 1
+    entryName.Text = entity.Name
+    entryName.TextColor3 = color
+    entryName.TextSize = 12
+    entryName.Font = Enum.Font.GothamSemibold
+    entryName.TextXAlignment = Enum.TextXAlignment.Left
+    entryName.TextTruncate = Enum.TextTruncate.AtEnd
+    entryName.Parent = entry
+
+    -- Distance
+    local entryDist = Instance.new("TextLabel")
+    entryDist.Name = "Distance"
+    entryDist.Size = UDim2.new(0.35, 0, 1, 0)
+    entryDist.Position = UDim2.new(0.65, 0, 0, 0)
+    entryDist.BackgroundTransparency = 1
+    entryDist.Text = "? studs"
+    entryDist.TextColor3 = Color3.fromRGB(150, 150, 150)
+    entryDist.TextSize = 11
+    entryDist.Font = Enum.Font.Gotham
+    entryDist.TextXAlignment = Enum.TextXAlignment.Right
+    entryDist.Parent = entry
+
+    return entry
+end
+
+local function removeEntityListEntry(entity)
+    for _, child in pairs(ScrollFrame:GetChildren()) do
+        if child:IsA("Frame") and string.find(child.Name, tostring(entity:GetDebugId()) or "") then
+            child:Destroy()
+        end
+    end
+end
+
+local function scanForEntities()
+    local foundEntities = {}
+    local containers = getEntityContainers()
+
+    for _, container in pairs(containers) do
+        if container then
+            for _, descendant in pairs(container:GetDescendants()) do
+                if descendant:IsA("Model") and isEntity(descendant) then
+                    table.insert(foundEntities, descendant)
+                end
+            end
+        end
+    end
+
+    return foundEntities
+end
+
+-- ============================================
+-- UPDATE LOOP
+-- ============================================
+
+local function updateScanner()
+    if not scannerActive then return end
+
+    local entities = scanForEntities()
+    local currentEntitySet = {}
+
+    -- Process found entities
+    for _, entity in pairs(entities) do
+        currentEntitySet[entity] = true
+
+        if not entityESPObjects[entity] then
+            -- New entity found
+            createESP(entity)
+            local color = getEntityColor(entity.Name)
+            createEntityListEntry(entity, color)
+        end
+    end
+
+    -- Remove ESP for entities that no longer exist
+    for entity, _ in pairs(entityESPObjects) do
+        if not currentEntitySet[entity] or not entity.Parent then
+            removeESP(entity)
+            removeEntityListEntry(entity)
+        end
+    end
+
+    -- Update entity count
+    local count = 0
+    for _ in pairs(entityESPObjects) do
+        count = count + 1
+    end
+    EntityCountLabel.Text = "Entities Detected: " .. tostring(count)
 
     if count > 0 then
-        statusLabel.Text = "Status: ✅ Unanchored " .. count .. " parts!"
-        statusLabel.TextColor3 = Color3.fromRGB(0, 255, 100)
+        EntityCountLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
     else
-        statusLabel.Text = "Status: ⚠️ Already unanchored"
-        statusLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
+        EntityCountLabel.TextColor3 = Color3.fromRGB(255, 200, 50)
     end
-
-    unanchorBtn.BackgroundColor3 = Color3.fromRGB(0, 255, 100)
-    tweenService:Create(unanchorBtn, TweenInfo.new(0.5), {
-        BackgroundColor3 = Color3.fromRGB(0, 100, 255)
-    }):Play()
 end
 
-local function findNearestPrompt()
-    local hrp = getHRP()
-    if not hrp then return nil, math.huge end
+-- Distance updater (runs more frequently)
+local function updateDistances()
+    local character = LocalPlayer.Character
+    if not character then return end
+    local rootPart = character:FindFirstChild("HumanoidRootPart")
+    if not rootPart then return end
 
-    local closest = nil
-    local closestDist = math.huge
+    for entity, data in pairs(entityESPObjects) do
+        if data.targetPart and data.distLabel then
+            local dist = math.floor((rootPart.Position - data.targetPart.Position).Magnitude)
+            data.distLabel.Text = tostring(dist) .. " studs"
 
-    for _, v in pairs(workspace:GetDescendants()) do
-        if v:IsA("ProximityPrompt") then
-            pcall(function()
-                local parent = v.Parent
-                local part = nil
-                if parent:IsA("BasePart") then
-                    part = parent
-                elseif parent:FindFirstChildWhichIsA("BasePart") then
-                    part = parent:FindFirstChildWhichIsA("BasePart")
-                end
-                if part then
-                    local dist = (part.Position - hrp.Position).Magnitude
-                    if dist < closestDist then
-                        closestDist = dist
-                        closest = v
-                    end
-                end
-            end)
+            -- Update color based on distance (closer = more red)
+            if dist < 30 then
+                data.distLabel.TextColor3 = Color3.fromRGB(255, 50, 50)
+            elseif dist < 60 then
+                data.distLabel.TextColor3 = Color3.fromRGB(255, 200, 50)
+            else
+                data.distLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+            end
         end
-    end
 
-    return closest, closestDist
-end
-
-local function forceInteract()
-    local prompt, dist = findNearestPrompt()
-
-    if prompt then
-        pcall(function()
-            prompt.MaxActivationDistance = 25
-            prompt.HoldDuration = 0
-            prompt.Enabled = true
-        end)
-
-        pcall(function()
-            prompt:InputHoldBegin()
-            task.wait(0.15)
-            prompt:InputHoldEnd()
-        end)
-
-        pcall(function()
-            fireproximityprompt(prompt)
-        end)
-
-        pcall(function()
-            for _, v in pairs(workspace:GetDescendants()) do
-                if v:IsA("ClickDetector") then
-                    local p = v.Parent
-                    if p and p:IsA("BasePart") then
-                        local hrp = getHRP()
-                        if hrp and (p.Position - hrp.Position).Magnitude < 15 then
-                            fireclickdetector(v)
-                        end
-                    end
+        -- Update list entry distances
+        for _, child in pairs(ScrollFrame:GetChildren()) do
+            if child:IsA("Frame") and string.find(child.Name, tostring(entity:GetDebugId()) or "") then
+                local distLabel = child:FindFirstChild("Distance")
+                if distLabel and data.targetPart then
+                    local dist = math.floor((rootPart.Position - data.targetPart.Position).Magnitude)
+                    distLabel.Text = tostring(dist) .. " studs"
                 end
             end
-        end)
-
-        pcall(function()
-            VIM:SendKeyEvent(true, Enum.KeyCode.F, false, game)
-            task.wait(0.1)
-            VIM:SendKeyEvent(false, Enum.KeyCode.F, false, game)
-        end)
-
-        statusLabel.Text = "Status: 🚪 Door opened! (Dist: " .. math.floor(dist) .. ")"
-        statusLabel.TextColor3 = Color3.fromRGB(0, 200, 255)
-    else
-        pcall(function()
-            VIM:SendKeyEvent(true, Enum.KeyCode.F, false, game)
-            task.wait(0.15)
-            VIM:SendKeyEvent(false, Enum.KeyCode.F, false, game)
-        end)
-
-        statusLabel.Text = "Status: ❌ No door nearby"
-        statusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+        end
     end
-
-    interactBtn.BackgroundColor3 = Color3.fromRGB(200, 0, 255)
-    tweenService:Create(interactBtn, TweenInfo.new(0.5), {
-        BackgroundColor3 = Color3.fromRGB(130, 0, 200)
-    }):Play()
 end
 
--- // ===== GUI CONTROLS ===== //
+-- ============================================
+-- BUTTON HANDLERS
+-- ============================================
 
--- Settings toggle
-settingsBtn.MouseButton1Click:Connect(function()
-    settingsOpen = not settingsOpen
-    if settingsOpen then
-        mainPage.Visible = false
-        settingsPage.Visible = true
-        settingsBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
-        statusLabel.Text = "⚙ Settings"
-        statusLabel.TextColor3 = Color3.fromRGB(200, 200, 255)
+ESPToggle.MouseButton1Click:Connect(function()
+    espEnabled = not espEnabled
+    if espEnabled then
+        ESPToggle.Text = "ESP: ON"
+        ESPToggle.BackgroundColor3 = Color3.fromRGB(0, 170, 80)
     else
-        mainPage.Visible = true
-        settingsPage.Visible = false
-        settingsBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 120)
-        statusLabel.Text = "Status: ✅ Ready"
-        statusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+        ESPToggle.Text = "ESP: OFF"
+        ESPToggle.BackgroundColor3 = Color3.fromRGB(120, 50, 50)
+    end
+
+    -- Update existing ESP
+    for entity, data in pairs(entityESPObjects) do
+        if data.highlight then
+            data.highlight.Enabled = espEnabled
+        end
     end
 end)
 
--- FIXED: Proper minimize (hides frame, shows small toggle button)
-minBtn.MouseButton1Click:Connect(function()
-    minimized = true
-    frame.Visible = false
-    toggleBtn.Visible = true
-    toggleBtn.Position = UDim2.new(frame.Position.X.Scale, frame.Position.X.Offset, frame.Position.Y.Scale, frame.Position.Y.Offset)
-end)
+NamesToggle.MouseButton1Click:Connect(function()
+    namesEnabled = not namesEnabled
+    if namesEnabled then
+        NamesToggle.Text = "Names: ON"
+        NamesToggle.BackgroundColor3 = Color3.fromRGB(0, 170, 80)
+    else
+        NamesToggle.Text = "Names: OFF"
+        NamesToggle.BackgroundColor3 = Color3.fromRGB(120, 50, 50)
+    end
 
-toggleBtn.MouseButton1Click:Connect(function()
-    minimized = false
-    frame.Visible = true
-    toggleBtn.Visible = false
-end)
-
--- Close
-closeBtn.MouseButton1Click:Connect(function()
-    screenGui:Destroy()
-end)
-
--- // BUTTON CONNECTIONS
-unanchorBtn.MouseButton1Click:Connect(unanchor)
-interactBtn.MouseButton1Click:Connect(forceInteract)
-
--- Toggle helpers
-local function makeToggle(btn, state, onText, offText, callback)
-    btn.MouseButton1Click:Connect(function()
-        state = not state
-        if state then
-            btn.Text = onText
-            btn.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
-        else
-            btn.Text = offText
-            btn.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+    -- Update existing billboards
+    for entity, data in pairs(entityESPObjects) do
+        if data.billboard then
+            data.billboard.Enabled = namesEnabled
         end
-        callback(state)
+    end
+end)
+
+CloseButton.MouseButton1Click:Connect(function()
+    scannerActive = false
+    clearAllESP()
+    ScreenGui:Destroy()
+end)
+
+-- ============================================
+-- WORKSPACE MONITORING (live detection)
+-- ============================================
+
+-- Monitor for new entities being added
+local function monitorContainer(container)
+    container.DescendantAdded:Connect(function(descendant)
+        if not scannerActive then return end
+        task.wait(0.1) -- Small delay to let the entity fully load
+        if descendant:IsA("Model") and isEntity(descendant) then
+            createESP(descendant)
+            local color = getEntityColor(descendant.Name)
+            createEntityListEntry(descendant, color)
+        end
+    end)
+
+    container.DescendantRemoving:Connect(function(descendant)
+        if not scannerActive then return end
+        if entityESPObjects[descendant] then
+            removeESP(descendant)
+            removeEntityListEntry(descendant)
+        end
     end)
 end
 
-makeToggle(autoDoorBtn, false,
-    "🚪 Auto Open Doors: ON",
-    "🚪 Auto Open Doors: OFF",
-    function(v) autoDoorOn = v end
-)
+for _, container in pairs(getEntityContainers()) do
+    monitorContainer(container)
+end
 
-makeToggle(autoUnanchorBtn, false,
-    "🔄 Auto Unanchor: ON",
-    "🔄 Auto Unanchor: OFF",
-    function(v) autoUnanchorOn = v end
-)
+-- ============================================
+-- PULSE ANIMATION
+-- ============================================
 
-makeToggle(doorBoostBtn, false,
-    "⚡ Door Booster: ON",
-    "⚡ Door Booster: OFF",
-    function(v) doorBoostOn = v end
-)
+local pulseDirection = 1
+local pulsePos = 0
 
--- Reset keybinds
-resetBtn.MouseButton1Click:Connect(function()
-    settings.forceInteractKey = Enum.KeyCode.G
-    settings.unanchorKey = Enum.KeyCode.H
-    settings.toggleGUIKey = Enum.KeyCode.RightShift
-
-    -- Update all keybind buttons
-    for _, child in pairs(settingsPage:GetDescendants()) do
-        if child:IsA("TextButton") and child.Text:match("^%[") then
-            -- Find which keybind this belongs to by checking parent label
-            local row = child.Parent
-            if row then
-                local label = row:FindFirstChildWhichIsA("TextLabel")
-                if label then
-                    if label.Text:match("Interact") then
-                        child.Text = "[G]"
-                    elseif label.Text:match("Unanchor") then
-                        child.Text = "[H]"
-                    elseif label.Text:match("GUI") then
-                        child.Text = "[RightShift]"
-                    end
-                end
-            end
+spawn(function()
+    while scannerActive do
+        pulsePos = pulsePos + (0.02 * pulseDirection)
+        if pulsePos >= 0.7 then
+            pulseDirection = -1
+        elseif pulsePos <= 0 then
+            pulseDirection = 1
         end
-    end
+        PulseBar.Position = UDim2.new(pulsePos, 0, 1, -3)
 
-    child = nil
-    updateHintText()
-    statusLabel.Text = "Status: 🔃 Keybinds reset!"
-    statusLabel.TextColor3 = Color3.fromRGB(255, 200, 0)
+        -- Pulse the scanner icon
+        local alpha = (math.sin(tick() * 3) + 1) / 2
+        ScannerIcon.TextTransparency = alpha * 0.5
+
+        task.wait(0.03)
+    end
 end)
 
--- // ===== KEYBIND LISTENER ===== //
-UIS.InputBegan:Connect(function(input, processed)
-    if input.UserInputType ~= Enum.UserInputType.Keyboard then return end
+-- ============================================
+-- MAIN LOOPS
+-- ============================================
 
-    -- If waiting for a keybind change
-    if waitingForKey then
-        local key = input.KeyCode
-        if key == Enum.KeyCode.Escape then
-            -- Cancel
-            waitingForKey.button.Text = "[" .. settings[waitingForKey.settingKey].Name .. "]"
-            waitingForKey.button.BackgroundColor3 = Color3.fromRGB(0, 100, 255)
-            statusLabel.Text = "Status: ❌ Cancelled"
-            statusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
-            waitingForKey = nil
-            return
-        end
+-- Entity scan loop (every 1 second)
+spawn(function()
+    while scannerActive do
+        updateScanner()
+        task.wait(1)
+    end
+end)
 
-        settings[waitingForKey.settingKey] = key
-        waitingForKey.button.Text = "[" .. key.Name .. "]"
-        waitingForKey.button.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
-        tweenService:Create(waitingForKey.button, TweenInfo.new(0.5), {
-            BackgroundColor3 = Color3.fromRGB(0, 100, 255)
-        }):Play()
-
-        statusLabel.Text = "Status: ✅ Bound to [" .. key.Name .. "]"
-        statusLabel.TextColor3 = Color3.fromRGB(0, 255, 100)
-
-        updateHintText()
-        waitingForKey = nil
+-- Distance update loop (every frame via heartbeat)
+local distUpdateConnection = RunService.Heartbeat:Connect(function()
+    if not scannerActive then
+        distUpdateConnection:Disconnect()
         return
     end
-
-    if processed then return end
-
-    -- Keybind actions
-    if input.KeyCode == settings.forceInteractKey then
-        forceInteract()
-    elseif input.KeyCode == settings.unanchorKey then
-        unanchor()
-    elseif input.KeyCode == settings.toggleGUIKey then
-        if frame.Visible then
-            minimized = true
-            frame.Visible = false
-            toggleBtn.Visible = true
-        else
-            minimized = false
-            frame.Visible = true
-            toggleBtn.Visible = false
-        end
-    end
+    updateDistances()
 end)
 
--- // ===== BACKGROUND LOOPS ===== //
+-- Initial scan
+updateScanner()
 
--- Auto Door Opener
-task.spawn(function()
-    while task.wait(0.5) do
-        if autoDoorOn then
-            pcall(function()
-                local prompt, dist = findNearestPrompt()
-                if prompt and dist < 15 then
-                    prompt.HoldDuration = 0
-                    prompt.MaxActivationDistance = 20
-                    prompt.Enabled = true
-
-                    pcall(function()
-                        prompt:InputHoldBegin()
-                        task.wait(0.1)
-                        prompt:InputHoldEnd()
-                    end)
-
-                    pcall(function() fireproximityprompt(prompt) end)
-
-                    pcall(function()
-                        VIM:SendKeyEvent(true, Enum.KeyCode.F, false, game)
-                        task.wait(0.1)
-                        VIM:SendKeyEvent(false, Enum.KeyCode.F, false, game)
-                    end)
-
-                    pcall(function()
-                        for _, v in pairs(workspace:GetDescendants()) do
-                            if v:IsA("ClickDetector") then
-                                local p = v.Parent
-                                if p and p:IsA("BasePart") then
-                                    local hrp = getHRP()
-                                    if hrp and (p.Position - hrp.Position).Magnitude < 15 then
-                                        fireclickdetector(v)
-                                    end
-                                end
-                            end
-                        end
-                    end)
-                end
-            end)
-        end
-    end
-end)
-
--- Auto Unanchor Loop
-task.spawn(function()
-    while task.wait(1.5) do
-        if autoUnanchorOn then
-            pcall(unanchor)
-        end
-    end
-end)
-
--- Door Booster Loop
-task.spawn(function()
-    while task.wait(1) do
-        if doorBoostOn then
-            pcall(function()
-                for _, v in pairs(workspace:GetDescendants()) do
-                    if v:IsA("ProximityPrompt") then
-                        v.HoldDuration = 0
-                        v.MaxActivationDistance = 25
-                        v.Enabled = true
-                    end
-                end
-            end)
-        end
-    end
-end)
-
--- Respawn handler
-player.CharacterAdded:Connect(function()
-    task.wait(1.5)
-    statusLabel.Text = "Status: 🔃 Respawned!"
-    statusLabel.TextColor3 = Color3.fromRGB(255, 200, 0)
-    if autoUnanchorOn then
-        task.wait(0.5)
-        unanchor()
-    end
-end)
-
--- Rainbow border
-task.spawn(function()
-    local hue = 0
-    while task.wait(0.03) do
-        if not frame or not frame.Parent then break end
-        hue = (hue + 1) % 360
-        frameStroke.Color = Color3.fromHSV(hue / 360, 0.8, 1)
-        toggleStroke.Color = Color3.fromHSV(hue / 360, 0.8, 1)
-    end
-end)
-
-print("⚡ Rooms Helper V4 loaded!")
-print("🚪 [" .. settings.forceInteractKey.Name .. "] Force open door")
-print("🔓 [" .. settings.unanchorKey.Name .. "] Unanchor yourself")
-print("👁️ [" .. settings.toggleGUIKey.Name .. "] Toggle GUI")
+print("[Entity Scanner] ✔ Loaded successfully!")
+print("[Entity Scanner] Rooms: Established")
+print("[Entity Scanner] Scanning for entities...")
