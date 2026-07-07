@@ -1,0 +1,356 @@
+-- // ⚡ Unanchor Yourself V2 - Rooms Edition ⚡
+-- // Fixed respawn issue + cooler design
+
+local player = game.Players.LocalPlayer
+local tweenService = game:GetService("TweenService")
+
+-- Destroy old GUI if exists
+if player.PlayerGui:FindFirstChild("UnanchorV2") then
+    player.PlayerGui:FindFirstChild("UnanchorV2"):Destroy()
+end
+
+-- // CREATE GUI
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "UnanchorV2"
+screenGui.ResetOnSpawn = false -- KEY FIX: GUI stays after respawn
+screenGui.Parent = player:WaitForChild("PlayerGui")
+
+-- Main Frame
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 250, 0, 200)
+frame.Position = UDim2.new(0.5, -125, 0.5, -100)
+frame.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
+frame.BorderSizePixel = 0
+frame.Active = true
+frame.Draggable = true
+frame.BackgroundTransparency = 0.05
+frame.Parent = screenGui
+
+local frameCorner = Instance.new("UICorner")
+frameCorner.CornerRadius = UDim.new(0, 12)
+frameCorner.Parent = frame
+
+local frameStroke = Instance.new("UIStroke")
+frameStroke.Color = Color3.fromRGB(0, 170, 255)
+frameStroke.Thickness = 2
+frameStroke.Transparency = 0.3
+frameStroke.Parent = frame
+
+-- Glow Effect (gradient)
+local gradient = Instance.new("UIGradient")
+gradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(20, 20, 40)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(10, 10, 20)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(20, 20, 40))
+})
+gradient.Rotation = 45
+gradient.Parent = frame
+
+-- Title Bar
+local titleBar = Instance.new("Frame")
+titleBar.Size = UDim2.new(1, 0, 0, 35)
+titleBar.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
+titleBar.BorderSizePixel = 0
+titleBar.Parent = frame
+
+local titleCorner = Instance.new("UICorner")
+titleCorner.CornerRadius = UDim.new(0, 12)
+titleCorner.Parent = titleBar
+
+-- Fix bottom corners of title bar
+local titleFix = Instance.new("Frame")
+titleFix.Size = UDim2.new(1, 0, 0, 15)
+titleFix.Position = UDim2.new(0, 0, 1, -15)
+titleFix.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
+titleFix.BorderSizePixel = 0
+titleFix.Parent = titleBar
+
+local titleGradient = Instance.new("UIGradient")
+titleGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 80, 255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 200, 255))
+})
+titleGradient.Parent = titleBar
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(0.85, 0, 1, 0)
+title.Position = UDim2.new(0, 10, 0, 0)
+title.BackgroundTransparency = 1
+title.Text = "⚡ UNANCHOR V2"
+title.TextColor3 = Color3.new(1, 1, 1)
+title.TextScaled = true
+title.Font = Enum.Font.GothamBlack
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.Parent = titleBar
+
+-- Close Button
+local closeBtn = Instance.new("TextButton")
+closeBtn.Size = UDim2.new(0, 30, 0, 30)
+closeBtn.Position = UDim2.new(1, -32, 0, 2)
+closeBtn.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+closeBtn.Text = "X"
+closeBtn.TextColor3 = Color3.new(1, 1, 1)
+closeBtn.TextScaled = true
+closeBtn.Font = Enum.Font.GothamBold
+closeBtn.Parent = titleBar
+
+local closeCorner = Instance.new("UICorner")
+closeCorner.CornerRadius = UDim.new(0, 8)
+closeCorner.Parent = closeBtn
+
+-- Minimize Button
+local minBtn = Instance.new("TextButton")
+minBtn.Size = UDim2.new(0, 30, 0, 30)
+minBtn.Position = UDim2.new(1, -65, 0, 2)
+minBtn.BackgroundColor3 = Color3.fromRGB(255, 180, 0)
+minBtn.Text = "—"
+minBtn.TextColor3 = Color3.new(1, 1, 1)
+minBtn.TextScaled = true
+minBtn.Font = Enum.Font.GothamBold
+minBtn.Parent = titleBar
+
+local minCorner = Instance.new("UICorner")
+minCorner.CornerRadius = UDim.new(0, 8)
+minCorner.Parent = minBtn
+
+-- Status Label
+local statusLabel = Instance.new("TextLabel")
+statusLabel.Size = UDim2.new(0.9, 0, 0, 20)
+statusLabel.Position = UDim2.new(0.05, 0, 0, 40)
+statusLabel.BackgroundTransparency = 1
+statusLabel.Text = "Status: Ready"
+statusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+statusLabel.TextScaled = true
+statusLabel.Font = Enum.Font.GothamBold
+statusLabel.TextXAlignment = Enum.TextXAlignment.Left
+statusLabel.Parent = frame
+
+-- UNANCHOR Button
+local unanchorBtn = Instance.new("TextButton")
+unanchorBtn.Size = UDim2.new(0.9, 0, 0, 45)
+unanchorBtn.Position = UDim2.new(0.05, 0, 0, 65)
+unanchorBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
+unanchorBtn.Text = "🔓 UNANCHOR YOURSELF"
+unanchorBtn.TextColor3 = Color3.new(1, 1, 1)
+unanchorBtn.TextScaled = true
+unanchorBtn.Font = Enum.Font.GothamBold
+unanchorBtn.Parent = frame
+
+local unanchorCorner = Instance.new("UICorner")
+unanchorCorner.CornerRadius = UDim.new(0, 10)
+unanchorCorner.Parent = unanchorBtn
+
+local unanchorStroke = Instance.new("UIStroke")
+unanchorStroke.Color = Color3.fromRGB(0, 200, 255)
+unanchorStroke.Thickness = 1.5
+unanchorStroke.Parent = unanchorBtn
+
+-- Auto Unanchor Toggle
+local autoToggle = Instance.new("TextButton")
+autoToggle.Size = UDim2.new(0.9, 0, 0, 35)
+autoToggle.Position = UDim2.new(0.05, 0, 0, 118)
+autoToggle.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+autoToggle.Text = "🔄 Auto Unanchor: OFF"
+autoToggle.TextColor3 = Color3.fromRGB(200, 200, 200)
+autoToggle.TextScaled = true
+autoToggle.Font = Enum.Font.GothamBold
+autoToggle.Parent = frame
+
+local autoCorner = Instance.new("UICorner")
+autoCorner.CornerRadius = UDim.new(0, 10)
+autoCorner.Parent = autoToggle
+
+-- Interaction Booster Toggle
+local interactToggle = Instance.new("TextButton")
+interactToggle.Size = UDim2.new(0.9, 0, 0, 35)
+interactToggle.Position = UDim2.new(0.05, 0, 0, 158)
+interactToggle.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+interactToggle.Text = "🚪 Door Booster: OFF"
+interactToggle.TextColor3 = Color3.fromRGB(200, 200, 200)
+interactToggle.TextScaled = true
+interactToggle.Font = Enum.Font.GothamBold
+interactToggle.Parent = frame
+
+local interactCorner = Instance.new("UICorner")
+interactCorner.CornerRadius = UDim.new(0, 10)
+interactCorner.Parent = interactToggle
+
+-- // ===== FUNCTIONS ===== //
+
+-- FIXED: Always get the current character (works after respawn!)
+local function getCharacter()
+    return player.Character or player.CharacterAdded:Wait()
+end
+
+-- Unanchor Function (FIXED for respawn)
+local function unanchor()
+    local character = getCharacter()
+    local count = 0
+
+    for _, part in pairs(character:GetDescendants()) do
+        if part:IsA("BasePart") and part.Anchored then
+            part.Anchored = false
+            count = count + 1
+        end
+    end
+
+    if character:FindFirstChild("Humanoid") then
+        character.Humanoid:ChangeState(Enum.HumanoidStateType.Running)
+    end
+
+    if character:FindFirstChild("HumanoidRootPart") then
+        character.HumanoidRootPart.Velocity = Vector3.new(0, 10, 0)
+    end
+
+    -- Flash status
+    if count > 0 then
+        statusLabel.Text = "Status: ✅ Unanchored " .. count .. " parts!"
+        statusLabel.TextColor3 = Color3.fromRGB(0, 255, 100)
+    else
+        statusLabel.Text = "Status: ⚠️ Already unanchored"
+        statusLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
+    end
+
+    -- Button flash animation
+    local originalColor = unanchorBtn.BackgroundColor3
+    unanchorBtn.BackgroundColor3 = Color3.fromRGB(0, 255, 100)
+    tweenService:Create(unanchorBtn, TweenInfo.new(0.5), {
+        BackgroundColor3 = originalColor
+    }):Play()
+
+    print("✅ Unanchored " .. count .. " parts!")
+end
+
+-- // BUTTON CONNECTIONS
+
+-- Unanchor Button
+unanchorBtn.MouseButton1Click:Connect(unanchor)
+
+-- Hover effects
+unanchorBtn.MouseEnter:Connect(function()
+    tweenService:Create(unanchorBtn, TweenInfo.new(0.2), {
+        BackgroundColor3 = Color3.fromRGB(0, 160, 255)
+    }):Play()
+end)
+unanchorBtn.MouseLeave:Connect(function()
+    tweenService:Create(unanchorBtn, TweenInfo.new(0.2), {
+        BackgroundColor3 = Color3.fromRGB(0, 120, 255)
+    }):Play()
+end)
+
+-- Close Button
+closeBtn.MouseButton1Click:Connect(function()
+    screenGui:Destroy()
+end)
+
+closeBtn.MouseEnter:Connect(function()
+    tweenService:Create(closeBtn, TweenInfo.new(0.2), {
+        BackgroundColor3 = Color3.fromRGB(255, 80, 80)
+    }):Play()
+end)
+closeBtn.MouseLeave:Connect(function()
+    tweenService:Create(closeBtn, TweenInfo.new(0.2), {
+        BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+    }):Play()
+end)
+
+-- Minimize Button
+local minimized = false
+minBtn.MouseButton1Click:Connect(function()
+    minimized = not minimized
+    if minimized then
+        tweenService:Create(frame, TweenInfo.new(0.3, Enum.EasingStyle.Quint), {
+            Size = UDim2.new(0, 250, 0, 35)
+        }):Play()
+        minBtn.Text = "+"
+    else
+        tweenService:Create(frame, TweenInfo.new(0.3, Enum.EasingStyle.Quint), {
+            Size = UDim2.new(0, 250, 0, 200)
+        }):Play()
+        minBtn.Text = "—"
+    end
+end)
+
+-- Auto Unanchor Toggle
+local autoOn = false
+autoToggle.MouseButton1Click:Connect(function()
+    autoOn = not autoOn
+    if autoOn then
+        autoToggle.Text = "🔄 Auto Unanchor: ON"
+        autoToggle.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+        autoToggle.TextColor3 = Color3.new(1, 1, 1)
+    else
+        autoToggle.Text = "🔄 Auto Unanchor: OFF"
+        autoToggle.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+        autoToggle.TextColor3 = Color3.fromRGB(200, 200, 200)
+    end
+end)
+
+-- Door Booster Toggle
+local doorBoostOn = false
+interactToggle.MouseButton1Click:Connect(function()
+    doorBoostOn = not doorBoostOn
+    if doorBoostOn then
+        interactToggle.Text = "🚪 Door Booster: ON"
+        interactToggle.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+        interactToggle.TextColor3 = Color3.new(1, 1, 1)
+    else
+        interactToggle.Text = "🚪 Door Booster: OFF"
+        interactToggle.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+        interactToggle.TextColor3 = Color3.fromRGB(200, 200, 200)
+    end
+end)
+
+-- // BACKGROUND LOOPS
+
+-- Auto Unanchor Loop (FIXED: gets fresh character every time)
+task.spawn(function()
+    while task.wait(1.5) do
+        if autoOn then
+            pcall(function()
+                unanchor()
+            end)
+        end
+    end
+end)
+
+-- Door Booster Loop
+task.spawn(function()
+    while task.wait(1) do
+        if doorBoostOn then
+            pcall(function()
+                for _, v in pairs(workspace:GetDescendants()) do
+                    if v:IsA("ProximityPrompt") then
+                        v.HoldDuration = 0
+                        v.MaxActivationDistance = 25
+                        v.Enabled = true
+                    end
+                end
+            end)
+        end
+    end
+end)
+
+-- // AUTO UNANCHOR ON RESPAWN (KEY FIX!)
+player.CharacterAdded:Connect(function(newCharacter)
+    task.wait(1) -- Wait for character to fully load
+    statusLabel.Text = "Status: 🔃 Respawned! Re-checking..."
+    statusLabel.TextColor3 = Color3.fromRGB(255, 200, 0)
+
+    if autoOn then
+        task.wait(0.5)
+        unanchor()
+    end
+end)
+
+-- // Rainbow stroke animation (cool effect)
+task.spawn(function()
+    local hue = 0
+    while task.wait(0.05) do
+        if not frame or not frame.Parent then break end
+        hue = (hue + 1) % 360
+        frameStroke.Color = Color3.fromHSV(hue / 360, 0.8, 1)
+    end
+end)
+
+print("⚡ Unanchor V2 loaded! Works after respawn!")
