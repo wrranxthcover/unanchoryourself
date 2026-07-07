@@ -829,8 +829,62 @@ RunService.Heartbeat:Connect(function()
                     if avg >= FAST_THRESH then sTxt = "⚡FAST " .. math.floor(avg); sCol = Color3.fromRGB(255, 80, 80)
                     elseif avg >= SLOW_THRESH then sTxt = "→ " .. math.floor(avg); sCol = Color3.fromRGB(255, 200, 80)
                     elseif avg >= 0.5 then sTxt = "🐌 " .. string.format("%.1f", avg); sCol = Color3.fromRGB(120, 180, 120)
-                    else sTxt = "■"; sCol = Color3.fromRGB(100, 100, 100) end
-                end
+                    else
+                        -- Idle detection (throttled)
+                        if not sd.idleCheck or now - sd.idleCheck > 1 then
+                            sd.idleCheck = now
+                            sd.idleState = "■ Idle"
+                            sd.idleCol = Color3.fromRGB(100, 100, 100)
+
+                            -- Despawn checks
+                            local desp = false
+                            if tp.Transparency > 0.3 then desp = true end
+                            if not sd.lSize then sd.lSize = tp.Size end
+                            if tp.Size.Magnitude < sd.lSize.Magnitude * 0.8 then desp = true end
+                            sd.lSize = tp.Size
+
+                            if ent.Parent and ent.Parent.Name:lower():find("debris") then desp = true end
+                            local hum = ent:FindFirstChildWhichIsA("Humanoid")
+                            if hum and hum.Health <= 0 then desp = true end
+
+                            -- Position check (entity falling through floor = despawn)
+                            if tp.Position.Y < -50 then desp = true end
+
+                            if desp then
+                                sd.idleState = "💨 Despawning!"
+                                sd.idleCol = Color3.fromRGB(150, 80, 255)
+                            else
+                                -- Nearby object check (only check close objects)
+                                local nLocker, nTable = false, false
+                                local entPos = tp.Position
+
+                                -- Use spatial query (faster than full scan)
+                                local nearby = workspace:GetPartBoundsInRadius(entPos, 8)
+                                for _, part in ipairs(nearby) do
+                                    if part ~= tp then
+                                        local pn = part.Name:lower()
+                                        if pn:find("locker") or pn:find("closet") or pn:find("wardrobe") or pn:find("cabinet") or pn:find("hide") then
+                                            nLocker = true
+                                        end
+                                        if pn:find("table") or pn:find("desk") or pn:find("shelf") or pn:find("drawer") then
+                                            nTable = true
+                                        end
+                                    end
+                                end
+
+                                if nLocker then
+                                    sd.idleState = "🚪 Checking Locker!"
+                                    sd.idleCol = Color3.fromRGB(255, 150, 50)
+                                elseif nTable then
+                                    sd.idleState = "🪑 Checking Table!"
+                                    sd.idleCol = Color3.fromRGB(200, 180, 80)
+                                end
+                            end
+                        end
+
+                        sTxt = sd.idleState or "■ Idle"
+                        sCol = sd.idleCol or Color3.fromRGB(100, 100, 100)
+                    end
             else spd[ent] = {lP = tp.Position, lT = now, sp = 0, sa = {}, pP = tp.Position, pT = now} end
 
             local tc = dist < 18 and Color3.fromRGB(255, 40, 40) or dist < 50 and Color3.fromRGB(255, 180, 30) or Color3.fromRGB(140, 140, 140)
