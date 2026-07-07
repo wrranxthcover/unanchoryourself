@@ -1,9 +1,10 @@
 -- Entity Scanner - Rooms: Es-stablished
--- Pattern 1: 1-3 chars (ï/letters mix) + dash + 1-2000
--- Pattern 2: MOB1 to MOB25
+-- Patterns: ï-mix, LX-42, MOB1-25, eye, mouth
+-- RED ALERT: Warning banner when entity is close
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
@@ -11,11 +12,12 @@ local Camera = workspace.CurrentCamera
 if LocalPlayer.PlayerGui:FindFirstChild("EntityScannerGui") then
     LocalPlayer.PlayerGui:FindFirstChild("EntityScannerGui"):Destroy()
 end
+if LocalPlayer.PlayerGui:FindFirstChild("RedAlertGui") then
+    LocalPlayer.PlayerGui:FindFirstChild("RedAlertGui"):Destroy()
+end
 
 -- ============================================
 -- PATTERNS
--- 1: ï-1, ïBï-100, GAï-1000 etc
--- 2: MOB1, MOB2 ... MOB25
 -- ============================================
 
 local function matchesEntityPattern(name)
@@ -26,9 +28,9 @@ local function matchesEntityPattern(name)
         local num = tonumber(name:sub(dashPos + 1))
         if num and num >= 1 and num <= 2000 then
             local cleaned = prefix:gsub("\195\175", "X"):gsub("\195\143", "X")
-            if #cleaned >= 1 and #cleaned <= 3 and cleaned:match("^[A-Za-zX]+$") then
-                local stripped = prefix:gsub("\195\175", ""):gsub("\195\143", "")
-                if stripped:match("^[A-Za-z]*$") then
+            if #cleaned >= 1 and #cleaned <= 3 then
+                local stripped = cleaned:gsub("X", "")
+                if stripped == "" or stripped:match("^[A-Za-z]+$") then
                     return true
                 end
             end
@@ -36,15 +38,19 @@ local function matchesEntityPattern(name)
     end
 
     -- Pattern 2: MOB1 to MOB25
-    local mobNum = name:match("^MOB(%d+)$") or name:match("^[Mm][Oo][Bb](%d+)$")
+    local mobNum = name:match("^[Mm][Oo][Bb](%d+)$")
     if mobNum then
         local n = tonumber(mobNum)
-        if n and n >= 1 and n <= 25 then
-            return true
-        end
+        if n and n >= 1 and n <= 25 then return true end
     end
 
     return false
+end
+
+-- Minion check: only if parent is tracked entity
+local function isMinionName(name)
+    local lower = name:lower()
+    return lower == "eye" or lower == "mouth"
 end
 
 local function getEntityNumber(name)
@@ -52,11 +58,9 @@ local function getEntityNumber(name)
 end
 
 local function getEntityPrefix(name)
-    -- MOB pattern
-    if name:match("^[Mm][Oo][Bb]%d+$") then
-        return "MOB"
-    end
-    -- ï pattern
+    if name:match("^[Mm][Oo][Bb]%d+$") then return "MOB" end
+    local lower = name:lower()
+    if lower == "eye" or lower == "mouth" then return lower end
     local dashPos = name:find("%-(%d+)$")
     if not dashPos then return name end
     return name:sub(1, dashPos - 1)
@@ -218,7 +222,7 @@ local DLabel = Instance.new("TextLabel")
 DLabel.Size = UDim2.new(1, -12, 0, 14)
 DLabel.Position = UDim2.new(0, 6, 0, 88)
 DLabel.BackgroundTransparency = 1
-DLabel.Text = "🔍 ï-pattern + MOB1-25"
+DLabel.Text = "🔍 ï-mix + MOB + minions"
 DLabel.TextColor3 = Color3.fromRGB(70, 70, 110)
 DLabel.TextSize = 8
 DLabel.Font = Enum.Font.Gotham
@@ -408,6 +412,161 @@ PBar.BorderSizePixel = 0
 PBar.Parent = MainFrame
 
 -- ============================================
+-- RED ALERT BANNER
+-- Opens from center, scrolls left, shows HIDE!
+-- ============================================
+
+local AlertGui = Instance.new("ScreenGui")
+AlertGui.Name = "RedAlertGui"
+AlertGui.ResetOnSpawn = false
+AlertGui.DisplayOrder = 200
+AlertGui.Parent = LocalPlayer.PlayerGui
+
+-- Main alert container
+local AlertFrame = Instance.new("Frame")
+AlertFrame.Size = UDim2.new(0, 0, 0, 80)
+AlertFrame.AnchorPoint = Vector2.new(0.5, 0)
+AlertFrame.Position = UDim2.new(0.5, 0, 0, 10)
+AlertFrame.BackgroundColor3 = Color3.fromRGB(120, 0, 0)
+AlertFrame.BorderSizePixel = 0
+AlertFrame.ClipsDescendants = true
+AlertFrame.Visible = false
+AlertFrame.Parent = AlertGui
+Instance.new("UICorner", AlertFrame).CornerRadius = UDim.new(0, 8)
+
+local AlertStroke = Instance.new("UIStroke")
+AlertStroke.Color = Color3.fromRGB(255, 0, 0)
+AlertStroke.Thickness = 2
+AlertStroke.Parent = AlertFrame
+
+-- Inner gradient
+local AlertGrad = Instance.new("UIGradient")
+AlertGrad.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(180, 0, 0)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(100, 0, 0)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(180, 0, 0))
+})
+AlertGrad.Parent = AlertFrame
+
+-- Entity name (big)
+local AlertName = Instance.new("TextLabel")
+AlertName.Size = UDim2.new(1, 0, 0, 35)
+AlertName.Position = UDim2.new(0, 0, 0, 5)
+AlertName.BackgroundTransparency = 1
+AlertName.Text = "⚠ ENTITY"
+AlertName.TextColor3 = Color3.fromRGB(255, 255, 255)
+AlertName.TextSize = 24
+AlertName.Font = Enum.Font.GothamBlack
+AlertName.TextStrokeTransparency = 0
+AlertName.TextStrokeColor3 = Color3.fromRGB(80, 0, 0)
+AlertName.Parent = AlertFrame
+
+-- HIDE! text that scrolls left
+local AlertHideContainer = Instance.new("Frame")
+AlertHideContainer.Size = UDim2.new(1, 0, 0, 30)
+AlertHideContainer.Position = UDim2.new(0, 0, 0, 42)
+AlertHideContainer.BackgroundTransparency = 1
+AlertHideContainer.ClipsDescendants = true
+AlertHideContainer.Parent = AlertFrame
+
+local AlertHide = Instance.new("TextLabel")
+AlertHide.Size = UDim2.new(3, 0, 1, 0)
+AlertHide.Position = UDim2.new(0, 0, 0, 0)
+AlertHide.BackgroundTransparency = 1
+AlertHide.Text = "⚠ HIDE! ⚠ HIDE! ⚠ HIDE! ⚠ HIDE! ⚠ HIDE! ⚠ HIDE! ⚠ HIDE! ⚠ HIDE! ⚠ HIDE! ⚠ HIDE!"
+AlertHide.TextColor3 = Color3.fromRGB(255, 60, 60)
+AlertHide.TextSize = 18
+AlertHide.Font = Enum.Font.GothamBlack
+AlertHide.TextStrokeTransparency = 0.2
+AlertHide.TextStrokeColor3 = Color3.fromRGB(50, 0, 0)
+AlertHide.TextXAlignment = Enum.TextXAlignment.Left
+AlertHide.Parent = AlertHideContainer
+
+-- Distance on alert
+local AlertDist = Instance.new("TextLabel")
+AlertDist.Size = UDim2.new(1, 0, 0, 14)
+AlertDist.Position = UDim2.new(0, 0, 1, -16)
+AlertDist.BackgroundTransparency = 1
+AlertDist.Text = "0s away"
+AlertDist.TextColor3 = Color3.fromRGB(255, 180, 180)
+AlertDist.TextSize = 10
+AlertDist.Font = Enum.Font.GothamSemibold
+AlertDist.Parent = AlertFrame
+
+-- Alert state
+local alertActive = false
+local alertEntity = nil
+local alertScrollConn = nil
+local alertPulseConn = nil
+
+local function showAlert(entityName, dist)
+    if alertActive and alertEntity == entityName then
+        AlertDist.Text = dist .. "s away"
+        return
+    end
+
+    alertEntity = entityName
+    AlertName.Text = "⚠ " .. entityName
+    AlertDist.Text = dist .. "s away"
+
+    -- Open animation: expand from center
+    AlertFrame.Size = UDim2.new(0, 0, 0, 80)
+    AlertFrame.Visible = true
+    alertActive = true
+
+    local openTween = TweenService:Create(AlertFrame, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+        Size = UDim2.new(0, 500, 0, 80)
+    })
+    openTween:Play()
+
+    -- Scroll HIDE! text left looping
+    if alertScrollConn then alertScrollConn:Disconnect() end
+    local scrollX = 0
+    alertScrollConn = RunService.Heartbeat:Connect(function(dt)
+        if not alertActive then return end
+        scrollX = scrollX - dt * 150
+        if scrollX < -600 then scrollX = 0 end
+        AlertHide.Position = UDim2.new(0, scrollX, 0, 0)
+    end)
+
+    -- Pulse the border
+    if alertPulseConn then alertPulseConn:Disconnect() end
+    alertPulseConn = RunService.Heartbeat:Connect(function()
+        if not alertActive then return end
+        local pulse = (math.sin(tick() * 8) + 1) / 2
+        AlertStroke.Color = Color3.fromRGB(
+            math.floor(180 + 75 * pulse),
+            0,
+            0
+        )
+        AlertFrame.BackgroundColor3 = Color3.fromRGB(
+            math.floor(80 + 60 * pulse),
+            0,
+            0
+        )
+    end)
+end
+
+local function hideAlert()
+    if not alertActive then return end
+    alertActive = false
+    alertEntity = nil
+
+    local closeTween = TweenService:Create(AlertFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+        Size = UDim2.new(0, 0, 0, 80)
+    })
+    closeTween:Play()
+    closeTween.Completed:Connect(function()
+        if not alertActive then
+            AlertFrame.Visible = false
+        end
+    end)
+
+    if alertScrollConn then alertScrollConn:Disconnect(); alertScrollConn = nil end
+    if alertPulseConn then alertPulseConn:Disconnect(); alertPulseConn = nil end
+end
+
+-- ============================================
 -- STATE
 -- ============================================
 
@@ -430,6 +589,8 @@ local entCount = 0
 local DIST_SKIP = 10
 local dFrame = 0
 
+local RED_THRESHOLD = 10000
+
 -- ============================================
 -- DEBUG
 -- ============================================
@@ -438,7 +599,7 @@ local function runDebug()
     print("========== ENTITY SCANNER DEBUG ==========")
     local found, nearMatch = 0, 0
     for _, obj in ipairs(workspace:GetDescendants()) do
-        if matchesEntityPattern(obj.Name) then
+        if matchesEntityPattern(obj.Name) or isMinionName(obj.Name) then
             found += 1
             print(string.format("  ✅ MATCH: '%s' [%s] Path:%s", obj.Name, obj.ClassName, obj:GetFullName()))
         elseif obj.Name:match("%-%d") or obj.Name:match("%d") then
@@ -513,7 +674,7 @@ local function stopViewEntity()
 end
 
 -- ============================================
--- START VIEW ENTITY (auto orbit, close-up)
+-- START VIEW ENTITY (auto orbit close-up)
 -- ============================================
 
 local function startViewEntity(entity)
@@ -699,6 +860,7 @@ local function untrack(entity)
     EL.Visible = entCount == 0
     if viewTarget == entity then stopView() end
     if viewEntityTarget == entity then stopViewEntity() end
+    if alertEntity == entity.Name then hideAlert() end
 end
 
 local function track(entity)
@@ -739,6 +901,7 @@ local function track(entity)
         bb.Parent = part
 
         local nt = Instance.new("TextLabel")
+        nt.Name = "NT"
         nt.Size = UDim2.new(1, 0, 0.55, 0)
         nt.BackgroundTransparency = 1
         nt.Text = "⚠ " .. entity.Name
@@ -764,6 +927,7 @@ local function track(entity)
 
         d.billboard = bb
         d.distLabel = dt
+        d.nameLabel = nt
     end
 
     if root then setupBillboard(root) end
@@ -786,16 +950,40 @@ local function track(entity)
                     d.highlight = hl
                 end
             end
+
+            -- Check for minion children (eye, mouth)
+            if isMinionName(child.Name) and not tracked[child] then
+                task.defer(function()
+                    if child.Parent then
+                        track(child)
+                    end
+                end)
+            end
         end)
+
+        -- Also check existing children for minions
+        for _, child in ipairs(entity:GetChildren()) do
+            if isMinionName(child.Name) and not tracked[child] then
+                task.defer(function()
+                    if child.Parent then
+                        track(child)
+                    end
+                end)
+            end
+        end
     end
 
-    -- Sort: MOB entities get high sort value to group them
+    -- Sorting
     local num = getEntityNumber(entity.Name)
     local prefix = getEntityPrefix(entity.Name)
     local sortVal = 0
 
     if prefix == "MOB" then
-        sortVal = 9000000 + num -- MOBs sort at bottom
+        sortVal = 9000000 + num
+    elseif prefix == "eye" then
+        sortVal = 9500000
+    elseif prefix == "mouth" then
+        sortVal = 9500001
     else
         for i = 1, #prefix do
             sortVal = sortVal + string.byte(prefix, i) * (100 ^ (4 - i))
@@ -818,6 +1006,7 @@ local function track(entity)
     es.Parent = entry
 
     local dot = Instance.new("Frame")
+    dot.Name = "Dot"
     dot.Size = UDim2.new(0, 5, 0, 5)
     dot.Position = UDim2.new(0, 5, 0.5, -2)
     dot.BackgroundColor3 = color
@@ -837,6 +1026,7 @@ local function track(entity)
     typeLabel.Parent = entry
 
     local nl = Instance.new("TextLabel")
+    nl.Name = "NL"
     nl.Size = UDim2.new(0.42, -14, 0.5, 0)
     nl.Position = UDim2.new(0, 30, 0, 1)
     nl.BackgroundTransparency = 1
@@ -916,6 +1106,9 @@ local function track(entity)
 
     d.entry = entry
     d.entryDist = edl
+    d.entryName = nl
+    d.entryDot = dot
+    d.entryStroke = es
 
     d.destroyConn = entity.AncestryChanged:Connect(function(_, parent)
         if not parent then untrack(entity) end
@@ -936,7 +1129,18 @@ end
 
 local function initialScan()
     for _, obj in ipairs(workspace:GetDescendants()) do
-        if isEntity(obj) then track(obj) end
+        if isEntity(obj) then
+            track(obj)
+        end
+    end
+
+    -- Check minions under tracked entities
+    for ent, _ in pairs(tracked) do
+        for _, child in ipairs(ent:GetDescendants()) do
+            if isMinionName(child.Name) and not tracked[child] then
+                track(child)
+            end
+        end
     end
 end
 
@@ -947,6 +1151,7 @@ end
 workspace.DescendantAdded:Connect(function(obj)
     if not active then return end
 
+    -- Direct entity match
     if matchesEntityPattern(obj.Name) and not playerChars[obj] then
         task.defer(function()
             if not obj.Parent or tracked[obj] then return end
@@ -965,6 +1170,24 @@ workspace.DescendantAdded:Connect(function(obj)
         end)
     end
 
+    -- Minion check: only if parent is tracked
+    if isMinionName(obj.Name) then
+        task.defer(function()
+            if not obj.Parent then return end
+            local parent = obj.Parent
+            if tracked[parent] and not tracked[obj] then
+                track(obj)
+                return
+            end
+            -- Check grandparent too
+            local gp = parent and parent.Parent
+            if gp and tracked[gp] and not tracked[obj] then
+                track(obj)
+            end
+        end)
+    end
+
+    -- BasePart: check parent
     if obj:IsA("BasePart") then
         task.defer(function()
             if not obj.Parent then return end
@@ -979,11 +1202,15 @@ workspace.DescendantAdded:Connect(function(obj)
         end)
     end
 
+    -- Container: check children
     if obj:IsA("Model") or obj:IsA("Folder") then
         task.defer(function()
             if not obj.Parent then return end
             for _, child in ipairs(obj:GetChildren()) do
                 if matchesEntityPattern(child.Name) and not playerChars[child] and not tracked[child] then
+                    track(child)
+                end
+                if isMinionName(child.Name) and tracked[obj] and not tracked[child] then
                     track(child)
                 end
             end
@@ -1007,11 +1234,21 @@ task.spawn(function()
                 track(obj)
             end
         end
+        -- Rescan minions
+        for ent, _ in pairs(tracked) do
+            if ent.Parent then
+                for _, child in ipairs(ent:GetChildren()) do
+                    if isMinionName(child.Name) and not tracked[child] then
+                        track(child)
+                    end
+                end
+            end
+        end
     end
 end)
 
 -- ============================================
--- DISTANCE UPDATE (with color change)
+-- DISTANCE UPDATE + COLOR CHANGE + RED ALERT
 -- ============================================
 
 RunService.Heartbeat:Connect(function()
@@ -1025,6 +1262,9 @@ RunService.Heartbeat:Connect(function()
     if not myR then return end
     local myP = myR.Position
 
+    local closestRedName = nil
+    local closestRedDist = math.huge
+
     for ent, d in pairs(tracked) do
         local tp = d.targetPart
         if not tp or not tp.Parent then
@@ -1034,7 +1274,7 @@ RunService.Heartbeat:Connect(function()
         if tp and tp.Parent then
             local dist = math.floor((myP - tp.Position).Magnitude)
 
-            -- Distance text color (short range indicator)
+            -- Distance text
             local textCol = dist < 18 and Color3.fromRGB(255, 40, 40)
                 or dist < 50 and Color3.fromRGB(255, 180, 30)
                 or Color3.fromRGB(140, 140, 140)
@@ -1042,62 +1282,50 @@ RunService.Heartbeat:Connect(function()
             if d.distLabel then d.distLabel.Text = txt; d.distLabel.TextColor3 = textCol end
             if d.entryDist then d.entryDist.Text = txt; d.entryDist.TextColor3 = textCol end
 
-            -- ESP color based on distance (white → yellow → orange → red)
+            -- ESP color: white → yellow → orange → red
             local espColor
             if dist >= 50000 then
-                -- Far: white
                 espColor = Color3.fromRGB(255, 255, 255)
             elseif dist >= 25000 then
-                -- 50000→25000: white to yellow
                 local t = (dist - 25000) / 25000
-                espColor = Color3.fromRGB(255, math.floor(255), math.floor(255 * t))
+                espColor = Color3.fromRGB(255, 255, math.floor(255 * t))
             elseif dist >= 10000 then
-                -- 25000→10000: yellow to orange
                 local t = (dist - 10000) / 15000
                 espColor = Color3.fromRGB(255, math.floor(140 + 115 * t), 0)
             else
-                -- <10000: orange to red
                 local t = math.clamp(dist / 10000, 0, 1)
                 espColor = Color3.fromRGB(255, math.floor(140 * t), 0)
             end
 
-            -- Apply to highlight
+            -- Apply colors
             if d.highlight then
                 d.highlight.FillColor = espColor
                 d.highlight.OutlineColor = espColor
             end
+            if d.nameLabel then d.nameLabel.TextColor3 = espColor end
+            if d.entryName then d.entryName.TextColor3 = espColor end
+            if d.entryStroke then d.entryStroke.Color = espColor end
+            if d.entryDot then d.entryDot.BackgroundColor3 = espColor end
 
-            -- Apply to billboard name
-            if d.billboard then
-                local nameLabel = d.billboard:FindFirstChildWhichIsA("TextLabel")
-                if nameLabel and nameLabel.Name ~= "DL" then
-                    nameLabel.TextColor3 = espColor
-                end
-            end
-
-            -- Apply to entry stroke + dot
-            if d.entry then
-                local stroke = d.entry:FindFirstChildWhichIsA("UIStroke")
-                if stroke then stroke.Color = espColor end
-                local dot = nil
-                for _, child in ipairs(d.entry:GetChildren()) do
-                    if child:IsA("Frame") and child.Size == UDim2.new(0, 5, 0, 5) then
-                        dot = child
-                        break
-                    end
-                end
-                if dot then dot.BackgroundColor3 = espColor end
-                local nl = d.entry:FindFirstChild("NL") or d.entry:FindFirstChildWhichIsA("TextLabel")
-                -- Update name color in list
-                for _, child in ipairs(d.entry:GetChildren()) do
-                    if child:IsA("TextLabel") and child.Name ~= "EDL" and child.TextSize == 10 then
-                        child.TextColor3 = espColor
-                    end
+            -- Track closest red entity for alert
+            if dist < RED_THRESHOLD and dist < closestRedDist then
+                -- Only main entities trigger alert (not minions)
+                if matchesEntityPattern(ent.Name) then
+                    closestRedName = ent.Name
+                    closestRedDist = dist
                 end
             end
         end
     end
+
+    -- Red alert
+    if closestRedName then
+        showAlert(closestRedName, closestRedDist)
+    else
+        hideAlert()
+    end
 end)
+
 -- ============================================
 -- BUTTONS
 -- ============================================
@@ -1199,8 +1427,10 @@ XBtn.MouseButton1Click:Connect(function()
     active = false
     stopView()
     stopViewEntity()
+    hideAlert()
     for ent in pairs(tracked) do untrack(ent) end
     ScreenGui:Destroy()
+    AlertGui:Destroy()
 end)
 
 -- ============================================
@@ -1227,4 +1457,5 @@ end)
 initialScan()
 runDebug()
 print("[Entity Scanner] Loaded")
-print("[Entity Scanner] Patterns: ï-mix + MOB1-25")
+print("[Entity Scanner] Patterns: ï-mix + LX-42 + MOB1-25 + eye/mouth minions")
+print("[Entity Scanner] RED ALERT when entity < 10000 studs")
