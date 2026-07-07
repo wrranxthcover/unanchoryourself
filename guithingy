@@ -1,6 +1,6 @@
--- Entity Scanner GUI - Rooms: Es-stablished
--- Pattern: A-Z (1-3 letters) + dash + number (1-1000)
--- Examples: A-1, B-500, AB-99, XYZ-1000, Z-999
+-- Entity Scanner - Rooms: Es-stablished
+-- Pattern: ABC-1000 (1-3 letters, dash, 1-2000)
+-- Examples: A-1, AB-50, ABC-1000, Z-2000
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -8,134 +8,78 @@ local TweenService = game:GetService("TweenService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
--- ============================================
--- CLEANUP
--- ============================================
-
 if LocalPlayer.PlayerGui:FindFirstChild("EntityScannerGui") then
     LocalPlayer.PlayerGui:FindFirstChild("EntityScannerGui"):Destroy()
 end
 
 -- ============================================
--- ENTITY PATTERN DETECTION
+-- PATTERN: 1-3 letters, dash, 1-2000
+-- A-1, AB-50, ABC-1000, Z-2000
 -- ============================================
 
--- Pattern: 1-3 uppercase/lowercase letters, dash, number 1-1000
--- Examples: A-1, B-500, AB-99, XYZ-1000, a-50, Ab-200
 local function matchesEntityPattern(name)
-    -- Match: 1-3 letters, dash, digits
-    local letters, number = name:match("^([A-Za-z][A-Za-z]?[A-Za-z]?)%-(%d+)$")
-    
-    if letters and number then
-        local num = tonumber(number)
-        if num and num >= 1 and num <= 1000 then
-            return true
-        end
-    end
-    
-    return false
+    -- Must be: letters (1-3) + dash + number (1-2000)
+    local letters, num = name:match("^([A-Za-z][A-Za-z]?[A-Za-z]?)%-(%d+)$")
+    if not letters or not num then return false end
+    local n = tonumber(num)
+    return n and n >= 1 and n <= 2000
 end
 
--- Color based on letter prefix (hashed to hue)
-local function getEntityColor(name)
-    local prefix = name:match("^([A-Za-z]+)%-")
-    if not prefix then return Color3.fromRGB(255, 80, 80) end
-    
-    prefix = prefix:upper()
-    
-    -- Simple hash: each letter adds to hue
-    local hue = 0
-    for i = 1, #prefix do
-        local charVal = string.byte(prefix, i) - 65 -- A=0, B=1, ..., Z=25
-        hue = hue + (charVal * (360 / 26)) + (i * 47)
-    end
-    hue = hue % 360
-    
-    return Color3.fromHSV(hue / 360, 0.9, 1)
-end
-
--- Get the number from entity name for sorting
 local function getEntityNumber(name)
-    local num = name:match("%-(%d+)$")
-    return tonumber(num) or 0
+    return tonumber(name:match("(%d+)$")) or 0
 end
 
--- ============================================
--- BLACKLIST
--- ============================================
+local function getEntityLetters(name)
+    return name:match("^([A-Za-z]+)%-") or ""
+end
 
-local BLACKLIST_WORDS = {
-    "door", "room", "wall", "floor", "ceiling", "baseplate", "spawn",
-    "lobby", "map", "light", "lamp", "prop", "furniture", "chair",
-    "table", "shelf", "cabinet", "bed", "chest", "barrel", "box",
-    "crate", "plant", "vent", "locker", "mirror", "couch", "sofa",
-    "painting", "picture", "decoration", "handle", "knob", "frame",
-    "panel", "button", "key", "lock", "sign", "poster", "tile",
-    "carpet", "rug", "curtain", "radiator", "pipe", "wire", "cable",
-    "switch", "outlet", "grate", "ladder", "stair", "railing",
-    "pillar", "column", "arch", "shop", "merchant", "vendor", "item",
-    "coin", "gold", "loot", "pickup", "badge", "checkpoint",
-    "elevator", "lift", "generator", "lever", "valve", "window",
-    "player", "character", "npc", "dummy",
-}
-
-local function isBlacklisted(name)
-    local lower = name:lower()
-    for _, word in ipairs(BLACKLIST_WORDS) do
-        if lower:find(word) then return true end
+-- Color from letters
+local colorCache = {}
+local function getEntityColor(name)
+    if colorCache[name] then return colorCache[name] end
+    local letters = getEntityLetters(name):upper()
+    local hue = 0
+    for i = 1, #letters do
+        hue = hue + (string.byte(letters, i) - 65) * 14 + i * 53
     end
-    return false
+    local c = Color3.fromHSV((hue % 360) / 360, 0.85, 1)
+    colorCache[name] = c
+    return c
 end
 
-local function isPlayerCharacter(model)
-    for _, player in pairs(Players:GetPlayers()) do
-        if player.Character == model then return true end
+-- ============================================
+-- PLAYER CHECK
+-- ============================================
+
+local playerChars = {}
+local function refreshPlayerChars()
+    playerChars = {}
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p.Character then playerChars[p.Character] = true end
     end
-    return false
 end
+refreshPlayerChars()
 
--- ============================================
--- CORE ENTITY CHECK
--- ============================================
+for _, p in ipairs(Players:GetPlayers()) do
+    p.CharacterAdded:Connect(function(c) playerChars[c] = true end)
+    p.CharacterRemoving:Connect(function(c) playerChars[c] = nil end)
+end
+Players.PlayerAdded:Connect(function(p)
+    p.CharacterAdded:Connect(function(c) playerChars[c] = true end)
+    p.CharacterRemoving:Connect(function(c) playerChars[c] = nil end)
+end)
+Players.PlayerRemoving:Connect(function(p)
+    if p.Character then playerChars[p.Character] = nil end
+end)
 
 local function isEntity(obj)
     if not obj:IsA("Model") then return false end
-    if isPlayerCharacter(obj) then return false end
-    if isBlacklisted(obj.Name) then return false end
-    if matchesEntityPattern(obj.Name) then return true end
-    return false
+    if playerChars[obj] then return false end
+    return matchesEntityPattern(obj.Name)
 end
 
 -- ============================================
--- SCAN WORKSPACE
--- ============================================
-
-local function scanForEntities()
-    local found = {}
-    local seen = {}
-    
-    for _, obj in pairs(workspace:GetDescendants()) do
-        if not seen[obj] and isEntity(obj) then
-            seen[obj] = true
-            table.insert(found, obj)
-        end
-    end
-    
-    -- Sort by letter then number (A-1 before A-2 before B-1)
-    table.sort(found, function(a, b)
-        local prefixA = a.Name:match("^([A-Za-z]+)%-") or ""
-        local prefixB = b.Name:match("^([A-Za-z]+)%-") or ""
-        if prefixA:upper() == prefixB:upper() then
-            return getEntityNumber(a.Name) < getEntityNumber(b.Name)
-        end
-        return prefixA:upper() < prefixB:upper()
-    end)
-    
-    return found
-end
-
--- ============================================
--- GUI CREATION
+-- GUI
 -- ============================================
 
 local ScreenGui = Instance.new("ScreenGui")
@@ -144,790 +88,694 @@ ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.Parent = LocalPlayer.PlayerGui
 
--- Main Frame
 local MainFrame = Instance.new("Frame")
-MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 320, 0, 420)
-MainFrame.Position = UDim2.new(0, 20, 0.5, -210)
+MainFrame.Size = UDim2.new(0, 280, 0, 380)
+MainFrame.Position = UDim2.new(0, 14, 0.5, -190)
 MainFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 20)
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
 MainFrame.Draggable = true
 MainFrame.Parent = ScreenGui
-Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
+Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 8)
 
-local MainStroke = Instance.new("UIStroke")
-MainStroke.Color = Color3.fromRGB(0, 160, 255)
-MainStroke.Thickness = 2
-MainStroke.Parent = MainFrame
+local MS = Instance.new("UIStroke")
+MS.Color = Color3.fromRGB(0, 140, 255)
+MS.Thickness = 1.5
+MS.Parent = MainFrame
 
--- Title Bar
-local TitleBar = Instance.new("Frame")
-TitleBar.Size = UDim2.new(1, 0, 0, 42)
-TitleBar.BackgroundColor3 = Color3.fromRGB(0, 90, 180)
-TitleBar.BorderSizePixel = 0
-TitleBar.Parent = MainFrame
-Instance.new("UICorner", TitleBar).CornerRadius = UDim.new(0, 10)
+-- Title
+local TBar = Instance.new("Frame")
+TBar.Size = UDim2.new(1, 0, 0, 36)
+TBar.BackgroundColor3 = Color3.fromRGB(0, 80, 160)
+TBar.BorderSizePixel = 0
+TBar.Parent = MainFrame
+Instance.new("UICorner", TBar).CornerRadius = UDim.new(0, 8)
 
-local TBarFix = Instance.new("Frame")
-TBarFix.Size = UDim2.new(1, 0, 0, 12)
-TBarFix.Position = UDim2.new(0, 0, 1, -12)
-TBarFix.BackgroundColor3 = TitleBar.BackgroundColor3
-TBarFix.BorderSizePixel = 0
-TBarFix.Parent = TitleBar
+local TFix = Instance.new("Frame")
+TFix.Size = UDim2.new(1, 0, 0, 10)
+TFix.Position = UDim2.new(0, 0, 1, -10)
+TFix.BackgroundColor3 = TBar.BackgroundColor3
+TFix.BorderSizePixel = 0
+TFix.Parent = TBar
 
-local ScanIcon = Instance.new("TextLabel")
-ScanIcon.Size = UDim2.new(0, 32, 0, 32)
-ScanIcon.Position = UDim2.new(0, 6, 0.5, -16)
-ScanIcon.BackgroundTransparency = 1
-ScanIcon.Text = "◎"
-ScanIcon.TextColor3 = Color3.fromRGB(255, 255, 255)
-ScanIcon.TextSize = 20
-ScanIcon.Font = Enum.Font.GothamBold
-ScanIcon.Parent = TitleBar
+local SIcon = Instance.new("TextLabel")
+SIcon.Size = UDim2.new(0, 26, 1, 0)
+SIcon.Position = UDim2.new(0, 6, 0, 0)
+SIcon.BackgroundTransparency = 1
+SIcon.Text = "◎"
+SIcon.TextColor3 = Color3.fromRGB(255, 255, 255)
+SIcon.TextSize = 16
+SIcon.Font = Enum.Font.GothamBold
+SIcon.Parent = TBar
 
-local TitleLabel = Instance.new("TextLabel")
-TitleLabel.Size = UDim2.new(1, -80, 1, 0)
-TitleLabel.Position = UDim2.new(0, 40, 0, 0)
-TitleLabel.BackgroundTransparency = 1
-TitleLabel.Text = "Entity Scanner"
-TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-TitleLabel.TextSize = 17
-TitleLabel.Font = Enum.Font.GothamBold
-TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
-TitleLabel.Parent = TitleBar
+local TLabel = Instance.new("TextLabel")
+TLabel.Size = UDim2.new(1, -70, 1, 0)
+TLabel.Position = UDim2.new(0, 34, 0, 0)
+TLabel.BackgroundTransparency = 1
+TLabel.Text = "Entity Scanner"
+TLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+TLabel.TextSize = 15
+TLabel.Font = Enum.Font.GothamBold
+TLabel.TextXAlignment = Enum.TextXAlignment.Left
+TLabel.Parent = TBar
 
-local CloseBtn = Instance.new("TextButton")
-CloseBtn.Size = UDim2.new(0, 26, 0, 26)
-CloseBtn.Position = UDim2.new(1, -33, 0.5, -13)
-CloseBtn.BackgroundColor3 = Color3.fromRGB(190, 40, 40)
-CloseBtn.Text = "✕"
-CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-CloseBtn.TextSize = 14
-CloseBtn.Font = Enum.Font.GothamBold
-CloseBtn.BorderSizePixel = 0
-CloseBtn.Parent = TitleBar
-Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 5)
+local XBtn = Instance.new("TextButton")
+XBtn.Size = UDim2.new(0, 22, 0, 22)
+XBtn.Position = UDim2.new(1, -28, 0.5, -11)
+XBtn.BackgroundColor3 = Color3.fromRGB(180, 35, 35)
+XBtn.Text = "✕"
+XBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+XBtn.TextSize = 12
+XBtn.Font = Enum.Font.GothamBold
+XBtn.BorderSizePixel = 0
+XBtn.Parent = TBar
+Instance.new("UICorner", XBtn).CornerRadius = UDim.new(0, 4)
 
--- Status Frame
-local StatusFrame = Instance.new("Frame")
-StatusFrame.Size = UDim2.new(1, -16, 0, 50)
-StatusFrame.Position = UDim2.new(0, 8, 0, 50)
-StatusFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 32)
-StatusFrame.BorderSizePixel = 0
-StatusFrame.Parent = MainFrame
-Instance.new("UICorner", StatusFrame).CornerRadius = UDim.new(0, 7)
+-- Status
+local SF = Instance.new("Frame")
+SF.Size = UDim2.new(1, -12, 0, 42)
+SF.Position = UDim2.new(0, 6, 0, 42)
+SF.BackgroundColor3 = Color3.fromRGB(15, 15, 28)
+SF.BorderSizePixel = 0
+SF.Parent = MainFrame
+Instance.new("UICorner", SF).CornerRadius = UDim.new(0, 6)
 
-local RoomLabel = Instance.new("TextLabel")
-RoomLabel.Size = UDim2.new(1, -10, 0, 20)
-RoomLabel.Position = UDim2.new(0, 6, 0, 4)
-RoomLabel.BackgroundTransparency = 1
-RoomLabel.Text = "🎮 Rooms: Es-stablished ✔"
-RoomLabel.TextColor3 = Color3.fromRGB(0, 255, 110)
-RoomLabel.TextSize = 13
-RoomLabel.Font = Enum.Font.GothamSemibold
-RoomLabel.TextXAlignment = Enum.TextXAlignment.Left
-RoomLabel.Parent = StatusFrame
+local RL = Instance.new("TextLabel")
+RL.Size = UDim2.new(1, -8, 0, 17)
+RL.Position = UDim2.new(0, 5, 0, 3)
+RL.BackgroundTransparency = 1
+RL.Text = "🎮 Rooms: Es-stablished ✔"
+RL.TextColor3 = Color3.fromRGB(0, 240, 100)
+RL.TextSize = 11
+RL.Font = Enum.Font.GothamSemibold
+RL.TextXAlignment = Enum.TextXAlignment.Left
+RL.Parent = SF
 
-local CountLabel = Instance.new("TextLabel")
-CountLabel.Name = "CountLabel"
-CountLabel.Size = UDim2.new(1, -10, 0, 20)
-CountLabel.Position = UDim2.new(0, 6, 0, 25)
-CountLabel.BackgroundTransparency = 1
-CountLabel.Text = "Entities: 0"
-CountLabel.TextColor3 = Color3.fromRGB(255, 200, 50)
-CountLabel.TextSize = 12
-CountLabel.Font = Enum.Font.GothamSemibold
-CountLabel.TextXAlignment = Enum.TextXAlignment.Left
-CountLabel.Parent = StatusFrame
+local CL = Instance.new("TextLabel")
+CL.Size = UDim2.new(1, -8, 0, 17)
+CL.Position = UDim2.new(0, 5, 0, 22)
+CL.BackgroundTransparency = 1
+CL.Text = "Entities: 0"
+CL.TextColor3 = Color3.fromRGB(255, 190, 40)
+CL.TextSize = 10
+CL.Font = Enum.Font.GothamSemibold
+CL.TextXAlignment = Enum.TextXAlignment.Left
+CL.Parent = SF
 
--- Pattern Label
-local PatternLabel = Instance.new("TextLabel")
-PatternLabel.Size = UDim2.new(1, -16, 0, 18)
-PatternLabel.Position = UDim2.new(0, 8, 0, 104)
-PatternLabel.BackgroundTransparency = 1
-PatternLabel.Text = "🔍 Pattern: [A-Z] to [ZZZ] - [1-1000]"
-PatternLabel.TextColor3 = Color3.fromRGB(100, 100, 140)
-PatternLabel.TextSize = 10
-PatternLabel.Font = Enum.Font.Gotham
-PatternLabel.TextXAlignment = Enum.TextXAlignment.Left
-PatternLabel.Parent = MainFrame
+-- Pattern
+local PL = Instance.new("TextLabel")
+PL.Size = UDim2.new(1, -12, 0, 14)
+PL.Position = UDim2.new(0, 6, 0, 88)
+PL.BackgroundTransparency = 1
+PL.Text = "🔍 A-1 | AB-50 | ABC-2000"
+PL.TextColor3 = Color3.fromRGB(70, 70, 110)
+PL.TextSize = 8
+PL.Font = Enum.Font.Gotham
+PL.TextXAlignment = Enum.TextXAlignment.Left
+PL.Parent = MainFrame
 
--- Toggle Row
-local ToggleFrame = Instance.new("Frame")
-ToggleFrame.Size = UDim2.new(1, -16, 0, 32)
-ToggleFrame.Position = UDim2.new(0, 8, 0, 124)
-ToggleFrame.BackgroundTransparency = 1
-ToggleFrame.Parent = MainFrame
+-- Toggles
+local TF = Instance.new("Frame")
+TF.Size = UDim2.new(1, -12, 0, 28)
+TF.Position = UDim2.new(0, 6, 0, 105)
+TF.BackgroundTransparency = 1
+TF.Parent = MainFrame
 
-local function makeBtn(text, color, xPos, xSize)
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(xSize, -2, 1, 0)
-    btn.Position = UDim2.new(xPos, 1, 0, 0)
-    btn.BackgroundColor3 = color
-    btn.Text = text
-    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    btn.TextSize = 11
-    btn.Font = Enum.Font.GothamBold
-    btn.BorderSizePixel = 0
-    btn.Parent = ToggleFrame
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 5)
-    return btn
+local function mkBtn(txt, col, xP, xS)
+    local b = Instance.new("TextButton")
+    b.Size = UDim2.new(xS, -2, 1, 0)
+    b.Position = UDim2.new(xP, 1, 0, 0)
+    b.BackgroundColor3 = col
+    b.Text = txt
+    b.TextColor3 = Color3.fromRGB(255, 255, 255)
+    b.TextSize = 10
+    b.Font = Enum.Font.GothamBold
+    b.BorderSizePixel = 0
+    b.Parent = TF
+    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 4)
+    return b
 end
 
-local ESPToggle   = makeBtn("ESP: ON",   Color3.fromRGB(0, 145, 70),  0,     0.33)
-local NamesToggle = makeBtn("Names: ON", Color3.fromRGB(0, 110, 180), 0.333, 0.33)
-local ViewTopBtn  = makeBtn("👁 View",   Color3.fromRGB(80, 0, 170),  0.666, 0.34)
+local EspBtn  = mkBtn("ESP: ON",   Color3.fromRGB(0, 130, 60),  0,     0.333)
+local NameBtn = mkBtn("Names: ON", Color3.fromRGB(0, 95, 160),  0.333, 0.333)
+local ViewBtn = mkBtn("👁 View",   Color3.fromRGB(70, 0, 150),  0.666, 0.334)
 
 -- View Panel
-local ViewPanel = Instance.new("Frame")
-ViewPanel.Size = UDim2.new(1, -16, 0, 32)
-ViewPanel.Position = UDim2.new(0, 8, 0, 160)
-ViewPanel.BackgroundColor3 = Color3.fromRGB(28, 0, 60)
-ViewPanel.BorderSizePixel = 0
-ViewPanel.Visible = false
-ViewPanel.Parent = MainFrame
-Instance.new("UICorner", ViewPanel).CornerRadius = UDim.new(0, 5)
+local VP = Instance.new("Frame")
+VP.Size = UDim2.new(1, -12, 0, 26)
+VP.Position = UDim2.new(0, 6, 0, 137)
+VP.BackgroundColor3 = Color3.fromRGB(22, 0, 50)
+VP.BorderSizePixel = 0
+VP.Visible = false
+VP.Parent = MainFrame
+Instance.new("UICorner", VP).CornerRadius = UDim.new(0, 4)
 
-local ViewStroke = Instance.new("UIStroke")
-ViewStroke.Color = Color3.fromRGB(140, 0, 255)
-ViewStroke.Thickness = 1.5
-ViewStroke.Parent = ViewPanel
+local VSt = Instance.new("UIStroke")
+VSt.Color = Color3.fromRGB(120, 0, 240)
+VSt.Thickness = 1.2
+VSt.Parent = VP
 
-local ViewingLabel = Instance.new("TextLabel")
-ViewingLabel.Size = UDim2.new(0.6, 0, 1, 0)
-ViewingLabel.Position = UDim2.new(0, 6, 0, 0)
-ViewingLabel.BackgroundTransparency = 1
-ViewingLabel.Text = "👁 None"
-ViewingLabel.TextColor3 = Color3.fromRGB(190, 140, 255)
-ViewingLabel.TextSize = 11
-ViewingLabel.Font = Enum.Font.GothamSemibold
-ViewingLabel.TextXAlignment = Enum.TextXAlignment.Left
-ViewingLabel.TextTruncate = Enum.TextTruncate.AtEnd
-ViewingLabel.Parent = ViewPanel
+local VL = Instance.new("TextLabel")
+VL.Size = UDim2.new(0.6, 0, 1, 0)
+VL.Position = UDim2.new(0, 5, 0, 0)
+VL.BackgroundTransparency = 1
+VL.Text = "👁 None"
+VL.TextColor3 = Color3.fromRGB(170, 120, 255)
+VL.TextSize = 10
+VL.Font = Enum.Font.GothamSemibold
+VL.TextXAlignment = Enum.TextXAlignment.Left
+VL.TextTruncate = Enum.TextTruncate.AtEnd
+VL.Parent = VP
 
-local StopViewBtn = Instance.new("TextButton")
-StopViewBtn.Size = UDim2.new(0, 60, 0, 20)
-StopViewBtn.Position = UDim2.new(1, -66, 0.5, -10)
-StopViewBtn.BackgroundColor3 = Color3.fromRGB(165, 25, 25)
-StopViewBtn.Text = "✕ Stop"
-StopViewBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-StopViewBtn.TextSize = 10
-StopViewBtn.Font = Enum.Font.GothamBold
-StopViewBtn.BorderSizePixel = 0
-StopViewBtn.Parent = ViewPanel
-Instance.new("UICorner", StopViewBtn).CornerRadius = UDim.new(0, 4)
+local SVBtn = Instance.new("TextButton")
+SVBtn.Size = UDim2.new(0, 50, 0, 16)
+SVBtn.Position = UDim2.new(1, -55, 0.5, -8)
+SVBtn.BackgroundColor3 = Color3.fromRGB(145, 20, 20)
+SVBtn.Text = "✕ Stop"
+SVBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+SVBtn.TextSize = 9
+SVBtn.Font = Enum.Font.GothamBold
+SVBtn.BorderSizePixel = 0
+SVBtn.Parent = VP
+Instance.new("UICorner", SVBtn).CornerRadius = UDim.new(0, 3)
 
 -- Divider
-local Divider = Instance.new("Frame")
-Divider.Size = UDim2.new(1, -24, 0, 1)
-Divider.Position = UDim2.new(0, 12, 0, 200)
-Divider.BackgroundColor3 = Color3.fromRGB(45, 45, 70)
-Divider.BorderSizePixel = 0
-Divider.Parent = MainFrame
+local Div = Instance.new("Frame")
+Div.Size = UDim2.new(1, -18, 0, 1)
+Div.Position = UDim2.new(0, 9, 0, 170)
+Div.BackgroundColor3 = Color3.fromRGB(38, 38, 60)
+Div.BorderSizePixel = 0
+Div.Parent = MainFrame
 
--- List Header
-local ListHeader = Instance.new("TextLabel")
-ListHeader.Size = UDim2.new(1, -16, 0, 18)
-ListHeader.Position = UDim2.new(0, 8, 0, 204)
-ListHeader.BackgroundTransparency = 1
-ListHeader.Text = "⚡ Live Entities:"
-ListHeader.TextColor3 = Color3.fromRGB(150, 150, 195)
-ListHeader.TextSize = 11
-ListHeader.Font = Enum.Font.GothamSemibold
-ListHeader.TextXAlignment = Enum.TextXAlignment.Left
-ListHeader.Parent = MainFrame
+local LH = Instance.new("TextLabel")
+LH.Size = UDim2.new(1, -12, 0, 14)
+LH.Position = UDim2.new(0, 6, 0, 174)
+LH.BackgroundTransparency = 1
+LH.Text = "⚡ Live:"
+LH.TextColor3 = Color3.fromRGB(120, 120, 170)
+LH.TextSize = 10
+LH.Font = Enum.Font.GothamSemibold
+LH.TextXAlignment = Enum.TextXAlignment.Left
+LH.Parent = MainFrame
 
--- Scroll Frame
-local ScrollFrame = Instance.new("ScrollingFrame")
-ScrollFrame.Name = "EntityList"
-ScrollFrame.Size = UDim2.new(1, -16, 1, -228)
-ScrollFrame.Position = UDim2.new(0, 8, 0, 224)
-ScrollFrame.BackgroundColor3 = Color3.fromRGB(14, 14, 28)
-ScrollFrame.BorderSizePixel = 0
-ScrollFrame.ScrollBarThickness = 3
-ScrollFrame.ScrollBarImageColor3 = Color3.fromRGB(0, 140, 255)
-ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
-ScrollFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
-ScrollFrame.Parent = MainFrame
-Instance.new("UICorner", ScrollFrame).CornerRadius = UDim.new(0, 5)
+-- Scroll
+local Scroll = Instance.new("ScrollingFrame")
+Scroll.Size = UDim2.new(1, -12, 1, -194)
+Scroll.Position = UDim2.new(0, 6, 0, 190)
+Scroll.BackgroundColor3 = Color3.fromRGB(12, 12, 24)
+Scroll.BorderSizePixel = 0
+Scroll.ScrollBarThickness = 2
+Scroll.ScrollBarImageColor3 = Color3.fromRGB(0, 120, 255)
+Scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+Scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+Scroll.Parent = MainFrame
+Instance.new("UICorner", Scroll).CornerRadius = UDim.new(0, 4)
 
-local ListLayout = Instance.new("UIListLayout")
-ListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-ListLayout.Padding = UDim.new(0, 2)
-ListLayout.Parent = ScrollFrame
+local LL = Instance.new("UIListLayout")
+LL.SortOrder = Enum.SortOrder.LayoutOrder
+LL.Padding = UDim.new(0, 2)
+LL.Parent = Scroll
 
-local ListPadding = Instance.new("UIPadding")
-ListPadding.PaddingTop = UDim.new(0, 3)
-ListPadding.PaddingLeft = UDim.new(0, 3)
-ListPadding.PaddingRight = UDim.new(0, 3)
-ListPadding.Parent = ScrollFrame
+local LP = Instance.new("UIPadding")
+LP.PaddingTop = UDim.new(0, 2)
+LP.PaddingLeft = UDim.new(0, 2)
+LP.PaddingRight = UDim.new(0, 2)
+LP.Parent = Scroll
 
--- Empty Label
-local EmptyLabel = Instance.new("TextLabel")
-EmptyLabel.Name = "EmptyLabel"
-EmptyLabel.Size = UDim2.new(1, 0, 0, 45)
-EmptyLabel.BackgroundTransparency = 1
-EmptyLabel.Text = "Scanning for entities...\n(A-1, B-500, XYZ-999, etc.)"
-EmptyLabel.TextColor3 = Color3.fromRGB(80, 80, 110)
-EmptyLabel.TextSize = 11
-EmptyLabel.Font = Enum.Font.GothamSemibold
-EmptyLabel.Parent = ScrollFrame
+local EL = Instance.new("TextLabel")
+EL.Name = "Empty"
+EL.Size = UDim2.new(1, 0, 0, 35)
+EL.BackgroundTransparency = 1
+EL.Text = "No entities yet..."
+EL.TextColor3 = Color3.fromRGB(60, 60, 90)
+EL.TextSize = 9
+EL.Font = Enum.Font.GothamSemibold
+EL.Parent = Scroll
 
--- Pulse Bar
-local PulseBar = Instance.new("Frame")
-PulseBar.Size = UDim2.new(0.2, 0, 0, 2)
-PulseBar.BackgroundColor3 = Color3.fromRGB(0, 190, 255)
-PulseBar.BorderSizePixel = 0
-PulseBar.Parent = MainFrame
-Instance.new("UICorner", PulseBar).CornerRadius = UDim.new(0, 1)
+-- Pulse
+local PBar = Instance.new("Frame")
+PBar.Size = UDim2.new(0.16, 0, 0, 2)
+PBar.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+PBar.BorderSizePixel = 0
+PBar.Parent = MainFrame
 
 -- ============================================
 -- STATE
 -- ============================================
 
-local espEnabled    = true
-local namesEnabled  = true
-local scannerActive = true
-local viewModeActive   = false
-local currentlyViewing = nil
-local viewConnection   = nil
-
-local entityESPObjects = {} -- [model] = {highlight, billboard, distLabel, targetPart, destroyConn}
-local entryMap = {}         -- [model] = Frame
-local sortOrder = {}        -- [model] = layoutOrder
+local active = true
+local espOn = true
+local namesOn = true
+local viewing = false
+local viewTarget = nil
+local viewConn = nil
+local tracked = {}
+local entCount = 0
+local DIST_SKIP = 10
+local dFrame = 0
 
 -- ============================================
--- VIEW MODE
+-- VIEW MODE (free movement HUD)
 -- ============================================
 
-local function stopViewMode()
-    viewModeActive = false
-    
-    if viewConnection then
-        viewConnection:Disconnect()
-        viewConnection = nil
+local viewIndicator = nil
+
+local function stopView()
+    viewing = false
+    if viewConn then viewConn:Disconnect(); viewConn = nil end
+    if viewIndicator then
+        pcall(function() viewIndicator:Destroy() end)
+        viewIndicator = nil
     end
-    
-    Camera.CameraType = Enum.CameraType.Custom
-    local char = LocalPlayer.Character
-    if char then
-        local hum = char:FindFirstChildOfClass("Humanoid")
-        if hum then Camera.CameraSubject = hum end
+    VP.Visible = false
+    ViewBtn.BackgroundColor3 = Color3.fromRGB(70, 0, 150)
+    ViewBtn.Text = "👁 View"
+    for _, d in pairs(tracked) do
+        local b = d.entry and d.entry:FindFirstChild("VB")
+        if b then b.Text = "👁"; b.BackgroundColor3 = Color3.fromRGB(70, 0, 150) end
     end
-    
-    ViewPanel.Visible = false
-    ViewTopBtn.BackgroundColor3 = Color3.fromRGB(80, 0, 170)
-    ViewTopBtn.Text = "👁 View"
-    
-    for _, frame in pairs(entryMap) do
-        local b = frame:FindFirstChild("ViewBtn")
-        if b then
-            b.Text = "👁"
-            b.BackgroundColor3 = Color3.fromRGB(80, 0, 170)
-        end
-    end
-    
-    currentlyViewing = nil
+    viewTarget = nil
 end
 
-local function startViewMode(entity)
-    if viewModeActive then stopViewMode() end
-    
-    local data = entityESPObjects[entity]
-    local root = data and data.targetPart
-    
+local function startView(entity)
+    if viewing then stopView() end
+
+    local data = tracked[entity]
+    if not data then return end
+
+    local root = data.targetPart
     if not root or not root.Parent then
-        root = entity:FindFirstChild("HumanoidRootPart")
-            or entity:FindFirstChild("Head")
-            or entity:FindFirstChild("Torso")
-            or entity.PrimaryPart
-            or entity:FindFirstChildWhichIsA("BasePart")
+        root = entity:FindFirstChildWhichIsA("BasePart")
+        data.targetPart = root
     end
-    
     if not root then return end
-    
-    viewModeActive = true
-    currentlyViewing = entity
-    ViewPanel.Visible = true
-    ViewingLabel.Text = "👁 Viewing: " .. entity.Name
-    ViewTopBtn.Text = "👁 ..."
-    ViewTopBtn.BackgroundColor3 = Color3.fromRGB(130, 0, 255)
-    
-    Camera.CameraType = Enum.CameraType.Scriptable
-    
-    local tween = TweenService:Create(Camera,
-        TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-        { CFrame = CFrame.new(root.Position + Vector3.new(0, 6, 10), root.Position) }
-    )
-    tween:Play()
-    
-    tween.Completed:Connect(function()
-        if not viewModeActive or currentlyViewing ~= entity then return end
-        
-        viewConnection = RunService.RenderStepped:Connect(function()
-            if not viewModeActive or not entity or not entity.Parent then
-                stopViewMode()
-                return
-            end
-            
-            if not root or not root.Parent then
-                root = entity:FindFirstChild("HumanoidRootPart")
-                    or entity:FindFirstChild("Head")
-                    or entity.PrimaryPart
-                    or entity:FindFirstChildWhichIsA("BasePart")
-                if not root then stopViewMode() return end
-            end
-            
-            local desired = CFrame.new(root.Position + Vector3.new(0, 6, 10), root.Position)
-            Camera.CFrame = Camera.CFrame:Lerp(desired, 0.08)
-        end)
+
+    viewing = true
+    viewTarget = entity
+    VP.Visible = true
+    VL.Text = "👁 " .. entity.Name
+    ViewBtn.Text = "👁 ..."
+    ViewBtn.BackgroundColor3 = Color3.fromRGB(115, 0, 235)
+
+    -- Create floating indicator
+    local indicator = Instance.new("ScreenGui")
+    indicator.Name = "ViewIndicator"
+    indicator.ResetOnSpawn = false
+    indicator.DisplayOrder = 100
+    indicator.Parent = LocalPlayer.PlayerGui
+
+    local arrow = Instance.new("TextLabel")
+    arrow.Name = "Arrow"
+    arrow.Size = UDim2.new(0, 160, 0, 50)
+    arrow.AnchorPoint = Vector2.new(0.5, 0)
+    arrow.Position = UDim2.new(0.5, 0, 0, 8)
+    arrow.BackgroundColor3 = Color3.fromRGB(15, 0, 35)
+    arrow.BackgroundTransparency = 0.2
+    arrow.Text = "⚠ " .. entity.Name .. "\n? studs"
+    arrow.TextColor3 = getEntityColor(entity.Name)
+    arrow.TextSize = 13
+    arrow.Font = Enum.Font.GothamBold
+    arrow.TextStrokeTransparency = 0.3
+    arrow.TextStrokeColor3 = Color3.new(0, 0, 0)
+    arrow.Parent = indicator
+    Instance.new("UICorner", arrow).CornerRadius = UDim.new(0, 6)
+
+    local arrowStroke = Instance.new("UIStroke")
+    arrowStroke.Color = getEntityColor(entity.Name)
+    arrowStroke.Thickness = 1.5
+    arrowStroke.Transparency = 0.3
+    arrowStroke.Parent = arrow
+
+    viewIndicator = indicator
+
+    local frameSkip = 0
+    viewConn = RunService.Heartbeat:Connect(function()
+        if not viewing or not entity or not entity.Parent then
+            stopView()
+            return
+        end
+
+        if not root or not root.Parent then
+            root = entity:FindFirstChildWhichIsA("BasePart")
+            data.targetPart = root
+            if not root then stopView(); return end
+        end
+
+        frameSkip += 1
+        if frameSkip < 3 then return end
+        frameSkip = 0
+
+        local screenPos, onScreen = Camera:WorldToScreenPoint(root.Position)
+        local vp = Camera.ViewportSize
+
+        local char = LocalPlayer.Character
+        local myRoot = char and char:FindFirstChild("HumanoidRootPart")
+        local distText = "?"
+        if myRoot then
+            distText = math.floor((myRoot.Position - root.Position).Magnitude) .. " studs"
+        end
+
+        arrow.Text = "⚠ " .. entity.Name .. "\n" .. distText
+
+        if onScreen then
+            local sx = math.clamp(screenPos.X, 80, vp.X - 80)
+            local sy = math.clamp(screenPos.Y, 8, 60)
+            arrow.Position = UDim2.new(0, sx, 0, sy)
+        else
+            local dir = (root.Position - Camera.CFrame.Position).Unit
+            local camRight = Camera.CFrame.RightVector
+            local dot = camRight:Dot(dir)
+            arrow.Position = UDim2.new(dot > 0 and 1 or 0, dot > 0 and -90 or 10, 0, 8)
+        end
     end)
 end
 
 -- ============================================
--- ESP FUNCTIONS
+-- TRACK / UNTRACK
 -- ============================================
 
-local function removeESP(entity)
-    local data = entityESPObjects[entity]
-    if not data then return end
-    
-    pcall(function() if data.highlight then data.highlight:Destroy() end end)
-    pcall(function() if data.billboard then data.billboard:Destroy() end end)
-    if data.destroyConn then data.destroyConn:Disconnect() end
-    
-    entityESPObjects[entity] = nil
-    
-    if currentlyViewing == entity then stopViewMode() end
+local function untrack(entity)
+    local d = tracked[entity]
+    if not d then return end
+    pcall(function() if d.highlight then d.highlight:Destroy() end end)
+    pcall(function() if d.billboard then d.billboard:Destroy() end end)
+    if d.destroyConn then d.destroyConn:Disconnect() end
+    pcall(function() if d.entry then d.entry:Destroy() end end)
+    tracked[entity] = nil
+    entCount = math.max(0, entCount - 1)
+    CL.Text = "Entities: " .. entCount
+    CL.TextColor3 = entCount > 0 and Color3.fromRGB(255, 50, 50) or Color3.fromRGB(255, 190, 40)
+    EL.Visible = entCount == 0
+    if viewTarget == entity then stopView() end
 end
 
-local function createESP(entity)
-    if entityESPObjects[entity] then return end
-    
+local function track(entity)
+    if tracked[entity] then return end
+
     local color = getEntityColor(entity.Name)
-    local espData = {}
-    
+    local d = {}
+
     -- Highlight
     local hl = Instance.new("Highlight")
-    hl.Name = "ESP_HL"
     hl.Adornee = entity
     hl.FillColor = color
     hl.FillTransparency = 0.55
     hl.OutlineColor = color
     hl.OutlineTransparency = 0
     hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-    hl.Enabled = espEnabled
+    hl.Enabled = espOn
     hl.Parent = entity
-    espData.highlight = hl
-    
-    -- Find root part
+    d.highlight = hl
+
+    -- Root
     local root = entity:FindFirstChild("HumanoidRootPart")
         or entity:FindFirstChild("Head")
         or entity:FindFirstChild("Torso")
         or entity.PrimaryPart
         or entity:FindFirstChildWhichIsA("BasePart")
-    espData.targetPart = root
-    
-    -- Billboard nametag
+    d.targetPart = root
+
+    -- Billboard
     if root then
         local bb = Instance.new("BillboardGui")
-        bb.Name = "ESP_BB"
         bb.Adornee = root
-        bb.Size = UDim2.new(0, 140, 0, 45)
-        bb.StudsOffset = Vector3.new(0, 4.5, 0)
+        bb.Size = UDim2.new(0, 120, 0, 38)
+        bb.StudsOffset = Vector3.new(0, 3.5, 0)
         bb.AlwaysOnTop = true
-        bb.MaxDistance = math.huge
-        bb.Enabled = namesEnabled
+        bb.MaxDistance = 600
+        bb.Enabled = namesOn
         bb.Parent = root
-        
-        local nameTag = Instance.new("TextLabel")
-        nameTag.Size = UDim2.new(1, 0, 0.55, 0)
-        nameTag.BackgroundTransparency = 1
-        nameTag.Text = "⚠ " .. entity.Name
-        nameTag.TextColor3 = color
-        nameTag.TextSize = 15
-        nameTag.Font = Enum.Font.GothamBold
-        nameTag.TextStrokeTransparency = 0.1
-        nameTag.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-        nameTag.Parent = bb
-        
-        local distTag = Instance.new("TextLabel")
-        distTag.Name = "DistLabel"
-        distTag.Size = UDim2.new(1, 0, 0.4, 0)
-        distTag.Position = UDim2.new(0, 0, 0.55, 0)
-        distTag.BackgroundTransparency = 1
-        distTag.Text = "?"
-        distTag.TextColor3 = Color3.fromRGB(180, 180, 180)
-        distTag.TextSize = 11
-        distTag.Font = Enum.Font.GothamSemibold
-        distTag.TextStrokeTransparency = 0.3
-        distTag.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-        distTag.Parent = bb
-        
-        espData.billboard = bb
-        espData.distLabel = distTag
+
+        local nt = Instance.new("TextLabel")
+        nt.Size = UDim2.new(1, 0, 0.55, 0)
+        nt.BackgroundTransparency = 1
+        nt.Text = "⚠ " .. entity.Name
+        nt.TextColor3 = color
+        nt.TextSize = 13
+        nt.Font = Enum.Font.GothamBold
+        nt.TextStrokeTransparency = 0.1
+        nt.TextStrokeColor3 = Color3.new(0, 0, 0)
+        nt.Parent = bb
+
+        local dt = Instance.new("TextLabel")
+        dt.Name = "DL"
+        dt.Size = UDim2.new(1, 0, 0.4, 0)
+        dt.Position = UDim2.new(0, 0, 0.55, 0)
+        dt.BackgroundTransparency = 1
+        dt.Text = "?"
+        dt.TextColor3 = Color3.fromRGB(170, 170, 170)
+        dt.TextSize = 10
+        dt.Font = Enum.Font.GothamSemibold
+        dt.TextStrokeTransparency = 0.3
+        dt.TextStrokeColor3 = Color3.new(0, 0, 0)
+        dt.Parent = bb
+
+        d.billboard = bb
+        d.distLabel = dt
     end
-    
-    -- Auto-cleanup
-    espData.destroyConn = entity.AncestryChanged:Connect(function(_, parent)
-        if not parent then
-            removeESP(entity)
-            if entryMap[entity] then
-                entryMap[entity]:Destroy()
-                entryMap[entity] = nil
-                sortOrder[entity] = nil
-            end
-            local c = 0
-            for _ in pairs(entryMap) do c += 1 end
-            EmptyLabel.Visible = c == 0
-        end
-    end)
-    
-    entityESPObjects[entity] = espData
-end
 
--- ============================================
--- LIST ENTRY
--- ============================================
-
-local function removeListEntry(entity)
-    if entryMap[entity] then
-        pcall(function() entryMap[entity]:Destroy() end)
-        entryMap[entity] = nil
-        sortOrder[entity] = nil
+    -- List entry
+    local num = getEntityNumber(entity.Name)
+    local letters = getEntityLetters(entity.Name):upper()
+    local sortVal = 0
+    for i = 1, #letters do
+        sortVal = sortVal * 27 + (string.byte(letters, i) - 64)
     end
-    local c = 0
-    for _ in pairs(entryMap) do c += 1 end
-    EmptyLabel.Visible = c == 0
-end
+    sortVal = sortVal * 2001 + num
 
-local function createListEntry(entity, layoutOrder)
-    if entryMap[entity] then return end
-    
-    local color = getEntityColor(entity.Name)
-    
     local entry = Instance.new("Frame")
-    entry.Name = "E_" .. entity.Name
-    entry.Size = UDim2.new(1, -6, 0, 34)
-    entry.BackgroundColor3 = Color3.fromRGB(20, 20, 40)
+    entry.Size = UDim2.new(1, -4, 0, 30)
+    entry.BackgroundColor3 = Color3.fromRGB(16, 16, 34)
     entry.BorderSizePixel = 0
-    entry.LayoutOrder = layoutOrder or 0
-    entry.Parent = ScrollFrame
-    Instance.new("UICorner", entry).CornerRadius = UDim.new(0, 5)
-    
-    local stroke = Instance.new("UIStroke")
-    stroke.Color = color
-    stroke.Thickness = 1
-    stroke.Transparency = 0.45
-    stroke.Parent = entry
-    
-    -- Color dot
+    entry.LayoutOrder = sortVal
+    entry.Parent = Scroll
+    Instance.new("UICorner", entry).CornerRadius = UDim.new(0, 4)
+
+    local es = Instance.new("UIStroke")
+    es.Color = color
+    es.Thickness = 1
+    es.Transparency = 0.5
+    es.Parent = entry
+
     local dot = Instance.new("Frame")
-    dot.Size = UDim2.new(0, 7, 0, 7)
-    dot.Position = UDim2.new(0, 6, 0.5, -3)
+    dot.Size = UDim2.new(0, 5, 0, 5)
+    dot.Position = UDim2.new(0, 5, 0.5, -2)
     dot.BackgroundColor3 = color
     dot.BorderSizePixel = 0
     dot.Parent = entry
     Instance.new("UICorner", dot).CornerRadius = UDim.new(1, 0)
-    
-    -- Name label
-    local nameLabel = Instance.new("TextLabel")
-    nameLabel.Size = UDim2.new(0.4, -16, 0.5, 0)
-    nameLabel.Position = UDim2.new(0, 18, 0, 2)
-    nameLabel.BackgroundTransparency = 1
-    nameLabel.Text = entity.Name
-    nameLabel.TextColor3 = color
-    nameLabel.TextSize = 12
-    nameLabel.Font = Enum.Font.GothamBold
-    nameLabel.TextXAlignment = Enum.TextXAlignment.Left
-    nameLabel.TextTruncate = Enum.TextTruncate.AtEnd
-    nameLabel.Parent = entry
-    
-    -- Distance label
-    local distLabel = Instance.new("TextLabel")
-    distLabel.Name = "Distance"
-    distLabel.Size = UDim2.new(0.4, -16, 0.5, 0)
-    distLabel.Position = UDim2.new(0, 18, 0.5, -2)
-    distLabel.BackgroundTransparency = 1
-    distLabel.Text = "..."
-    distLabel.TextColor3 = Color3.fromRGB(100, 100, 130)
-    distLabel.TextSize = 9
-    distLabel.Font = Enum.Font.Gotham
-    distLabel.TextXAlignment = Enum.TextXAlignment.Left
-    distLabel.Parent = entry
-    
-    -- View button
-    local viewBtn = Instance.new("TextButton")
-    viewBtn.Name = "ViewBtn"
-    viewBtn.Size = UDim2.new(0, 36, 0, 22)
-    viewBtn.Position = UDim2.new(1, -42, 0.5, -11)
-    viewBtn.BackgroundColor3 = Color3.fromRGB(80, 0, 170)
-    viewBtn.Text = "👁"
-    viewBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    viewBtn.TextSize = 12
-    viewBtn.Font = Enum.Font.GothamBold
-    viewBtn.BorderSizePixel = 0
-    viewBtn.Parent = entry
-    Instance.new("UICorner", viewBtn).CornerRadius = UDim.new(0, 4)
-    
-    viewBtn.MouseEnter:Connect(function()
-        if currentlyViewing ~= entity then
-            TweenService:Create(viewBtn, TweenInfo.new(0.08), {BackgroundColor3 = Color3.fromRGB(110, 0, 255)}):Play()
-        end
-    end)
-    
-    viewBtn.MouseLeave:Connect(function()
-        if currentlyViewing ~= entity then
-            TweenService:Create(viewBtn, TweenInfo.new(0.08), {BackgroundColor3 = Color3.fromRGB(80, 0, 170)}):Play()
-        end
-    end)
-    
-    viewBtn.MouseButton1Click:Connect(function()
-        if currentlyViewing == entity then
-            stopViewMode()
+
+    local nl = Instance.new("TextLabel")
+    nl.Size = UDim2.new(0.5, -14, 0.5, 0)
+    nl.Position = UDim2.new(0, 14, 0, 1)
+    nl.BackgroundTransparency = 1
+    nl.Text = entity.Name
+    nl.TextColor3 = color
+    nl.TextSize = 10
+    nl.Font = Enum.Font.GothamBold
+    nl.TextXAlignment = Enum.TextXAlignment.Left
+    nl.TextTruncate = Enum.TextTruncate.AtEnd
+    nl.Parent = entry
+
+    local edl = Instance.new("TextLabel")
+    edl.Name = "EDL"
+    edl.Size = UDim2.new(0.5, -14, 0.5, 0)
+    edl.Position = UDim2.new(0, 14, 0.5, -1)
+    edl.BackgroundTransparency = 1
+    edl.Text = "..."
+    edl.TextColor3 = Color3.fromRGB(80, 80, 110)
+    edl.TextSize = 8
+    edl.Font = Enum.Font.Gotham
+    edl.TextXAlignment = Enum.TextXAlignment.Left
+    edl.Parent = entry
+
+    local vb = Instance.new("TextButton")
+    vb.Name = "VB"
+    vb.Size = UDim2.new(0, 28, 0, 18)
+    vb.Position = UDim2.new(1, -33, 0.5, -9)
+    vb.BackgroundColor3 = Color3.fromRGB(70, 0, 150)
+    vb.Text = "👁"
+    vb.TextColor3 = Color3.fromRGB(255, 255, 255)
+    vb.TextSize = 10
+    vb.Font = Enum.Font.GothamBold
+    vb.BorderSizePixel = 0
+    vb.Parent = entry
+    Instance.new("UICorner", vb).CornerRadius = UDim.new(0, 3)
+
+    vb.MouseButton1Click:Connect(function()
+        if viewTarget == entity then
+            stopView()
         else
-            for ent, frame in pairs(entryMap) do
-                local b = frame:FindFirstChild("ViewBtn")
-                if b and ent ~= entity then
-                    b.Text = "👁"
-                    b.BackgroundColor3 = Color3.fromRGB(80, 0, 170)
-                end
+            for _, dd in pairs(tracked) do
+                local bb = dd.entry and dd.entry:FindFirstChild("VB")
+                if bb then bb.Text = "👁"; bb.BackgroundColor3 = Color3.fromRGB(70, 0, 150) end
             end
-            startViewMode(entity)
-            viewBtn.Text = "✔"
-            viewBtn.BackgroundColor3 = Color3.fromRGB(130, 0, 255)
+            startView(entity)
+            vb.Text = "✔"
+            vb.BackgroundColor3 = Color3.fromRGB(115, 0, 235)
         end
     end)
-    
-    entryMap[entity] = entry
-    sortOrder[entity] = layoutOrder
-    EmptyLabel.Visible = false
+
+    d.entry = entry
+    d.entryDist = edl
+
+    d.destroyConn = entity.AncestryChanged:Connect(function(_, parent)
+        if not parent then untrack(entity) end
+    end)
+
+    tracked[entity] = d
+    entCount += 1
+    CL.Text = "Entities: " .. entCount
+    CL.TextColor3 = Color3.fromRGB(255, 50, 50)
+    EL.Visible = false
 end
 
 -- ============================================
--- MAIN SCANNER
+-- INITIAL SCAN
 -- ============================================
 
-local function updateScanner()
-    if not scannerActive then return end
-    
-    local found = scanForEntities()
-    local foundSet = {}
-    
-    for i, entity in ipairs(found) do
-        foundSet[entity] = true
-        if not entityESPObjects[entity] then
-            createESP(entity)
-            createListEntry(entity, i)
-        end
+local function initialScan()
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if isEntity(obj) then track(obj) end
     end
-    
-    -- Remove stale
-    for entity in pairs(entityESPObjects) do
-        if not foundSet[entity] or not entity.Parent then
-            removeESP(entity)
-            removeListEntry(entity)
-        end
-    end
-    
-    -- Update count
-    local total = 0
-    for _ in pairs(entityESPObjects) do total += 1 end
-    CountLabel.Text = "Entities: " .. total
-    CountLabel.TextColor3 = total > 0
-        and Color3.fromRGB(255, 60, 60)
-        or Color3.fromRGB(255, 200, 50)
 end
 
--- Distance update
-RunService.Heartbeat:Connect(function()
-    if not scannerActive then return end
-    
-    local char = LocalPlayer.Character
-    local root = char and char:FindFirstChild("HumanoidRootPart")
-    if not root then return end
-    
-    for entity, data in pairs(entityESPObjects) do
-        if not data.targetPart or not data.targetPart.Parent then
-            data.targetPart = entity:FindFirstChild("HumanoidRootPart")
-                or entity:FindFirstChild("Head")
-                or entity.PrimaryPart
-                or entity:FindFirstChildWhichIsA("BasePart")
-        end
-        
-        local tp = data.targetPart
-        if tp and tp.Parent then
-            local dist = math.floor((root.Position - tp.Position).Magnitude)
-            local col = dist < 20 and Color3.fromRGB(255, 50, 50)
-                or dist < 60 and Color3.fromRGB(255, 190, 40)
-                or Color3.fromRGB(160, 160, 160)
-            
-            if data.distLabel then
-                data.distLabel.Text = dist .. " studs"
-                data.distLabel.TextColor3 = col
-            end
-            
-            local ef = entryMap[entity]
-            if ef then
-                local dl = ef:FindFirstChild("Distance")
-                if dl then
-                    dl.Text = dist .. " studs"
-                    dl.TextColor3 = col
-                end
-            end
-        end
-    end
-end)
+-- ============================================
+-- LIVE DETECTION
+-- ============================================
 
--- Live workspace monitoring
 workspace.DescendantAdded:Connect(function(obj)
-    if not scannerActive then return end
-    task.wait(0.08)
-    if isEntity(obj) and not entityESPObjects[obj] then
-        createESP(obj)
-        local order = 9999
-        for ent, o in pairs(sortOrder) do
-            if o >= order then order = o + 1 end
+    if not active or not obj:IsA("Model") then return end
+    task.defer(function()
+        if obj.Parent and isEntity(obj) and not tracked[obj] then
+            track(obj)
         end
-        createListEntry(obj, order)
-        
-        local total = 0
-        for _ in pairs(entityESPObjects) do total += 1 end
-        CountLabel.Text = "Entities: " .. total
-        CountLabel.TextColor3 = Color3.fromRGB(255, 60, 60)
-    end
+    end)
 end)
 
 workspace.DescendantRemoving:Connect(function(obj)
-    if entityESPObjects[obj] then
-        removeESP(obj)
-        removeListEntry(obj)
-        
-        local total = 0
-        for _ in pairs(entityESPObjects) do total += 1 end
-        CountLabel.Text = "Entities: " .. total
-    end
+    if tracked[obj] then untrack(obj) end
 end)
 
 -- ============================================
--- BUTTON HANDLERS
+-- DISTANCE UPDATE (throttled)
 -- ============================================
 
-ESPToggle.MouseButton1Click:Connect(function()
-    espEnabled = not espEnabled
-    ESPToggle.Text = espEnabled and "ESP: ON" or "ESP: OFF"
-    ESPToggle.BackgroundColor3 = espEnabled
-        and Color3.fromRGB(0, 145, 70)
-        or Color3.fromRGB(115, 35, 35)
-    
-    for _, data in pairs(entityESPObjects) do
-        if data.highlight then data.highlight.Enabled = espEnabled end
-    end
-end)
+RunService.Heartbeat:Connect(function()
+    if not active then return end
+    dFrame += 1
+    if dFrame < DIST_SKIP then return end
+    dFrame = 0
 
-NamesToggle.MouseButton1Click:Connect(function()
-    namesEnabled = not namesEnabled
-    NamesToggle.Text = namesEnabled and "Names: ON" or "Names: OFF"
-    NamesToggle.BackgroundColor3 = namesEnabled
-        and Color3.fromRGB(0, 110, 180)
-        or Color3.fromRGB(115, 35, 35)
-    
-    for _, data in pairs(entityESPObjects) do
-        if data.billboard then data.billboard.Enabled = namesEnabled end
-    end
-end)
-
-ViewTopBtn.MouseButton1Click:Connect(function()
-    if viewModeActive then
-        stopViewMode()
-        return
-    end
-    
     local char = LocalPlayer.Character
-    local root = char and char:FindFirstChild("HumanoidRootPart")
-    if not root then return end
-    
-    local nearest, nearDist = nil, math.huge
-    for entity, data in pairs(entityESPObjects) do
-        local tp = data.targetPart
+    local myR = char and char:FindFirstChild("HumanoidRootPart")
+    if not myR then return end
+    local myP = myR.Position
+
+    for ent, d in pairs(tracked) do
+        local tp = d.targetPart
+        if not tp or not tp.Parent then
+            tp = ent:FindFirstChildWhichIsA("BasePart")
+            d.targetPart = tp
+        end
         if tp and tp.Parent then
-            local d = (root.Position - tp.Position).Magnitude
-            if d < nearDist then
-                nearest = entity
-                nearDist = d
-            end
+            local dist = math.floor((myP - tp.Position).Magnitude)
+            local col = dist < 18 and Color3.fromRGB(255, 40, 40)
+                or dist < 50 and Color3.fromRGB(255, 180, 30)
+                or Color3.fromRGB(140, 140, 140)
+            local txt = dist .. "s"
+            if d.distLabel then d.distLabel.Text = txt; d.distLabel.TextColor3 = col end
+            if d.entryDist then d.entryDist.Text = txt; d.entryDist.TextColor3 = col end
         end
     end
-    
-    if nearest then
-        for _, frame in pairs(entryMap) do
-            local b = frame:FindFirstChild("ViewBtn")
-            if b then
-                b.Text = "👁"
-                b.BackgroundColor3 = Color3.fromRGB(80, 0, 170)
-            end
+end)
+
+-- ============================================
+-- BUTTONS
+-- ============================================
+
+EspBtn.MouseButton1Click:Connect(function()
+    espOn = not espOn
+    EspBtn.Text = espOn and "ESP: ON" or "ESP: OFF"
+    EspBtn.BackgroundColor3 = espOn and Color3.fromRGB(0, 130, 60) or Color3.fromRGB(100, 28, 28)
+    for _, d in pairs(tracked) do
+        if d.highlight then d.highlight.Enabled = espOn end
+    end
+end)
+
+NameBtn.MouseButton1Click:Connect(function()
+    namesOn = not namesOn
+    NameBtn.Text = namesOn and "Names: ON" or "Names: OFF"
+    NameBtn.BackgroundColor3 = namesOn and Color3.fromRGB(0, 95, 160) or Color3.fromRGB(100, 28, 28)
+    for _, d in pairs(tracked) do
+        if d.billboard then d.billboard.Enabled = namesOn end
+    end
+end)
+
+ViewBtn.MouseButton1Click:Connect(function()
+    if viewing then stopView(); return end
+    local char = LocalPlayer.Character
+    local myR = char and char:FindFirstChild("HumanoidRootPart")
+    if not myR then return end
+    local near, nDist = nil, math.huge
+    for ent, d in pairs(tracked) do
+        local tp = d.targetPart
+        if tp and tp.Parent then
+            local dist = (myR.Position - tp.Position).Magnitude
+            if dist < nDist then near = ent; nDist = dist end
         end
-        startViewMode(nearest)
-        local ef = entryMap[nearest]
-        if ef then
-            local b = ef:FindFirstChild("ViewBtn")
-            if b then
-                b.Text = "✔"
-                b.BackgroundColor3 = Color3.fromRGB(130, 0, 255)
-            end
+    end
+    if near then
+        for _, dd in pairs(tracked) do
+            local bb = dd.entry and dd.entry:FindFirstChild("VB")
+            if bb then bb.Text = "👁"; bb.BackgroundColor3 = Color3.fromRGB(70, 0, 150) end
         end
+        startView(near)
+        local nd = tracked[near]
+        local bb = nd and nd.entry and nd.entry:FindFirstChild("VB")
+        if bb then bb.Text = "✔"; bb.BackgroundColor3 = Color3.fromRGB(115, 0, 235) end
     else
-        ViewTopBtn.Text = "None!"
-        ViewTopBtn.BackgroundColor3 = Color3.fromRGB(145, 25, 25)
-        task.delay(1.2, function()
-            if not viewModeActive then
-                ViewTopBtn.Text = "👁 View"
-                ViewTopBtn.BackgroundColor3 = Color3.fromRGB(80, 0, 170)
+        ViewBtn.Text = "None!"
+        ViewBtn.BackgroundColor3 = Color3.fromRGB(130, 20, 20)
+        task.delay(1, function()
+            if not viewing then
+                ViewBtn.Text = "👁 View"
+                ViewBtn.BackgroundColor3 = Color3.fromRGB(70, 0, 150)
             end
         end)
     end
 end)
 
-StopViewBtn.MouseButton1Click:Connect(stopViewMode)
+SVBtn.MouseButton1Click:Connect(stopView)
 
-CloseBtn.MouseButton1Click:Connect(function()
-    scannerActive = false
-    stopViewMode()
-    for entity in pairs(entityESPObjects) do removeESP(entity) end
+XBtn.MouseButton1Click:Connect(function()
+    active = false
+    stopView()
+    for ent in pairs(tracked) do untrack(ent) end
     ScreenGui:Destroy()
 end)
 
 -- ============================================
--- PULSE ANIMATION
+-- PULSE
 -- ============================================
 
-local pDir, pPos = 1, 0
-spawn(function()
-    while scannerActive do
-        pPos += 0.014 * pDir
-        if pPos >= 0.8 then pDir = -1 elseif pPos <= 0 then pDir = 1 end
-        PulseBar.Position = UDim2.new(pPos, 0, 1, -2)
-        ScanIcon.TextTransparency = ((math.sin(tick() * 2.5) + 1) / 2) * 0.45
-        
-        if viewModeActive then
-            ViewStroke.Transparency = ((math.sin(tick() * 4) + 1) / 2) * 0.4
-        end
-        
-        task.wait(0.025)
+local pD, pP = 1, 0
+task.spawn(function()
+    while active do
+        pP += 0.01 * pD
+        if pP >= 0.84 then pD = -1 elseif pP <= 0 then pD = 1 end
+        PBar.Position = UDim2.new(pP, 0, 1, -2)
+        SIcon.TextTransparency = ((math.sin(tick() * 2) + 1) / 2) * 0.35
+        if viewing then VSt.Transparency = ((math.sin(tick() * 3) + 1) / 2) * 0.3 end
+        task.wait(0.066)
     end
 end)
 
--- Scan loop
-spawn(function()
-    while scannerActive do
-        updateScanner()
-        task.wait(1)
-    end
-end)
+-- ============================================
+-- START
+-- ============================================
 
--- Initial
-updateScanner()
+initialScan()
 print("[Entity Scanner] ✔ Loaded")
-print("[Entity Scanner] Pattern: A-Z (1-3 letters) + 1-1000")
-print("[Entity Scanner] Examples: A-1, B-500, AB-99, XYZ-1000")
+print("[Entity Scanner] Pattern: ABC-1 to ABC-2000")
+print("[Entity Scanner] View = free movement HUD")
