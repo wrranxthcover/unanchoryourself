@@ -239,27 +239,153 @@ UIS.InputEnded:Connect(function(i)
 end)
 
 -- ============================================
--- SPEED APPLY (Block Entity Support)
+-- SPEED APPLY (Efficient - Apply Once, Not Loop)
 -- ============================================
 local speedApplyConn = nil
 local speedApplyTarget = nil
+local lastAppliedSpeed = 0
+local speedApplyActive = false
+
+local function cleanSpeedControl(target)
+    if not target or not target.Parent then return end
+    local root = getPart(target)
+    if root and root.Parent then
+        local bv = root:FindFirstChild("SpeedControlBV")
+        if bv then bv:Destroy() end
+    end
+end
+
+local function applySpeedOnce(target, speed)
+    if not target or not target.Parent then return end
+    local root = getPart(target)
+    if not root or not root.Parent then return end
+
+    -- Method 1: Humanoid
+    local hum = target:FindFirstChildWhichIsA("Humanoid")
+    if hum then hum.WalkSpeed = speed end
+
+    -- Method 2: NumberValue speed configs
+    for _, child in ipairs(target:GetDescendants()) do
+        if child:IsA("NumberValue") or child:IsA("IntValue") then
+            local ln = child.Name:lower()
+            if ln:find("speed") or ln:find("spd") or ln:find("velocity") or ln:find("movespeed") or ln:find("walkspeed") or ln:find("runspeed") then
+                child.Value = speed
+            end
+        end
+    end
+
+    -- Method 3: Existing movers
+    for _, child in ipairs(target:GetDescendants()) do
+        if child:IsA("BodyVelocity") and child.Name ~= "SpeedControlBV" then
+            if child.Velocity.Magnitude > 0.1 then
+                child.Velocity = child.Velocity.Unit * speed
+            end
+        end
+        if child:IsA("LinearVelocity") then
+            pcall(function()
+                if child.VectorVelocity.Magnitude > 0.1 then
+                    child.VectorVelocity = child.VectorVelocity.Unit * speed
+                end
+            end)
+            pcall(function()
+                if child.LineVelocity and child.LineVelocity ~= 0 then
+                    local sign = child.LineVelocity > 0 and 1 or -1
+                    child.LineVelocity = sign * speed
+                end
+            end)
+        end
+        if child:IsA("AlignPosition") then
+            pcall(function() child.MaxVelocity = speed end)
+        end
+        if child:IsA("BodyForce") then
+            if child.Force.Magnitude > 0.1 then
+                child.Force = child.Force.Unit * speed * root:GetMass()
+            end
+        end
+    end
+end
 
 local function stopSpeedApply()
     if speedApplyConn then speedApplyConn:Disconnect(); speedApplyConn = nil end
-    -- Clean up BodyVelocity we added
-    if speedApplyTarget and speedApplyTarget.Parent then
-        local root = getPart(speedApplyTarget)
-        if root and root.Parent then
-            local bv = root:FindFirstChild("SpeedControlBV"); if bv then bv:Destroy() end
-        end
-    end
+    cleanSpeedControl(speedApplyTarget)
     speedApplyTarget = nil
+    speedApplyActive = false
+    lastAppliedSpeed = 0
     spApp.Text = "Apply"; spApp.BackgroundColor3 = Color3.fromRGB(0, 140, 60)
 end
 
-spApp.MouseButton1Click:Connect(function()
-    if speedApplyConn then stopSpeedApply(); return end
+local function startSpeedLoop(target)
+    if speedApplyConn then speedApplyConn:Disconnect(); speedApplyConn = nil end
 
+    speedApplyActive = true
+    lastAppliedSpeed = selSpeed
+
+    -- Apply immediately
+    applySpeedOnce(target, selSpeed)
+
+    -- Light monitor: only re-applies when entity's movers reset or speed changed
+    -- Runs every 0.5 seconds instead of every frame
+    local checkCount = 0
+    speedApplyConn = RunService.Heartbeat:Connect(function(dt)
+        if not active or not target or not target.Parent then stopSpeedApply(); return end
+        local root = getPart(target)
+        if not root or not root.Parent then stopSpeedApply(); return end
+
+        checkCount += 1
+        -- Only check every 30 frames (~0.5 seconds at 60fps)
+        if checkCount < 30 then return end
+        checkCount = 0
+
+        -- Re-apply to keep speed consistent
+        -- (entity scripts may reset values)
+        applySpeedOnce(target, selSpeed)
+
+        -- Handle unanchored blocks: maintain BodyVelocity direction
+        if not root.Anchored then
+            local bv = root:FindFirstChild("SpeedControlBV")
+            if bv then
+                -- Keep existing direction, just ensure speed
+                if bv.Velocity.Magnitude > 0.1 then
+                    bv.Velocity = bv.Velocity.Unit * selSpeed
+                end
+            else
+                -- Detect movement direction and add BV
+                local sd = spd[target]
+                if sd and sd.lP then
+                    local dir = (root.Position - sd.lP)
+                    if dir.Magnitude > 0.1 then
+                        dir = Vector3.new(dir.X, 0, dir.Z).Unit
+                        bv = Instance.new("BodyVelocity")
+                        bv.Name = "SpeedControlBV"
+                        bv.MaxForce = Vector3.new(math.huge, 0, math.huge)
+                        bv.P = 100000
+                        bv.Velocity = dir * selSpeed
+                        bv.Parent = root
+                    end
+                end
+            end
+        else
+            -- Anchored: move via CFrame (only when needed)
+            local sd = spd[target]
+            if sd and sd.lP then
+                local dir = (root.Position - sd.lP)
+                if dir.Magnitude > 0.01 then
+                    dir = Vector3.new(dir.X, 0, dir.Z).Unit
+                    root.CFrame = root.CFrame + dir * selSpeed * (30/60) -- compensate for check interval
+                end
+            end
+        end
+    end)
+end
+
+spApp.MouseButton1Click:Connect(function()
+    -- If already active, stop
+    if speedApplyActive then
+        stopSpeedApply()
+        return
+    end
+
+    -- Find target
     local target = viewEntTarget
     if not target then
         local c = LP.Character; local mr = c and c:FindFirstChild("HumanoidRootPart")
@@ -278,113 +404,44 @@ spApp.MouseButton1Click:Connect(function()
 
     if not target then
         spApp.Text = "None!"
-        task.delay(1, function() if not speedApplyConn then spApp.Text = "Apply" end end)
+        task.delay(1, function() if not speedApplyActive then spApp.Text = "Apply" end end)
         return
     end
 
     speedApplyTarget = target
     spApp.Text = "■ Stop"; spApp.BackgroundColor3 = Color3.fromRGB(200, 60, 0)
-
-    local lastPos = nil
-    local lastDir = Vector3.new(0, 0, -1)
-    local root = getPart(target)
-    if root then lastPos = root.Position end
-
-    speedApplyConn = RunService.Heartbeat:Connect(function(dt)
-        if not active or not target or not target.Parent then stopSpeedApply(); return end
-
-        root = getPart(target)
-        if not root or not root.Parent then stopSpeedApply(); return end
-
-        -- Method 1: Humanoid WalkSpeed
-        local hum = target:FindFirstChildWhichIsA("Humanoid")
-        if hum then hum.WalkSpeed = selSpeed end
-
-        -- Method 2: Find speed-related values in entity
-        for _, child in ipairs(target:GetDescendants()) do
-            if child:IsA("NumberValue") or child:IsA("IntValue") then
-                local ln = child.Name:lower()
-                if ln:find("speed") or ln:find("spd") or ln:find("velocity") or ln:find("movespeed") or ln:find("walkspeed") or ln:find("runspeed") then
-                    child.Value = selSpeed
-                end
-            end
-        end
-
-        -- Method 3: Modify existing movers on the root part
-        for _, child in ipairs(root:GetChildren()) do
-            if child:IsA("BodyVelocity") and child.Name ~= "SpeedControlBV" then
-                if child.Velocity.Magnitude > 0.1 then
-                    child.Velocity = child.Velocity.Unit * selSpeed
-                end
-            end
-            if child:IsA("BodyForce") then
-                if child.Force.Magnitude > 0.1 then
-                    child.Force = child.Force.Unit * selSpeed * root:GetMass()
-                end
-            end
-            if child:IsA("LinearVelocity") then
-                pcall(function()
-                    if child.VectorVelocity.Magnitude > 0.1 then
-                        child.VectorVelocity = child.VectorVelocity.Unit * selSpeed
-                    end
-                end)
-                pcall(function()
-                    if child.LineVelocity and child.LineVelocity ~= 0 then
-                        local sign = child.LineVelocity > 0 and 1 or -1
-                        child.LineVelocity = sign * selSpeed
-                    end
-                end)
-            end
-            if child:IsA("AlignPosition") then
-                pcall(function() child.MaxVelocity = selSpeed end)
-            end
-        end
-
-        -- Also check descendants of entity for movers
-        for _, child in ipairs(target:GetDescendants()) do
-            if child:IsA("BodyVelocity") and child.Name ~= "SpeedControlBV" then
-                if child.Velocity.Magnitude > 0.1 then
-                    child.Velocity = child.Velocity.Unit * selSpeed
-                end
-            end
-            if child:IsA("LinearVelocity") then
-                pcall(function()
-                    if child.VectorVelocity.Magnitude > 0.1 then
-                        child.VectorVelocity = child.VectorVelocity.Unit * selSpeed
-                    end
-                end)
-            end
-        end
-
-        -- Method 4: Detect direction from movement + apply BodyVelocity
-        local curPos = root.Position
-        if lastPos then
-            local delta = curPos - lastPos
-            if delta.Magnitude > 0.05 then
-                lastDir = Vector3.new(delta.X, 0, delta.Z).Unit
-            end
-        end
-        lastPos = curPos
-
-        if not root.Anchored then
-            local bv = root:FindFirstChild("SpeedControlBV")
-            if not bv then
-                bv = Instance.new("BodyVelocity")
-                bv.Name = "SpeedControlBV"
-                bv.MaxForce = Vector3.new(math.huge, 0, math.huge)
-                bv.P = 100000
-                bv.Parent = root
-            end
-            bv.Velocity = lastDir * selSpeed
-        else
-            -- Method 5: Anchored block - CFrame move
-            root.CFrame = root.CFrame + lastDir * selSpeed * dt
-        end
-    end)
+    startSpeedLoop(target)
 end)
 
-updateSpUI()
+-- When slider changes while active, restart loop with new speed
+local function onSpeedChanged()
+    if speedApplyActive and speedApplyTarget then
+        -- Speed changed, apply new speed immediately
+        applySpeedOnce(speedApplyTarget, selSpeed)
 
+        -- Update BodyVelocity if exists
+        local root = getPart(speedApplyTarget)
+        if root and root.Parent then
+            local bv = root:FindFirstChild("SpeedControlBV")
+            if bv and bv.Velocity.Magnitude > 0.1 then
+                bv.Velocity = bv.Velocity.Unit * selSpeed
+            end
+        end
+
+        lastAppliedSpeed = selSpeed
+    end
+end
+function updateSpUI()
+    local pct = (selSpeed-1)/999
+    slFill.Size = UDim2.new(math.max(pct,0.01), 0, 1, 0)
+    slKnob.Position = UDim2.new(math.max(pct,0.01), 0, 0.5, 0)
+    spVal.Text = tostring(selSpeed); spB.Text = "⚡ Speed: "..selSpeed
+    if selSpeed <= 100 then slFill.BackgroundColor3 = Color3.fromRGB(0,200,80); slKnob.BackgroundColor3 = Color3.fromRGB(100,255,150)
+    elseif selSpeed <= 500 then slFill.BackgroundColor3 = Color3.fromRGB(255,200,0); slKnob.BackgroundColor3 = Color3.fromRGB(255,230,100)
+    else slFill.BackgroundColor3 = Color3.fromRGB(255,60,0); slKnob.BackgroundColor3 = Color3.fromRGB(255,120,80) end
+    -- Apply new speed if active
+    onSpeedChanged()
+end
 -- ============================================
 -- LAYOUT + TABS + PANELS
 -- ============================================
