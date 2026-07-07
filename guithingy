@@ -412,8 +412,8 @@ PBar.BorderSizePixel = 0
 PBar.Parent = MainFrame
 
 -- ============================================
--- RED ALERT BANNER
--- Opens from center, scrolls left, shows HIDE!
+-- RED ALERT SYSTEM
+-- Center banner + left side stack
 -- ============================================
 
 local AlertGui = Instance.new("ScreenGui")
@@ -422,7 +422,7 @@ AlertGui.ResetOnSpawn = false
 AlertGui.DisplayOrder = 200
 AlertGui.Parent = LocalPlayer.PlayerGui
 
--- Main alert container
+-- Main center banner
 local AlertFrame = Instance.new("Frame")
 AlertFrame.Size = UDim2.new(0, 0, 0, 80)
 AlertFrame.AnchorPoint = Vector2.new(0.5, 0)
@@ -439,7 +439,6 @@ AlertStroke.Color = Color3.fromRGB(255, 0, 0)
 AlertStroke.Thickness = 2
 AlertStroke.Parent = AlertFrame
 
--- Inner gradient
 local AlertGrad = Instance.new("UIGradient")
 AlertGrad.Color = ColorSequence.new({
     ColorSequenceKeypoint.new(0, Color3.fromRGB(180, 0, 0)),
@@ -448,7 +447,6 @@ AlertGrad.Color = ColorSequence.new({
 })
 AlertGrad.Parent = AlertFrame
 
--- Entity name (big)
 local AlertName = Instance.new("TextLabel")
 AlertName.Size = UDim2.new(1, 0, 0, 35)
 AlertName.Position = UDim2.new(0, 0, 0, 5)
@@ -461,7 +459,6 @@ AlertName.TextStrokeTransparency = 0
 AlertName.TextStrokeColor3 = Color3.fromRGB(80, 0, 0)
 AlertName.Parent = AlertFrame
 
--- HIDE! text that scrolls left
 local AlertHideContainer = Instance.new("Frame")
 AlertHideContainer.Size = UDim2.new(1, 0, 0, 30)
 AlertHideContainer.Position = UDim2.new(0, 0, 0, 42)
@@ -469,11 +466,13 @@ AlertHideContainer.BackgroundTransparency = 1
 AlertHideContainer.ClipsDescendants = true
 AlertHideContainer.Parent = AlertFrame
 
+local hideText = "⚠ HIDE! ⚠ HIDE! ⚠ HIDE! ⚠ HIDE! ⚠ HIDE! "
+
 local AlertHide = Instance.new("TextLabel")
 AlertHide.Size = UDim2.new(3, 0, 1, 0)
 AlertHide.Position = UDim2.new(0, 0, 0, 0)
 AlertHide.BackgroundTransparency = 1
-AlertHide.Text = "⚠ HIDE! ⚠ HIDE! ⚠ HIDE! ⚠ HIDE! ⚠ HIDE! ⚠ HIDE! ⚠ HIDE! ⚠ HIDE! ⚠ HIDE! ⚠ HIDE!"
+AlertHide.Text = hideText
 AlertHide.TextColor3 = Color3.fromRGB(255, 60, 60)
 AlertHide.TextSize = 18
 AlertHide.Font = Enum.Font.GothamBlack
@@ -482,7 +481,20 @@ AlertHide.TextStrokeColor3 = Color3.fromRGB(50, 0, 0)
 AlertHide.TextXAlignment = Enum.TextXAlignment.Left
 AlertHide.Parent = AlertHideContainer
 
--- Distance on alert
+local AlertHide2 = Instance.new("TextLabel")
+AlertHide2.Name = "AlertHide2"
+AlertHide2.Size = UDim2.new(3, 0, 1, 0)
+AlertHide2.Position = UDim2.new(0, 500, 0, 0)
+AlertHide2.BackgroundTransparency = 1
+AlertHide2.Text = hideText
+AlertHide2.TextColor3 = Color3.fromRGB(255, 60, 60)
+AlertHide2.TextSize = 18
+AlertHide2.Font = Enum.Font.GothamBlack
+AlertHide2.TextStrokeTransparency = 0.2
+AlertHide2.TextStrokeColor3 = Color3.fromRGB(50, 0, 0)
+AlertHide2.TextXAlignment = Enum.TextXAlignment.Left
+AlertHide2.Parent = AlertHideContainer
+
 local AlertDist = Instance.new("TextLabel")
 AlertDist.Size = UDim2.new(1, 0, 0, 14)
 AlertDist.Position = UDim2.new(0, 0, 1, -16)
@@ -493,58 +505,199 @@ AlertDist.TextSize = 10
 AlertDist.Font = Enum.Font.GothamSemibold
 AlertDist.Parent = AlertFrame
 
+-- ============================================
+-- LEFT SIDE STACK (other red entities)
+-- ============================================
+
+local LeftStack = Instance.new("Frame")
+LeftStack.Size = UDim2.new(0, 200, 1, 0)
+LeftStack.Position = UDim2.new(0, 8, 0, 100)
+LeftStack.BackgroundTransparency = 1
+LeftStack.Parent = AlertGui
+
+local LeftLayout = Instance.new("UIListLayout")
+LeftLayout.SortOrder = Enum.SortOrder.LayoutOrder
+LeftLayout.Padding = UDim.new(0, 3)
+LeftLayout.Parent = LeftStack
+
 -- Alert state
 local alertActive = false
 local alertEntity = nil
 local alertScrollConn = nil
 local alertPulseConn = nil
+local leftEntries = {} -- {entityName = frame}
+local redEntities = {} -- {entityName = dist} all red entities this frame
 
-local function showAlert(entityName, dist)
+local function clearLeftStack()
+    for name, frame in pairs(leftEntries) do
+        pcall(function() frame:Destroy() end)
+    end
+    leftEntries = {}
+end
+
+local function updateLeftStack(redList, closestName)
+    -- redList = {name = dist, ...}, closestName = main banner entity
+    -- Remove entries no longer red
+    for name, frame in pairs(leftEntries) do
+        if not redList[name] or name == closestName then
+            pcall(function() frame:Destroy() end)
+            leftEntries[name] = nil
+        end
+    end
+
+    -- Count how many to show (exclude closest, it's on main banner)
+    local count = 0
+    for name, _ in pairs(redList) do
+        if name ~= closestName then count += 1 end
+    end
+
+    -- Size based on count
+    local entryHeight
+    local fontSize
+    if count <= 3 then
+        entryHeight = 32
+        fontSize = 13
+    elseif count <= 6 then
+        entryHeight = 26
+        fontSize = 11
+    elseif count <= 10 then
+        entryHeight = 22
+        fontSize = 9
+    else
+        entryHeight = 18
+        fontSize = 8
+    end
+
+    -- Update existing + add new
+    local order = 0
+    for name, dist in pairs(redList) do
+        if name == closestName then continue end
+        order += 1
+
+        if leftEntries[name] then
+            -- Update existing
+            local frame = leftEntries[name]
+            frame.Size = UDim2.new(1, 0, 0, entryHeight)
+            local dl = frame:FindFirstChild("DL")
+            if dl then dl.Text = dist .. "s" end
+            local nl = frame:FindFirstChild("NL")
+            if nl then nl.TextSize = fontSize end
+            frame.LayoutOrder = dist -- sort by distance
+        else
+            -- Create new entry
+            local frame = Instance.new("Frame")
+            frame.Name = name
+            frame.Size = UDim2.new(1, 0, 0, entryHeight)
+            frame.BackgroundColor3 = Color3.fromRGB(100, 0, 0)
+            frame.BackgroundTransparency = 0.15
+            frame.BorderSizePixel = 0
+            frame.LayoutOrder = dist
+            frame.Parent = LeftStack
+            Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 5)
+
+            local ls = Instance.new("UIStroke")
+            ls.Color = Color3.fromRGB(255, 40, 40)
+            ls.Thickness = 1
+            ls.Transparency = 0.3
+            ls.Parent = frame
+
+            local icon = Instance.new("TextLabel")
+            icon.Size = UDim2.new(0, 20, 1, 0)
+            icon.Position = UDim2.new(0, 3, 0, 0)
+            icon.BackgroundTransparency = 1
+            icon.Text = "⚠"
+            icon.TextColor3 = Color3.fromRGB(255, 60, 60)
+            icon.TextSize = fontSize
+            icon.Font = Enum.Font.GothamBold
+            icon.Parent = frame
+
+            local nl = Instance.new("TextLabel")
+            nl.Name = "NL"
+            nl.Size = UDim2.new(0.6, -20, 1, 0)
+            nl.Position = UDim2.new(0, 22, 0, 0)
+            nl.BackgroundTransparency = 1
+            nl.Text = name
+            nl.TextColor3 = Color3.fromRGB(255, 200, 200)
+            nl.TextSize = fontSize
+            nl.Font = Enum.Font.GothamBold
+            nl.TextXAlignment = Enum.TextXAlignment.Left
+            nl.TextTruncate = Enum.TextTruncate.AtEnd
+            nl.TextStrokeTransparency = 0.3
+            nl.TextStrokeColor3 = Color3.new(0, 0, 0)
+            nl.Parent = frame
+
+            local dlabel = Instance.new("TextLabel")
+            dlabel.Name = "DL"
+            dlabel.Size = UDim2.new(0.35, 0, 1, 0)
+            dlabel.Position = UDim2.new(0.65, 0, 0, 0)
+            dlabel.BackgroundTransparency = 1
+            dlabel.Text = dist .. "s"
+            dlabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+            dlabel.TextSize = fontSize - 1
+            dlabel.Font = Enum.Font.GothamSemibold
+            dlabel.TextXAlignment = Enum.TextXAlignment.Right
+            dlabel.Parent = frame
+
+            local lp = Instance.new("UIPadding")
+            lp.PaddingRight = UDim.new(0, 5)
+            lp.Parent = dlabel
+
+            leftEntries[name] = frame
+        end
+    end
+end
+
+local function showAlert(entityName, dist, allRedEntities)
     if alertActive and alertEntity == entityName then
         AlertDist.Text = dist .. "s away"
+        updateLeftStack(allRedEntities, entityName)
         return
     end
 
+    -- Different closest entity or first time
     alertEntity = entityName
     AlertName.Text = "⚠ " .. entityName
     AlertDist.Text = dist .. "s away"
 
-    -- Open animation: expand from center
-    AlertFrame.Size = UDim2.new(0, 0, 0, 80)
-    AlertFrame.Visible = true
-    alertActive = true
+    if not alertActive then
+        -- Open animation
+        AlertFrame.Size = UDim2.new(0, 0, 0, 80)
+        AlertFrame.Visible = true
+        alertActive = true
 
-    local openTween = TweenService:Create(AlertFrame, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-        Size = UDim2.new(0, 500, 0, 80)
-    })
-    openTween:Play()
+        local openTween = TweenService:Create(AlertFrame, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+            Size = UDim2.new(0, 500, 0, 80)
+        })
+        openTween:Play()
+    else
+        alertActive = true
+    end
 
-    -- Scroll HIDE! text left looping
+    -- Seamless scroll
     if alertScrollConn then alertScrollConn:Disconnect() end
     local scrollX = 0
+    local textWidth = 500
+
     alertScrollConn = RunService.Heartbeat:Connect(function(dt)
         if not alertActive then return end
         scrollX = scrollX - dt * 150
-        if scrollX < -600 then scrollX = 0 end
+        if scrollX < -textWidth then
+            scrollX = scrollX + textWidth
+        end
         AlertHide.Position = UDim2.new(0, scrollX, 0, 0)
+        AlertHide2.Position = UDim2.new(0, scrollX + textWidth, 0, 0)
     end)
 
-    -- Pulse the border
+    -- Pulse
     if alertPulseConn then alertPulseConn:Disconnect() end
     alertPulseConn = RunService.Heartbeat:Connect(function()
         if not alertActive then return end
         local pulse = (math.sin(tick() * 8) + 1) / 2
-        AlertStroke.Color = Color3.fromRGB(
-            math.floor(180 + 75 * pulse),
-            0,
-            0
-        )
-        AlertFrame.BackgroundColor3 = Color3.fromRGB(
-            math.floor(80 + 60 * pulse),
-            0,
-            0
-        )
+        AlertStroke.Color = Color3.fromRGB(math.floor(180 + 75 * pulse), 0, 0)
+        AlertFrame.BackgroundColor3 = Color3.fromRGB(math.floor(80 + 60 * pulse), 0, 0)
     end)
+
+    updateLeftStack(allRedEntities, entityName)
 end
 
 local function hideAlert()
@@ -564,8 +717,8 @@ local function hideAlert()
 
     if alertScrollConn then alertScrollConn:Disconnect(); alertScrollConn = nil end
     if alertPulseConn then alertPulseConn:Disconnect(); alertPulseConn = nil end
+    clearLeftStack()
 end
-
 -- ============================================
 -- STATE
 -- ============================================
@@ -1248,7 +1401,7 @@ task.spawn(function()
 end)
 
 -- ============================================
--- DISTANCE UPDATE + COLOR CHANGE + RED ALERT
+-- DISTANCE UPDATE + COLOR + RED ALERT
 -- ============================================
 
 RunService.Heartbeat:Connect(function()
@@ -1264,6 +1417,7 @@ RunService.Heartbeat:Connect(function()
 
     local closestRedName = nil
     local closestRedDist = math.huge
+    local allRed = {} -- all entities in red range
 
     for ent, d in pairs(tracked) do
         local tp = d.targetPart
@@ -1274,7 +1428,6 @@ RunService.Heartbeat:Connect(function()
         if tp and tp.Parent then
             local dist = math.floor((myP - tp.Position).Magnitude)
 
-            -- Distance text
             local textCol = dist < 18 and Color3.fromRGB(255, 40, 40)
                 or dist < 50 and Color3.fromRGB(255, 180, 30)
                 or Color3.fromRGB(140, 140, 140)
@@ -1282,7 +1435,6 @@ RunService.Heartbeat:Connect(function()
             if d.distLabel then d.distLabel.Text = txt; d.distLabel.TextColor3 = textCol end
             if d.entryDist then d.entryDist.Text = txt; d.entryDist.TextColor3 = textCol end
 
-            -- ESP color: white → yellow → orange → red
             local espColor
             if dist >= 50000 then
                 espColor = Color3.fromRGB(255, 255, 255)
@@ -1297,7 +1449,6 @@ RunService.Heartbeat:Connect(function()
                 espColor = Color3.fromRGB(255, math.floor(140 * t), 0)
             end
 
-            -- Apply colors
             if d.highlight then
                 d.highlight.FillColor = espColor
                 d.highlight.OutlineColor = espColor
@@ -1307,10 +1458,10 @@ RunService.Heartbeat:Connect(function()
             if d.entryStroke then d.entryStroke.Color = espColor end
             if d.entryDot then d.entryDot.BackgroundColor3 = espColor end
 
-            -- Track closest red entity for alert
-            if dist < RED_THRESHOLD and dist < closestRedDist then
-                -- Only main entities trigger alert (not minions)
-                if matchesEntityPattern(ent.Name) then
+            -- Track red entities (only main entities, not minions)
+            if dist < RED_THRESHOLD and matchesEntityPattern(ent.Name) then
+                allRed[ent.Name] = dist
+                if dist < closestRedDist then
                     closestRedName = ent.Name
                     closestRedDist = dist
                 end
@@ -1318,9 +1469,8 @@ RunService.Heartbeat:Connect(function()
         end
     end
 
-    -- Red alert
     if closestRedName then
-        showAlert(closestRedName, closestRedDist)
+        showAlert(closestRedName, closestRedDist, allRed)
     else
         hideAlert()
     end
