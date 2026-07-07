@@ -28,7 +28,8 @@ local spd = {}
 local dSkip, dF = 6, 0
 local alertOn, alertEnt, alertScrConn, alertPulseConn = false, nil, nil, nil
 local leftEntries, undoEntries = {}, {}
-local selSpeed = 50
+local MIN_SPEED = -100
+local MAX_SPEED = 10000
 local speedPanelOpen = false
 
 local function matchPat(name)
@@ -164,7 +165,7 @@ Instance.new("UICorner", spPanel).CornerRadius = UDim.new(0, 6)
 local spSt2 = Instance.new("UIStroke"); spSt2.Color = Color3.fromRGB(200, 140, 0); spSt2.Thickness = 1; spSt2.Parent = spPanel
 
 local spTit = Instance.new("TextLabel"); spTit.Size = UDim2.new(1, 0, 0, 14); spTit.Position = UDim2.new(0, 5, 0, 2)
-spTit.BackgroundTransparency = 1; spTit.Text = "⚡ Block Speed (-100 to 10000)"; spTit.TextColor3 = Color3.fromRGB(255, 200, 80)
+spTit.BackgroundTransparency = 1; spTit.Text = "⚡ Speed (-100 to 10000)"; spTit.TextColor3 = Color3.fromRGB(255, 200, 80)
 spTit.TextSize = 8; spTit.Font = Enum.Font.GothamBold; spTit.TextXAlignment = Enum.TextXAlignment.Left; spTit.Parent = spPanel
 
 local slBG = Instance.new("Frame"); slBG.Size = UDim2.new(0.58, 0, 0, 10); slBG.Position = UDim2.new(0.03, 0, 0, 20)
@@ -189,8 +190,8 @@ spApp.BackgroundColor3 = Color3.fromRGB(0, 140, 60); spApp.Text = "Apply"; spApp
 spApp.TextSize = 8; spApp.Font = Enum.Font.GothamBold; spApp.Parent = spPanel
 Instance.new("UICorner", spApp).CornerRadius = UDim.new(0, 3)
 
-local qBtns = {{"-10", Color3.fromRGB(140, 60, 0), -10},{"+10", Color3.fromRGB(0, 100, 50), 10},
-    {"-50", Color3.fromRGB(140, 30, 0), -50},{"+50", Color3.fromRGB(0, 80, 40), 50}}
+local qBtns = {{"-100", Color3.fromRGB(140, 60, 0), -100},{"+100", Color3.fromRGB(0, 100, 50), 100},
+    {"-500", Color3.fromRGB(140, 30, 0), -500},{"+500", Color3.fromRGB(0, 80, 40), 500}}
 for i, info in ipairs(qBtns) do
     local qb = Instance.new("TextButton"); qb.Size = UDim2.new(0, 26, 0, 13); qb.Position = UDim2.new(0, 3+(i-1)*30, 0, 38)
     qb.BackgroundColor3 = info[2]; qb.Text = info[1]; qb.TextColor3 = Color3.new(1,1,1)
@@ -199,17 +200,17 @@ for i, info in ipairs(qBtns) do
     qb.MouseButton1Click:Connect(function() selSpeed = math.clamp(selSpeed+info[3], 1, 1000); updateSpUI() end)
 end
 
-local presets = {{" -100 ",-100},{"0",0},{"1000",1000},{"MAX",100000}}
+local presets = {{" -100 ",-100},{"0",0},{"5000",5000},{"MAX",100000}}
 for i, info in ipairs(presets) do
     local pb = Instance.new("TextButton"); pb.Size = UDim2.new(0, 26, 0, 13); pb.Position = UDim2.new(0, 125+(i-1)*30, 0, 38)
     pb.BackgroundColor3 = i==4 and Color3.fromRGB(140,0,0) or Color3.fromRGB(60,60,80)
     pb.Text = info[1]; pb.TextColor3 = Color3.new(1,1,1); pb.TextSize = 7; pb.Font = Enum.Font.GothamBold; pb.Parent = spPanel
     Instance.new("UICorner", pb).CornerRadius = UDim.new(0, 3)
-    pb.MouseButton1Click:Connect(function() selSpeed = info[2]; updateSpUI() end)
+qb.MouseButton1Click:Connect(function() selSpeed = math.clamp(selSpeed+info[3], MIN_SPEED, MAX_SPEED); updateSpUI() end)
 end
 
 function updateSpUI()
-    local pct = (selSpeed-1)/999
+    local pct = (selSpeed - MIN_SPEED) / (MAX_SPEED - MIN_SPEED)
     slFill.Size = UDim2.new(math.max(pct,0.01), 0, 1, 0)
     slKnob.Position = UDim2.new(math.max(pct,0.01), 0, 0.5, 0)
     spVal.Text = tostring(selSpeed); spB.Text = "⚡ Speed: "..selSpeed
@@ -222,7 +223,7 @@ local draggingSl = false
 slBG.InputBegan:Connect(function(i)
     if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
         draggingSl = true; local rel = (i.Position.X-slBG.AbsolutePosition.X)/slBG.AbsoluteSize.X
-        selSpeed = math.clamp(math.floor(1+rel*999),1,1000); updateSpUI()
+        selSpeed = math.clamp(math.floor(MIN_SPEED + rel * (MAX_SPEED - MIN_SPEED)), MIN_SPEED, MAX_SPEED); updateSpUI()
     end
 end)
 slKnob.InputBegan:Connect(function(i)
@@ -231,7 +232,7 @@ end)
 UIS.InputChanged:Connect(function(i)
     if draggingSl and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
         local rel = math.clamp((i.Position.X-slBG.AbsolutePosition.X)/slBG.AbsoluteSize.X, 0, 1)
-        selSpeed = math.clamp(math.floor(1+rel*999),1,1000); updateSpUI()
+        selSpeed = math.clamp(math.floor(MIN_SPEED + rel * (MAX_SPEED - MIN_SPEED)), MIN_SPEED, MAX_SPEED); updateSpUI()
     end
 end)
 UIS.InputEnded:Connect(function(i)
