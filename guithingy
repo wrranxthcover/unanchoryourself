@@ -51,6 +51,17 @@ end
 
 local function isMinion(name) local l = name:lower(); return l == "eye" or l == "mouth" end
 
+local function getDisplayName(entity)
+    local l = entity.Name:lower()
+    if l == "eye" or l == "mouth" then
+        local parent = entity.Parent
+        if parent and matchPat(parent.Name) then
+            return parent.Name .. "'s " .. entity.Name
+        end
+    end
+    return entity.Name
+end
+
 local function getPrefix(name)
     if name:match("^[Mm][Oo][Bb]%d+$") then return "MOB" end
     local l = name:lower(); if l == "eye" or l == "mouth" then return l end
@@ -501,7 +512,8 @@ local function startVE(entity) if viewingEnt then stopVE() end
     local data = tracked[entity]; if not data then return end
     local root = data.targetPart; if not root or not root.Parent then root = getPart(entity); data.targetPart = root end
     if not root then return end; if viewing then stopV() end
-    viewingEnt = true; viewEntTarget = entity; vep2.Visible = true; velb2.Text = "🎥 "..entity.Name
+    viewingEnt = true; viewEntTarget = entity; vep2.Visible = true
+    velb2.Text = "🎥 " .. getDisplayName(entity)
     veB.Text = "🎥 ON"; veB.BackgroundColor3 = Color3.fromRGB(0,140,50)
     savedCamType = Camera.CameraType; Camera.CameraType = Enum.CameraType.Scriptable
     local ang, lastTP = 0, root.Position
@@ -512,19 +524,20 @@ local function startVE(entity) if viewingEnt then stopVE() end
         local fs = math.clamp(0.15+(es/100), 0.15, 0.95); if es > FAST_THRESH then fs = 0.85 end
         Camera.CFrame = Camera.CFrame:Lerp(CFrame.lookAt(tp+Vector3.new(math.sin(ang)*12,5,math.cos(ang)*12), tp), fs)
         local c = LP.Character; local mr = c and c:FindFirstChild("HumanoidRootPart")
-        if mr then velb2.Text = "🎥 "..entity.Name.." | "..math.floor((mr.Position-tp).Magnitude).."s"..(es > FAST_THRESH and " ⚡" or "") end
+        if mr then velb2.Text = "🎥 " .. getDisplayName(entity) .. " | " .. math.floor((mr.Position-tp).Magnitude) .. "s" .. (es > FAST_THRESH and " ⚡" or "") end
     end); layoutGUI() end
 
 local function startV(entity) if viewing then stopV() end
     local data = tracked[entity]; if not data then return end
     local root = data.targetPart; if not root or not root.Parent then root = getPart(entity); data.targetPart = root end
     if not root then return end; if viewingEnt then stopVE() end
-    viewing = true; viewTarget = entity; vp2.Visible = true; vlb.Text = "👁 "..entity.Name
+    viewing = true; viewTarget = entity; vp2.Visible = true
+    vlb.Text = "👁 " .. getDisplayName(entity)
     vwB.Text = "👁 ..."; vwB.BackgroundColor3 = Color3.fromRGB(115,0,235)
     local ind = Instance.new("ScreenGui"); ind.Name = "ViewIndicator"; ind.ResetOnSpawn = false; ind.DisplayOrder = 100; ind.Parent = LP.PlayerGui
     local ar = Instance.new("TextLabel"); ar.Size = UDim2.new(0,140,0,40); ar.AnchorPoint = Vector2.new(0.5,0)
     ar.Position = UDim2.new(0.5,0,0,8); ar.BackgroundColor3 = Color3.fromRGB(15,0,35); ar.BackgroundTransparency = 0.2
-    ar.Text = "⚠ "..entity.Name; ar.TextColor3 = getCol(entity.Name); ar.TextSize = 11; ar.Font = Enum.Font.GothamBold
+    ar.Text = "⚠ " .. getDisplayName(entity); ar.TextColor3 = getCol(entity.Name); ar.TextSize = 11; ar.Font = Enum.Font.GothamBold
     ar.TextStrokeTransparency = 0.3; ar.Parent = ind; Instance.new("UICorner", ar).CornerRadius = UDim.new(0,6)
     viewIndicator = ind; local fs3 = 0
     viewConn = RunService.Heartbeat:Connect(function()
@@ -534,7 +547,7 @@ local function startV(entity) if viewing then stopV() end
         local sp, on = Camera:WorldToScreenPoint(root.Position); local vpS = Camera.ViewportSize
         local c = LP.Character; local mr = c and c:FindFirstChild("HumanoidRootPart"); local dt2 = "?"
         if mr then dt2 = math.floor((mr.Position-root.Position).Magnitude).."s" end
-        ar.Text = "⚠ "..entity.Name.."\n"..dt2
+        ar.Text = "⚠ " .. getDisplayName(entity) .. "\n" .. dt2
         if on then ar.Position = UDim2.new(0, math.clamp(sp.X,80,vpS.X-80), 0, math.clamp(sp.Y,8,50))
         else local dir = (root.Position-Camera.CFrame.Position).Unit; local d2 = Camera.CFrame.RightVector:Dot(dir)
             ar.Position = UDim2.new(d2>0 and 1 or 0, d2>0 and -80 or 10, 0, 8) end
@@ -599,11 +612,12 @@ track = function(entity)
         local hl = Instance.new("Highlight"); hl.Adornee = entity; hl.FillColor = color; hl.FillTransparency = 0.55
         hl.OutlineColor = color; hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop; hl.Enabled = espOn; hl.Parent = entity; d.highlight = hl end
     local root = getPart(entity); d.targetPart = root
+    local displayName = getDisplayName(entity)
     local function sBB(part) if d.billboard or not part then return end
         local bb = Instance.new("BillboardGui"); bb.Adornee = part; bb.Size = UDim2.new(0,120,0,50)
         bb.StudsOffset = Vector3.new(0,3.5,0); bb.AlwaysOnTop = true; bb.MaxDistance = 600; bb.Enabled = namesOn; bb.Parent = part
         local nt = Instance.new("TextLabel"); nt.Name = "NT"; nt.Size = UDim2.new(1,0,0,13); nt.BackgroundTransparency = 1
-        nt.Text = "⚠ "..entity.Name; nt.TextColor3 = color; nt.TextSize = 11; nt.Font = Enum.Font.GothamBold; nt.TextStrokeTransparency = 0.1; nt.Parent = bb
+        nt.Text = "⚠ " .. displayName; nt.TextColor3 = color; nt.TextSize = 11; nt.Font = Enum.Font.GothamBold; nt.TextStrokeTransparency = 0.1; nt.Parent = bb
         local dt3 = Instance.new("TextLabel"); dt3.Name = "DL"; dt3.Size = UDim2.new(1,0,0,10); dt3.Position = UDim2.new(0,0,0,13)
         dt3.BackgroundTransparency = 1; dt3.Text = "?"; dt3.TextColor3 = Color3.fromRGB(170,170,170); dt3.TextSize = 8; dt3.Font = Enum.Font.GothamSemibold; dt3.Parent = bb
         local sl = Instance.new("TextLabel"); sl.Name = "SL"; sl.Size = UDim2.new(1,0,0,12); sl.Position = UDim2.new(0,0,0,23)
@@ -630,7 +644,7 @@ track = function(entity)
     local dot = Instance.new("Frame"); dot.Name = "Dot"; dot.Size = UDim2.new(0,4,0,4); dot.Position = UDim2.new(0,4,0,7)
     dot.BackgroundColor3 = color; dot.Parent = entry; Instance.new("UICorner", dot).CornerRadius = UDim.new(1,0)
     local nl2 = Instance.new("TextLabel"); nl2.Name = "NL"; nl2.Size = UDim2.new(0.35,0,0,12); nl2.Position = UDim2.new(0,12,0,1)
-    nl2.BackgroundTransparency = 1; nl2.Text = entity.Name; nl2.TextColor3 = color; nl2.TextSize = 8; nl2.Font = Enum.Font.GothamBold
+    nl2.BackgroundTransparency = 1; nl2.Text = displayName; nl2.TextColor3 = color; nl2.TextSize = 8; nl2.Font = Enum.Font.GothamBold
     nl2.TextXAlignment = Enum.TextXAlignment.Left; nl2.TextTruncate = Enum.TextTruncate.AtEnd; nl2.Parent = entry
     local edl = Instance.new("TextLabel"); edl.Name = "EDL"; edl.Size = UDim2.new(0.2,0,0,10); edl.Position = UDim2.new(0,12,0,13)
     edl.BackgroundTransparency = 1; edl.Text = "..."; edl.TextColor3 = Color3.fromRGB(80,80,110); edl.TextSize = 7
