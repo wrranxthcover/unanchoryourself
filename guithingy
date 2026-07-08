@@ -257,162 +257,34 @@ UIS.InputChanged:Connect(function(i) if draggingSl and (i.UserInputType == Enum.
 UIS.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then draggingSl = false end end)
 
 -- ============================================
--- FORCE SPEED (Ultimate - All Executor Methods)
+-- FORCE SPEED (Visual Override - Client Side)
 -- ============================================
 local speedApplyConn = nil
 local speedApplyConn2 = nil
-local speedApplyConn3 = nil
 local speedApplyTarget = nil
 local speedApplyActive = false
-local savedPositions = {}
-local destroyedScripts = {}
-local frozenCFrame = nil
+local visualOffset = Vector3.zero
+local lastRealPos = nil
+local lastDir = nil
+local frozenPos = nil
 
--- Try every known executor network ownership method
-local function claimOwnership(part)
-    -- Method 1: sethiddenproperty
-    pcall(function() sethiddenproperty(part, "NetworkOwnershipRule", 2) end)
-    -- Method 2: direct SetNetworkOwner
-    pcall(function() part:SetNetworkOwner(LP) end)
-    -- Method 3: setnewworkowner (some executors)
-    pcall(function() setnewworkowner(part) end)
-    -- Method 4: setnetworkowner (some executors)  
-    pcall(function() setnetworkowner(part, LP) end)
-    -- Method 5: setnetworkowner no args
-    pcall(function() setnetworkowner(part) end)
-    -- Method 6: change NetworkOwnership via sethiddenproperty Automatic
-    pcall(function() sethiddenproperty(part, "NetworkOwnership", Enum.NetworkOwnership.Manual) end)
-    -- Method 7: gethiddenproperty then set
-    pcall(function()
-        local cur = gethiddenproperty(part, "NetworkOwnerV3")
-        sethiddenproperty(part, "NetworkOwnerV3", LP)
-    end)
-    -- Method 8: setscriptable
-    pcall(function()
-        setscriptable(part, "NetworkOwnerV3", true)
-        part.NetworkOwnerV3 = LP
-    end)
-    -- Method 9: Synapse/Fluxus style
-    pcall(function() fireclickdetector(part) end)
-    -- Method 10: Raw property
-    pcall(function() part.Anchored = false end)
+local function getEntityCFrame(target)
+    if target:IsA("Model") then
+        return target:GetPivot()
+    else
+        local p = getPart(target)
+        if p then return p.CFrame end
+    end
+    return nil
 end
 
-local function nukeEntity(target)
-    if destroyedScripts[target] then return end
-    destroyedScripts[target] = true
-    
-    -- Destroy EVERYTHING that could control the entity
-    local toDestroy = {}
-    for _, child in ipairs(target:GetDescendants()) do
-        pcall(function()
-            if child:IsA("Script") or child:IsA("LocalScript") or child:IsA("ModuleScript") then
-                table.insert(toDestroy, child)
-            elseif child:IsA("BodyVelocity") and child.Name ~= "SpeedControlBV" then
-                table.insert(toDestroy, child)
-            elseif child:IsA("BodyForce") or child:IsA("BodyPosition") or child:IsA("BodyGyro")
-                or child:IsA("BodyThrust") or child:IsA("BodyAngularVelocity")
-                or child:IsA("LinearVelocity") or child:IsA("AlignPosition")
-                or child:IsA("AlignOrientation") or child:IsA("VectorForce")
-                or child:IsA("LineForce") or child:IsA("RocketPropulsion")
-                or child:IsA("AngularVelocity") then
-                table.insert(toDestroy, child)
-            elseif child:IsA("BindableEvent") or child:IsA("BindableFunction")
-                or child:IsA("RemoteEvent") or child:IsA("RemoteFunction") then
-                table.insert(toDestroy, child)
-            elseif child:IsA("Animator") or child:IsA("AnimationController") then
-                table.insert(toDestroy, child)
-            elseif child:IsA("PathfindingLink") or child:IsA("PathfindingModifier") then
-                table.insert(toDestroy, child)
-            end
-        end)
+local function setEntityCFrame(target, cf)
+    if target:IsA("Model") then
+        pcall(function() target:PivotTo(cf) end)
+    else
+        local p = getPart(target)
+        if p then pcall(function() p.CFrame = cf end) end
     end
-    for _, obj in ipairs(toDestroy) do pcall(function() obj:Destroy() end) end
-    
-    -- Stop all animations
-    for _, child in ipairs(target:GetDescendants()) do pcall(function()
-        if child:IsA("Humanoid") then
-            local animator = child:FindFirstChildOfClass("Animator")
-            if animator then
-                for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
-                    pcall(function() track:Stop() end)
-                end
-            end
-        end
-    end) end
-    
-    -- Kill humanoid AI
-    for _, child in ipairs(target:GetDescendants()) do pcall(function()
-        if child:IsA("Humanoid") then
-            child.WalkSpeed = 0
-            child.JumpPower = 0
-            child.JumpHeight = 0
-            child.PlatformStand = true
-            child.AutoRotate = false
-            pcall(function() child:SetAttribute("WalkSpeed", 0) end)
-            pcall(function() child:SetAttribute("Speed", 0) end)
-            pcall(function() child:SetAttribute("MoveSpeed", 0) end)
-            pcall(function() child:SetAttribute("RunSpeed", 0) end)
-            pcall(function() child:SetAttribute("ChaseSpeed", 0) end)
-            pcall(function() child:ChangeState(Enum.HumanoidStateType.Physics) end)
-        end
-    end) end
-    
-    -- Override ALL value objects
-    for _, child in ipairs(target:GetDescendants()) do pcall(function()
-        if child:IsA("NumberValue") or child:IsA("IntValue") then
-            child.Value = 0
-        elseif child:IsA("BoolValue") then
-            local ln = child.Name:lower()
-            if ln:find("active") or ln:find("chase") or ln:find("move")
-                or ln:find("enabled") or ln:find("alive") or ln:find("aggro")
-                or ln:find("attack") or ln:find("hunt") or ln:find("patrol") then
-                child.Value = false
-            end
-        elseif child:IsA("StringValue") then
-            local ln = child.Name:lower()
-            if ln:find("state") or ln:find("mode") or ln:find("status") then
-                child.Value = "Idle"
-            end
-        end
-    end) end
-
-    -- Prevent new children from controlling entity
-    pcall(function()
-        target.ChildAdded:Connect(function(child)
-            if not speedApplyActive then return end
-            pcall(function()
-                if child:IsA("Script") or child:IsA("LocalScript") or child:IsA("ModuleScript") then
-                    child:Destroy()
-                elseif child:IsA("BodyVelocity") and child.Name ~= "SpeedControlBV" then
-                    child:Destroy()
-                elseif child:IsA("BodyForce") or child:IsA("BodyPosition") or child:IsA("BodyGyro")
-                    or child:IsA("LinearVelocity") or child:IsA("AlignPosition")
-                    or child:IsA("AlignOrientation") or child:IsA("VectorForce") then
-                    child:Destroy()
-                end
-            end)
-        end)
-    end)
-    
-    -- Same for all descendants
-    pcall(function()
-        target.DescendantAdded:Connect(function(child)
-            if not speedApplyActive then return end
-            pcall(function()
-                if child:IsA("Script") or child:IsA("LocalScript") or child:IsA("ModuleScript") then
-                    child:Destroy()
-                elseif child:IsA("BodyVelocity") and child.Name ~= "SpeedControlBV" then
-                    child:Destroy()
-                elseif child:IsA("BodyForce") or child:IsA("BodyPosition") or child:IsA("BodyGyro")
-                    or child:IsA("LinearVelocity") or child:IsA("AlignPosition")
-                    or child:IsA("AlignOrientation") or child:IsA("VectorForce")
-                    or child:IsA("BodyThrust") or child:IsA("RocketPropulsion") then
-                    child:Destroy()
-                end
-            end)
-        end)
-    end)
 end
 
 local function forceSpeed(target, speed)
@@ -420,142 +292,125 @@ local function forceSpeed(target, speed)
     local absSpeed = math.abs(speed)
     local reversed = speed < 0
 
-    local allParts = {}
-    if target:IsA("BasePart") then table.insert(allParts, target)
-    else for _, desc in ipairs(target:GetDescendants()) do if desc:IsA("BasePart") then table.insert(allParts, desc) end end end
-    if #allParts == 0 then return end
+    local root = getPart(target)
+    if not root or not root.Parent then return end
 
-    local root = getPart(target); if not root then root = allParts[1] end
+    local realPos = root.Position
 
-    -- Claim network ownership on ALL parts
-    for _, part in ipairs(allParts) do claimOwnership(part) end
-
-    -- Nuke entity once (destroy scripts, movers, remotes, etc)
-    nukeEntity(target)
-
-    -- Clean any new movers that appeared
-    for _, child in ipairs(target:GetDescendants()) do pcall(function()
-        if child:IsA("BodyVelocity") and child.Name ~= "SpeedControlBV" then child:Destroy() end
-        if child:IsA("BodyForce") or child:IsA("BodyPosition") or child:IsA("BodyGyro")
-            or child:IsA("LinearVelocity") or child:IsA("AlignPosition")
-            or child:IsA("AlignOrientation") or child:IsA("VectorForce")
-            or child:IsA("LineForce") or child:IsA("BodyThrust")
-            or child:IsA("RocketPropulsion") or child:IsA("AngularVelocity") then
-            child:Destroy()
-        end
-    end) end
-
-    -- Direction detection
-    local sd = spd[target]
-    local dir = root.CFrame.LookVector
-    if sd and sd.forceLastPos then
-        local delta = root.Position - sd.forceLastPos
-        if delta.Magnitude > 0.01 then
+    -- Detect movement direction from server movement
+    if lastRealPos then
+        local delta = realPos - lastRealPos
+        if delta.Magnitude > 0.05 then
             local flatDir = Vector3.new(delta.X, 0, delta.Z)
-            if flatDir.Magnitude > 0 then dir = flatDir.Unit; sd.lastMoveDir = dir end
+            if flatDir.Magnitude > 0 then
+                lastDir = flatDir.Unit
+            end
         end
     end
-    if sd and sd.lastMoveDir then dir = sd.lastMoveDir end
+    lastRealPos = realPos
+
+    local dir = lastDir or root.CFrame.LookVector
     if reversed then dir = -dir end
-    if sd then sd.forceLastPos = root.Position end
 
     if absSpeed == 0 then
-        -- FREEZE: Anchor everything and zero velocity
-        for _, part in ipairs(allParts) do pcall(function()
-            part.Anchored = true
-            part.AssemblyLinearVelocity = Vector3.zero
-            part.AssemblyAngularVelocity = Vector3.zero
-            part.Velocity = Vector3.zero
-            part.RotVelocity = Vector3.zero
-        end) end
-        local bv = root:FindFirstChild("SpeedControlBV")
-        if bv then bv:Destroy() end
-        if not frozenCFrame then
-            if target:IsA("Model") then frozenCFrame = target:GetPivot()
-            else frozenCFrame = root.CFrame end
+        -- FREEZE: Keep teleporting back to frozen position
+        if not frozenPos then
+            frozenPos = getEntityCFrame(target)
         end
-        -- Hold position
-        if frozenCFrame then
-            if target:IsA("Model") then pcall(function() target:PivotTo(frozenCFrame) end)
-            else pcall(function() root.CFrame = frozenCFrame end) end
+        if frozenPos then
+            setEntityCFrame(target, frozenPos)
+        end
+        -- Also try anchoring
+        for _, desc in ipairs(target:GetDescendants()) do
+            if desc:IsA("BasePart") then
+                pcall(function() desc.Anchored = true end)
+                pcall(function() desc.Velocity = Vector3.zero end)
+                pcall(function() desc.AssemblyLinearVelocity = Vector3.zero end)
+            end
         end
         return
     end
 
-    frozenCFrame = nil
+    frozenPos = nil
 
-    -- Unanchor for movement
-    for _, part in ipairs(allParts) do pcall(function() part.Anchored = false end) end
+    -- Calculate speed multiplier relative to entity's natural speed
+    -- We override by adding extra CFrame movement on top
+    local moveAmt = dir * absSpeed * (1/60)
 
-    -- Weld parts together
-    for _, part in ipairs(allParts) do
-        if part ~= root then
-            local hasWeld = false
-            for _, j in ipairs(part:GetJoints()) do
-                if j:IsA("WeldConstraint") or j:IsA("Weld") or j:IsA("Motor6D") then hasWeld = true; break end end
-            if not hasWeld then pcall(function()
-                local w = Instance.new("WeldConstraint"); w.Name = "SpeedControlWeld"
-                w.Part0 = root; w.Part1 = part; w.Parent = root end) end
-        end
+    -- Method 1: CFrame teleport (works visually even without network ownership)
+    local currentCF = getEntityCFrame(target)
+    if currentCF and dir.Magnitude > 0 then
+        setEntityCFrame(target, currentCF + moveAmt)
     end
 
-    -- BodyVelocity with infinite force
+    -- Method 2: Try velocity (may or may not work depending on ownership)
+    pcall(function()
+        root.Velocity = dir * absSpeed
+        root.AssemblyLinearVelocity = dir * absSpeed
+        root.AssemblyAngularVelocity = Vector3.zero
+    end)
+
+    -- Method 3: BodyVelocity (backup)
     pcall(function()
         local bv = root:FindFirstChild("SpeedControlBV")
         if not bv then
-            bv = Instance.new("BodyVelocity"); bv.Name = "SpeedControlBV"; bv.Parent = root
+            bv = Instance.new("BodyVelocity")
+            bv.Name = "SpeedControlBV"
+            bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+            bv.P = math.huge
+            bv.Parent = root
         end
-        bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-        bv.P = math.huge
         bv.Velocity = dir * absSpeed
     end)
 
-    -- Direct velocity on all parts
-    for _, part in ipairs(allParts) do pcall(function()
-        part.AssemblyLinearVelocity = dir * absSpeed
-        part.AssemblyAngularVelocity = Vector3.zero
-        part.Velocity = dir * absSpeed
-        part.RotVelocity = Vector3.zero
-    end) end
-
-    -- CFrame teleport (most reliable on client)
-    if dir.Magnitude > 0 then
-        local moveAmt = dir * absSpeed * (1/60)
-        if target:IsA("Model") then
-            pcall(function() target:PivotTo(target:GetPivot() + moveAmt) end)
-        else
-            pcall(function() root.CFrame = root.CFrame + moveAmt end)
+    -- Method 4: Try to slow down/speed up humanoid
+    for _, child in ipairs(target:GetDescendants()) do
+        if child:IsA("Humanoid") then
+            pcall(function() child.WalkSpeed = absSpeed end)
         end
     end
+
+    -- Method 5: Override speed values
+    for _, child in ipairs(target:GetDescendants()) do pcall(function()
+        if child:IsA("NumberValue") or child:IsA("IntValue") then
+            local ln = child.Name:lower()
+            if ln:find("speed") or ln:find("spd") or ln:find("velocity")
+                or ln:find("move") or ln:find("walk") or ln:find("run")
+                or ln:find("chase") or ln:find("patrol") or ln:find("rate") then
+                child.Value = speed
+            end
+        end
+    end) end
+
+    -- Method 6: Destroy server movers fighting us
+    for _, child in ipairs(target:GetDescendants()) do pcall(function()
+        if child:IsA("BodyVelocity") and child.Name ~= "SpeedControlBV" then child:Destroy() end
+        if child:IsA("BodyPosition") or child:IsA("AlignPosition")
+            or child:IsA("LinearVelocity") or child:IsA("BodyForce")
+            or child:IsA("VectorForce") then child:Destroy() end
+    end) end
 end
 
 local function cleanSpeedControl(target)
     if not target or not target.Parent then return end
     for _, desc in ipairs(target:GetDescendants()) do pcall(function()
-        if desc.Name == "SpeedControlBV" or desc.Name == "SpeedControlLV" or desc.Name == "SpeedControlWeld" then desc:Destroy() end
+        if desc.Name == "SpeedControlBV" or desc.Name == "SpeedControlWeld" then desc:Destroy() end
     end) end
-    for _, child in ipairs(target:GetDescendants()) do pcall(function()
-        if child:IsA("Humanoid") then
-            child.PlatformStand = false
-            child.AutoRotate = true
-            pcall(function() child:ChangeState(Enum.HumanoidStateType.Running) end)
-        end
-    end) end
-    for _, child in ipairs(target:GetDescendants()) do pcall(function()
-        if child:IsA("BasePart") then child.Anchored = false end
+    for _, desc in ipairs(target:GetDescendants()) do pcall(function()
+        if desc:IsA("BasePart") then desc.Anchored = false end
     end) end
 end
 
 local function stopSpeedApply()
     if speedApplyConn then speedApplyConn:Disconnect(); speedApplyConn = nil end
     if speedApplyConn2 then speedApplyConn2:Disconnect(); speedApplyConn2 = nil end
-    if speedApplyConn3 then speedApplyConn3:Disconnect(); speedApplyConn3 = nil end
     if speedApplyTarget and speedApplyTarget.Parent then
         cleanSpeedControl(speedApplyTarget)
     end
-    destroyedScripts[speedApplyTarget] = nil
-    savedPositions[speedApplyTarget] = nil
-    frozenCFrame = nil
+    visualOffset = Vector3.zero
+    lastRealPos = nil
+    lastDir = nil
+    frozenPos = nil
     speedApplyTarget = nil; speedApplyActive = false
     spApp.Text = "Apply"; spApp.BackgroundColor3 = Color3.fromRGB(0, 140, 60)
 end
@@ -563,30 +418,27 @@ end
 local function startSpeedLoop(target)
     if speedApplyConn then speedApplyConn:Disconnect(); speedApplyConn = nil end
     if speedApplyConn2 then speedApplyConn2:Disconnect(); speedApplyConn2 = nil end
-    if speedApplyConn3 then speedApplyConn3:Disconnect(); speedApplyConn3 = nil end
     speedApplyActive = true
-    savedPositions[target] = nil
-    destroyedScripts[target] = nil
-    frozenCFrame = nil
-    forceSpeed(target, selSpeed)
-    
-    -- Triple enforcement: RenderStepped + Stepped + Heartbeat
+    visualOffset = Vector3.zero
+    lastRealPos = nil
+    lastDir = nil
+    frozenPos = nil
+
+    -- Primary: RenderStepped (runs before render, highest visual priority)
     pcall(function()
         speedApplyConn = RunService.RenderStepped:Connect(function()
             if not active or not target or not target.Parent then stopSpeedApply(); return end
+            local root = getPart(target)
+            if not root or not root.Parent then stopSpeedApply(); return end
             forceSpeed(target, selSpeed)
         end)
     end)
-    
-    pcall(function()
-        speedApplyConn2 = RunService.Stepped:Connect(function()
-            if not active or not target or not target.Parent then return end
-            forceSpeed(target, selSpeed)
-        end)
-    end)
-    
-    speedApplyConn3 = RunService.Heartbeat:Connect(function()
+
+    -- Backup: Heartbeat
+    speedApplyConn2 = RunService.Heartbeat:Connect(function()
         if not active or not target or not target.Parent then stopSpeedApply(); return end
+        local root = getPart(target)
+        if not root or not root.Parent then stopSpeedApply(); return end
         forceSpeed(target, selSpeed)
     end)
 end
