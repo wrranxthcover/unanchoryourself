@@ -31,7 +31,27 @@ local leftEntries, undoEntries = {}, {}
 local selSpeed = 50
 local speedPanelOpen = false
 
+-- Known entity names (case-insensitive check)
+local KNOWN_ENTITIES = {
+    ["rush"] = true, ["ambush"] = true, ["seek"] = true, ["figure"] = true,
+    ["halt"] = true, ["eyes"] = true, ["screech"] = true, ["hide"] = true,
+    ["jack"] = true, ["dupe"] = true, ["glitch"] = true, ["void"] = true,
+    ["shadow"] = true, ["snare"] = true, ["timothy"] = true, ["window"] = true,
+    ["lookman"] = true, ["watchdog"] = true, ["blitz"] = true, ["pandemonium"] = true,
+    ["a-60"] = true, ["a-90"] = true, ["a-120"] = true, ["a-200"] = true,
+    ["el goblino"] = true, ["bob"] = true, ["grumble"] = true, ["jeff"] = true,
+    ["curious light"] = true, ["guiding light"] = true, ["haste"] = true,
+    ["eye"] = true, ["mouth"] = true, ["rage"] = true, ["shade"] = true,
+    ["turret"] = true, ["siren"] = true, ["ripper"] = true, ["depth"] = true,
+    ["wall"] = true, ["angler"] = true, ["froger"] = true, ["pinkie"] = true,
+    ["greed"] = true, ["agony"] = true, ["grip"] = true, ["silence"] = true,
+}
+
 local function matchPat(name)
+    -- Check known entity names (case-insensitive)
+    if KNOWN_ENTITIES[name:lower()] then return true end
+
+    -- Original pattern: prefix-number (like A-60, L-243)
     local dp = name:find("%-(%d+)$")
     if dp then
         local pre = name:sub(1, dp-1)
@@ -44,8 +64,11 @@ local function matchPat(name)
             end
         end
     end
+
+    -- Mob pattern
     local mn = name:match("^[Mm][Oo][Bb](%d+)$")
     if mn then local n = tonumber(mn); if n and n >= 1 and n <= 25 then return true end end
+
     return false
 end
 
@@ -55,8 +78,15 @@ local function getDisplayName(entity)
     local l = entity.Name:lower()
     if l == "eye" or l == "mouth" then
         local parent = entity.Parent
-        if parent and matchPat(parent.Name) then
-            return parent.Name .. "'s " .. entity.Name
+        if parent then
+            if matchPat(parent.Name) then
+                return parent.Name .. "'s " .. entity.Name
+            end
+            -- Check grandparent too
+            local gp = parent.Parent
+            if gp and matchPat(gp.Name) then
+                return gp.Name .. "'s " .. entity.Name
+            end
         end
     end
     return entity.Name
@@ -65,6 +95,7 @@ end
 local function getPrefix(name)
     if name:match("^[Mm][Oo][Bb]%d+$") then return "MOB" end
     local l = name:lower(); if l == "eye" or l == "mouth" then return l end
+    if KNOWN_ENTITIES[l] then return name end
     local dp = name:find("%-(%d+)$"); if not dp then return name end; return name:sub(1, dp-1)
 end
 
@@ -244,7 +275,6 @@ local function forceSpeed(target, speed)
 
     local root = getPart(target); if not root then root = allParts[1] end
 
-    -- FORCE 1: DESTROY all movers
     for _, child in ipairs(target:GetDescendants()) do pcall(function()
         if child:IsA("BodyVelocity") and child.Name ~= "SpeedControlBV" then child:Destroy() end
         if child:IsA("BodyForce") then child:Destroy() end
@@ -259,12 +289,10 @@ local function forceSpeed(target, speed)
         if child:IsA("RocketPropulsion") then child:Destroy() end
     end) end
 
-    -- FORCE 2: Disable scripts
     for _, child in ipairs(target:GetDescendants()) do pcall(function()
         if child:IsA("Script") or child:IsA("LocalScript") then child.Disabled = true end
     end) end
 
-    -- FORCE 3: Override values
     for _, child in ipairs(target:GetDescendants()) do pcall(function()
         if child:IsA("NumberValue") or child:IsA("IntValue") then
             local ln = child.Name:lower()
@@ -274,14 +302,12 @@ local function forceSpeed(target, speed)
         end
     end) end
 
-    -- FORCE 4: Humanoid
     for _, child in ipairs(target:GetDescendants()) do pcall(function()
         if child:IsA("Humanoid") then child.WalkSpeed = absSpeed
             pcall(function() child:SetAttribute("WalkSpeed", absSpeed) end)
             pcall(function() child:SetAttribute("Speed", absSpeed) end) end
     end) end
 
-    -- FORCE 5: Direction
     local sd = spd[target]
     local dir = root.CFrame.LookVector
     if sd and sd.forceLastPos then
@@ -295,10 +321,8 @@ local function forceSpeed(target, speed)
     if reversed then dir = -dir end
     if sd then sd.forceLastPos = root.Position end
 
-    -- FORCE 6: Unanchor
     for _, part in ipairs(allParts) do pcall(function() part.Anchored = false end) end
 
-    -- FORCE 7: Weld parts together
     for _, part in ipairs(allParts) do
         if part ~= root then
             local hasWeld = false
@@ -310,7 +334,6 @@ local function forceSpeed(target, speed)
         end
     end
 
-    -- FORCE 8: BodyVelocity 10^15
     if not root.Anchored then
         local bv = root:FindFirstChild("SpeedControlBV")
         if not bv then bv = Instance.new("BodyVelocity"); bv.Name = "SpeedControlBV"; bv.Parent = root end
@@ -320,11 +343,9 @@ local function forceSpeed(target, speed)
         pcall(function() root.Velocity = dir * absSpeed end)
     end
 
-    -- FORCE 9: All parts velocity
     for _, part in ipairs(allParts) do pcall(function()
         part.AssemblyLinearVelocity = dir * absSpeed; part.Velocity = dir * absSpeed end) end
 
-    -- FORCE 10: CFrame teleport
     if absSpeed > 0 and dir.Magnitude > 0 then
         local moveAmt = dir * absSpeed * (1/60)
         if target:IsA("Model") then pcall(function() target:PivotTo(target:GetPivot() + moveAmt) end)
@@ -489,7 +510,7 @@ local function addUndo(name)
     db.BackgroundColor3 = Color3.fromRGB(140,20,20); db.Text = "🗑Delete"; db.TextColor3 = Color3.new(1,1,1)
     db.TextSize = 7; db.Font = Enum.Font.GothamBold; db.Parent = e; Instance.new("UICorner", db).CornerRadius = UDim.new(0,3)
     rb.MouseButton1Click:Connect(function() bl[name] = nil; blCount -= 1; updUndo(); e:Destroy(); undoEntries[name] = nil
-        for _, obj in ipairs(workspace:GetDescendants()) do if obj.Name == name and matchPat(obj.Name) and not pChars[obj] and not tracked[obj] then
+        for _, obj in ipairs(workspace:GetDescendants()) do if obj.Name == name and (matchPat(obj.Name) or KNOWN_ENTITIES[obj.Name:lower()]) and not pChars[obj] and not tracked[obj] then
             task.defer(function() if obj.Parent then track(obj) end end) end end end)
     db.MouseButton1Click:Connect(function() e:Destroy(); undoEntries[name] = nil end)
     undoEntries[name] = e; updUndo()
@@ -532,12 +553,13 @@ local function startV(entity) if viewing then stopV() end
     local root = data.targetPart; if not root or not root.Parent then root = getPart(entity); data.targetPart = root end
     if not root then return end; if viewingEnt then stopVE() end
     viewing = true; viewTarget = entity; vp2.Visible = true
-    vlb.Text = "👁 " .. getDisplayName(entity)
+    local dName = getDisplayName(entity)
+    vlb.Text = "👁 " .. dName
     vwB.Text = "👁 ..."; vwB.BackgroundColor3 = Color3.fromRGB(115,0,235)
     local ind = Instance.new("ScreenGui"); ind.Name = "ViewIndicator"; ind.ResetOnSpawn = false; ind.DisplayOrder = 100; ind.Parent = LP.PlayerGui
     local ar = Instance.new("TextLabel"); ar.Size = UDim2.new(0,140,0,40); ar.AnchorPoint = Vector2.new(0.5,0)
     ar.Position = UDim2.new(0.5,0,0,8); ar.BackgroundColor3 = Color3.fromRGB(15,0,35); ar.BackgroundTransparency = 0.2
-    ar.Text = "⚠ " .. getDisplayName(entity); ar.TextColor3 = getCol(entity.Name); ar.TextSize = 11; ar.Font = Enum.Font.GothamBold
+    ar.Text = "⚠ " .. dName; ar.TextColor3 = getCol(entity.Name); ar.TextSize = 11; ar.Font = Enum.Font.GothamBold
     ar.TextStrokeTransparency = 0.3; ar.Parent = ind; Instance.new("UICorner", ar).CornerRadius = UDim.new(0,6)
     viewIndicator = ind; local fs3 = 0
     viewConn = RunService.Heartbeat:Connect(function()
@@ -547,7 +569,7 @@ local function startV(entity) if viewing then stopV() end
         local sp, on = Camera:WorldToScreenPoint(root.Position); local vpS = Camera.ViewportSize
         local c = LP.Character; local mr = c and c:FindFirstChild("HumanoidRootPart"); local dt2 = "?"
         if mr then dt2 = math.floor((mr.Position-root.Position).Magnitude).."s" end
-        ar.Text = "⚠ " .. getDisplayName(entity) .. "\n" .. dt2
+        ar.Text = "⚠ " .. dName .. "\n" .. dt2
         if on then ar.Position = UDim2.new(0, math.clamp(sp.X,80,vpS.X-80), 0, math.clamp(sp.Y,8,50))
         else local dir = (root.Position-Camera.CFrame.Position).Unit; local d2 = Camera.CFrame.RightVector:Dot(dir)
             ar.Position = UDim2.new(d2>0 and 1 or 0, d2>0 and -80 or 10, 0, 8) end
@@ -608,11 +630,11 @@ blacklistEnt = function(name) bl[name] = true; blCount += 1; addUndo(name)
 track = function(entity)
     if tracked[entity] or not entity.Parent or bl[entity.Name] then return end
     local color = getCol(entity.Name); local d = {}
+    local displayName = getDisplayName(entity)
     if entity:IsA("Model") or entity:IsA("BasePart") then
         local hl = Instance.new("Highlight"); hl.Adornee = entity; hl.FillColor = color; hl.FillTransparency = 0.55
         hl.OutlineColor = color; hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop; hl.Enabled = espOn; hl.Parent = entity; d.highlight = hl end
     local root = getPart(entity); d.targetPart = root
-    local displayName = getDisplayName(entity)
     local function sBB(part) if d.billboard or not part then return end
         local bb = Instance.new("BillboardGui"); bb.Adornee = part; bb.Size = UDim2.new(0,120,0,50)
         bb.StudsOffset = Vector3.new(0,3.5,0); bb.AlwaysOnTop = true; bb.MaxDistance = 600; bb.Enabled = namesOn; bb.Parent = part
@@ -756,11 +778,19 @@ RunService.Heartbeat:Connect(function()
             if d.nameLabel then d.nameLabel.TextColor3 = ec end; if d.entryName then d.entryName.TextColor3 = ec end
             if d.entryStroke then d.entryStroke.Color = ec end; if d.entryDot then d.entryDot.BackgroundColor3 = ec end
 
-            if dist < RED_THRESH and matchPat(ent.Name) then local appr = true
+            -- Alert for known entities AND pattern-matched entities (not minions alone)
+            local shouldAlert = false
+            if matchPat(ent.Name) and not isMinion(ent.Name) then shouldAlert = true end
+
+            if dist < RED_THRESH and shouldAlert then local appr = true
                 if sd and sd.pP then local toP = (myP-tp.Position).Unit; local vel = Vector3.zero
                     local pdt = now-(sd.pT or now); if pdt > 0 then vel = (tp.Position-sd.pP)/pdt end
                     if vel.Magnitude > 0.5 then appr = vel.Unit:Dot(toP) > 0.1 end; sd.pP = tp.Position; sd.pT = now end
-                if appr then allR[ent.Name] = dist; if dist < cRD then cRN = ent.Name; cRD = dist; cRS = sTxt end end end
+                if appr then
+                    local alertName = getDisplayName(ent)
+                    allR[alertName] = dist
+                    if dist < cRD then cRN = alertName; cRD = dist; cRS = sTxt end
+                end end
         end
     end
     if cRN then showAl(cRN, cRD, allR, cRS) else hideAl() end
@@ -801,6 +831,8 @@ task.spawn(function() while active do
     task.wait(0.066) end end)
 
 layoutGUI()
-print("[Entity Scanner v7] ✅ FORCE 1000x Speed Control")
+print("[Entity Scanner v7] ✅ FORCE 1000x Speed Control + Known Entities")
+print("Detects: Rush, Ambush, Seek, Figure, Halt, Eyes, Screech, Hide, Jack, Dupe,")
+print("Glitch, Void, Shadow, Snare, Timothy, Window, Lookman, Watchdog, Blitz,")
+print("A-60, A-90, A-120, Pandemonium, Haste, Rage, Shade, Turret, Siren + more")
 print("10 Force Methods | Every Frame | -100 to 10000")
-print("Destroys movers | Disables scripts | CFrame teleport | 10^15 BodyVelocity")
