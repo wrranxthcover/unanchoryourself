@@ -1,4 +1,4 @@
--- ☠ Entity Scanner ULTRA v9 ☠ - Maximum Overdrive
+-- ☠ Entity Scanner ULTRA v9 ☠ - Maximum Overdrive (Radar Fixed)
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
@@ -415,35 +415,39 @@ local function showWarning(name, dist, tip, threat)
 end
 
 -- ============================================
--- RADAR
+-- RADAR (FIXED)
 -- ============================================
 local RG = Instance.new("ScreenGui"); RG.Name = "EntityRadarGui"; RG.ResetOnSpawn = false; RG.DisplayOrder = 90; RG.Parent = LP.PlayerGui
 local radarFrame = Instance.new("Frame"); radarFrame.Size = UDim2.new(0, 150, 0, 150)
 radarFrame.Position = UDim2.new(1, -165, 0, 15); radarFrame.BackgroundColor3 = Color3.fromRGB(5, 5, 15)
-radarFrame.BackgroundTransparency = 0.15; radarFrame.Parent = RG
+radarFrame.BackgroundTransparency = 0.15; radarFrame.ZIndex = 5; radarFrame.Parent = RG
 Instance.new("UICorner", radarFrame).CornerRadius = UDim.new(0.5, 0)
 local rSt = Instance.new("UIStroke"); rSt.Color = Color3.fromRGB(255, 0, 60); rSt.Thickness = 2; rSt.Parent = radarFrame
-Instance.new("Frame", radarFrame).Size = UDim2.new(0, 1, 1, -10); Instance.new("Frame", radarFrame):FindFirstAncestorWhichIsA("Frame") -- crosshair
+
 local rCH = Instance.new("Frame"); rCH.Size = UDim2.new(0, 1, 1, -10); rCH.Position = UDim2.new(0.5, 0, 0, 5)
-rCH.BackgroundColor3 = Color3.fromRGB(40, 40, 60); rCH.BackgroundTransparency = 0.5; rCH.BorderSizePixel = 0; rCH.Parent = radarFrame
+rCH.BackgroundColor3 = Color3.fromRGB(40, 40, 60); rCH.BackgroundTransparency = 0.5; rCH.BorderSizePixel = 0; rCH.ZIndex = 6; rCH.Parent = radarFrame
 local rCH2 = Instance.new("Frame"); rCH2.Size = UDim2.new(1, -10, 0, 1); rCH2.Position = UDim2.new(0, 5, 0.5, 0)
-rCH2.BackgroundColor3 = Color3.fromRGB(40, 40, 60); rCH2.BackgroundTransparency = 0.5; rCH2.BorderSizePixel = 0; rCH2.Parent = radarFrame
+rCH2.BackgroundColor3 = Color3.fromRGB(40, 40, 60); rCH2.BackgroundTransparency = 0.5; rCH2.BorderSizePixel = 0; rCH2.ZIndex = 6; rCH2.Parent = radarFrame
+
 local rCenter = Instance.new("Frame"); rCenter.Size = UDim2.new(0, 6, 0, 6); rCenter.AnchorPoint = Vector2.new(0.5, 0.5)
 rCenter.Position = UDim2.new(0.5, 0, 0.5, 0); rCenter.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
-rCenter.Parent = radarFrame; Instance.new("UICorner", rCenter).CornerRadius = UDim.new(1, 0)
+rCenter.ZIndex = 7; rCenter.Parent = radarFrame; Instance.new("UICorner", rCenter).CornerRadius = UDim.new(1, 0)
+
 for _, r in ipairs({0.25, 0.45}) do
     local ring = Instance.new("Frame"); ring.Size = UDim2.new(r*2, 0, r*2, 0); ring.AnchorPoint = Vector2.new(0.5, 0.5)
-    ring.Position = UDim2.new(0.5, 0, 0.5, 0); ring.BackgroundTransparency = 1; ring.Parent = radarFrame
+    ring.Position = UDim2.new(0.5, 0, 0.5, 0); ring.BackgroundTransparency = 1; ring.ZIndex = 6; ring.Parent = radarFrame
     Instance.new("UICorner", ring).CornerRadius = UDim.new(0.5, 0)
     local rs = Instance.new("UIStroke"); rs.Color = Color3.fromRGB(30, 30, 50); rs.Thickness = 1; rs.Transparency = 0.5; rs.Parent = ring
 end
+
 local radarTitle = Instance.new("TextLabel"); radarTitle.Size = UDim2.new(1, 0, 0, 14); radarTitle.Position = UDim2.new(0, 0, 1, 4)
 radarTitle.BackgroundTransparency = 1; radarTitle.Text = "📡 RADAR | 200s"; radarTitle.TextColor3 = Color3.fromRGB(120, 120, 160)
 radarTitle.TextSize = 9; radarTitle.Font = Enum.Font.GothamBold; radarTitle.Parent = radarFrame
+
 local sweepLine = Instance.new("Frame"); sweepLine.Size = UDim2.new(0, 1, 0.5, 0)
 sweepLine.AnchorPoint = Vector2.new(0.5, 1); sweepLine.Position = UDim2.new(0.5, 0, 0.5, 0)
 sweepLine.BackgroundColor3 = Color3.fromRGB(0, 255, 80); sweepLine.BackgroundTransparency = 0.4
-sweepLine.BorderSizePixel = 0; sweepLine.Parent = radarFrame
+sweepLine.BorderSizePixel = 0; sweepLine.ZIndex = 7; sweepLine.Parent = radarFrame
 
 local radarDots = {}
 local RADAR_RANGE = 200
@@ -455,38 +459,78 @@ local function updateRadar()
     local char = LP.Character; local mr = char and char:FindFirstChild("HumanoidRootPart")
     if not mr then return end
     local myP = mr.Position; local camCF = Camera.CFrame
+    
     local forward = Vector3.new(camCF.LookVector.X, 0, camCF.LookVector.Z)
-    if forward.Magnitude > 0 then forward = forward.Unit else forward = Vector3.new(0,0,-1) end
+    if forward.Magnitude > 0.01 then forward = forward.Unit else forward = Vector3.new(0,0,-1) end
+    
+    local rightVec = Vector3.new(camCF.RightVector.X, 0, camCF.RightVector.Z)
+    if rightVec.Magnitude > 0.01 then rightVec = rightVec.Unit else rightVec = Vector3.new(1,0,0) end
+
     sweepAngle = sweepAngle + 2; if sweepAngle >= 360 then sweepAngle = 0 end
     sweepLine.Rotation = sweepAngle
+
+    -- Clean up old dots
     for name, dot in pairs(radarDots) do
-        if not dot._entity or not tracked[dot._entity] then dot:Destroy(); radarDots[name] = nil end
+        if not dot._entity or not tracked[dot._entity] or not tracked[dot._entity].targetPart then 
+            pcall(function() dot:Destroy() end)
+            radarDots[name] = nil 
+        end
     end
+
     for ent, d in pairs(tracked) do
         local tp = d.targetPart
         if tp and tp.Parent then
-            local offset = tp.Position - myP; local dist = offset.Magnitude
-            if dist <= RADAR_RANGE then
+            local offset = tp.Position - myP
+            local dist = offset.Magnitude
+            
+            if dist <= RADAR_RANGE and dist > 0.5 then
                 local flatOff = Vector3.new(offset.X, 0, offset.Z)
-                if flatOff.Magnitude > 0 then flatOff = flatOff.Unit else flatOff = Vector3.zero end
-                local rel = Vector2.new(forward:Cross(flatOff).Y, -forward:Dot(flatOff)) * (dist / RADAR_RANGE) * 0.45
+                
+                -- Calculate relative position (Right = X, Forward = -Y)
+                local relX = rightVec:Dot(flatOff) / RADAR_RANGE * 0.45
+                local relY = -forward:Dot(flatOff) / RADAR_RANGE * 0.45
+                
                 local dotKey = tostring(ent)
                 local dot = radarDots[dotKey]
-                if not dot then
-                    dot = Instance.new("Frame"); dot.Size = UDim2.new(0, 5, 0, 5)
-                    dot.AnchorPoint = Vector2.new(0.5, 0.5); dot.BorderSizePixel = 0
-                    dot.Parent = radarFrame; Instance.new("UICorner", dot).CornerRadius = UDim.new(1, 0)
-                    dot._entity = ent; radarDots[dotKey] = dot
+                
+                if not dot or not dot.Parent then
+                    dot = Instance.new("Frame")
+                    dot.Size = UDim2.new(0, 5, 0, 5)
+                    dot.AnchorPoint = Vector2.new(0.5, 0.5)
+                    dot.BorderSizePixel = 0
+                    dot.BackgroundTransparency = 0
+                    dot.ZIndex = 10 -- Render above the radar background/crosshairs
+                    dot.Parent = radarFrame
+                    Instance.new("UICorner", dot).CornerRadius = UDim.new(1, 0)
+                    dot._entity = ent
+                    radarDots[dotKey] = dot
                 end
-                dot.Position = UDim2.new(0.5 + rel.X, 0, 0.5 + rel.Y, 0)
+                
+                dot.Position = UDim2.new(0.5 + relX, 0, 0.5 + relY, 0)
                 dot.BackgroundColor3 = getThreatCol(getThreat(ent.Name))
-                dot.Size = dist < KILL_ZONE and UDim2.new(0, 9, 0, 9) or dist < DANGER_CLOSE and UDim2.new(0, 7, 0, 7) or UDim2.new(0, 5, 0, 5)
+                
+                if dist < KILL_ZONE then
+                    dot.Size = UDim2.new(0, 9, 0, 9)
+                elseif dist < DANGER_CLOSE then
+                    dot.Size = UDim2.new(0, 7, 0, 7)
+                else
+                    dot.Size = UDim2.new(0, 5, 0, 5)
+                end
             else
+                -- Entity out of range, remove dot
                 local dotKey = tostring(ent)
-                if radarDots[dotKey] then radarDots[dotKey]:Destroy(); radarDots[dotKey] = nil end
+                if radarDots[dotKey] then 
+                    pcall(function() radarDots[dotKey]:Destroy() end)
+                    radarDots[dotKey] = nil 
+                end
             end
         end
     end
+    
+    -- Update radar title with entity count
+    local dotCount = 0
+    for _ in pairs(radarDots) do dotCount = dotCount + 1 end
+    radarTitle.Text = "📡 RADAR | " .. RADAR_RANGE .. "s | " .. dotCount .. " entities"
 end
 
 -- ============================================
@@ -997,7 +1041,7 @@ print("  ☠ ENTITY SCANNER ULTRA v9 ☠")
 print("═══════════════════════════════════════")
 print("  ⚠ Survival tips for every entity")
 print("  🔔 Proximity warnings (120s + 18s)")
-print("  📡 Live Radar with sweep")
+print("  📡 Live Radar with sweep (FIXED)")
 print("  ☠ Threat levels + dynamic colors")
 print("  − Minimize button (red)")
 print("  🔴 APPROACHING / 🟢 RETREATING")
@@ -1005,5 +1049,4 @@ print("  💨 Advanced despawn detection")
 print("  🚪🪑🛏🕳🪜📦🏚 Environment scan")
 print("  🔴 Screen flash on kill zone")
 print("  📊 Session stats + timer")
-print("  ❌ Removed: face, window entities")
 print("═══════════════════════════════════════")
