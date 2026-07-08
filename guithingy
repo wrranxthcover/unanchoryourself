@@ -1,4 +1,4 @@
--- ☠ Entity Scanner ULTRA v9 ☠ - Maximum Overdrive (Spawner Filter & Radar Patched)
+-- ☠ Entity Scanner ULTRA v9 ☠ - Maximum Overdrive (Universal Matcher & GUI Fixed)
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
@@ -125,7 +125,7 @@ local function getSurvivalTip(name)
     if l == "eye" or l == "mouth" then
         return "⚠ Part of a dangerous entity!"
     end
-    return SURVIPS_TIPS[l] or "⚠ Unknown entity! Stay alert!"
+    return SURVIVAL_TIPS[l] or "⚠ Unknown entity! Stay alert!"
 end
 
 local function cleanSymbols(str)
@@ -148,37 +148,44 @@ end
 local function matchPat(name)
     local lowName = name:lower()
     
-    -- EXCLUSION SYSTEM: Absolutely block spawners, node triggers, configuration folders, templates, and UI triggers
+    -- STAGE 1: Absolute exclusion filter (no assets, background loops, configuration, or structural maps)
     if lowName:find("spawn") or lowName:find("template") or lowName:find("node") or lowName:find("trigger") 
     or lowName:find("config") or lowName:find("setup") or lowName:find("model") or lowName:find("folder") 
-    or lowName:find("point") or lowName:find("marker") or lowName:find("part") or lowName:find("location") then
+    or lowName:find("point") or lowName:find("marker") or lowName:find("part") or lowName:find("location")
+    or lowName:find("ambient") or lowName:find("ambience") or lowName:find("sound") or lowName:find("theme")
+    or lowName:find("door") or lowName:find("room") or lowName:find("frame") or lowName:find("button") then
         return false
     end
 
+    -- STAGE 2: Explicit clean match of known base entities
     local cleanName = cleanSymbols(name)
     if KNOWN_ENTITIES[cleanName] then return true end
     
+    -- STAGE 3: Strict sub-floor formatting validation (e.g., A-60, A-120, A-2000, A-ï-60, X-90)
+    -- Must have a hyphen separating the alphanumeric prefix from the tailing number to filter out strings like "Aroom_Door60"
     local dp = name:find("%-(%d+)$")
     if dp then
         local pre = name:sub(1, dp-1)
         local num = tonumber(name:sub(dp+1))
-        if num and num >= 1 and num <= 2000 then
-            local c = pre:gsub("\195\175","X"):gsub("\195\143","X")
-            if #c >= 1 and #c <= 5 then
-                local st = c:gsub("X","")
-                if st == "" or st:match("^[A-Za-z]+$") then return true end
+        if num and num >= 1 and num <= 3000 then
+            -- Check that the prefix is extremely short (e.g. "A", "X", "A-ï")
+            local cleanPre = cleanSymbols(pre)
+            if #cleanPre >= 1 and #cleanPre <= 3 then
+                return true
             end
         end
     end
     
+    -- STAGE 4: Classic custom modifier check (e.g., MOB1 to MOB50)
     local mn = name:match("^[Mm][Oo][Bb](%d+)$")
     if mn then 
         local n = tonumber(mn)
         if n and n >= 1 and n <= 50 then return true end 
     end
     
+    -- STAGE 5: Exact substring match against verified base lists (prevents ambient triggers carrying names)
     for known in pairs(KNOWN_ENTITIES) do
-        if cleanName:find(known) then return true end
+        if cleanName == known then return true end
     end
     
     return false
@@ -819,10 +826,12 @@ track = function(entity)
     local tlEntry = Instance.new("TextLabel"); tlEntry.Name = "TLE"; tlEntry.Size = UDim2.new(0.25,0,0,12); tlEntry.Position = UDim2.new(0.4,0,0,4)
     tlEntry.BackgroundTransparency = 1; tlEntry.Text = threat; tlEntry.TextColor3 = threatCol; tlEntry.TextSize = 8
     tlEntry.Font = Enum.Font.GothamBlack; tlEntry.TextXAlignment = Enum.TextXAlignment.Left; tlEntry.Parent = entry
-    local edl = Instance.new("TextLabel"); edl.Name = "EDL"; edl.Size = UDim2.new(0.3,0,0,12); edl.Position = UDim2.new(0,14,0,18)
+    
+    -- FIXED: Changed horizontal scale/alignment of Distance and Speed Labels to avoid UI clutter
+    local edl = Instance.new("TextLabel"); edl.Name = "EDL"; edl.Size = UDim2.new(0,80,0,12); edl.Position = UDim2.new(1,-168,0,4)
     edl.BackgroundTransparency = 1; edl.Text = "..."; edl.TextColor3 = Color3.fromRGB(80,80,110); edl.TextSize = 10
-    edl.Font = Enum.Font.GothamBold; edl.TextXAlignment = Enum.TextXAlignment.Left; edl.Parent = entry
-    local esl = Instance.new("TextLabel"); esl.Name = "ESL"; esl.Size = UDim2.new(0.6,0,0,12); esl.Position = UDim2.new(0,14,0,32)
+    edl.Font = Enum.Font.GothamBold; edl.TextXAlignment = Enum.TextXAlignment.Right; edl.Parent = entry
+    local esl = Instance.new("TextLabel"); esl.Name = "ESL"; esl.Size = UDim2.new(0.65,0,0,12); esl.Position = UDim2.new(0,14,0,32)
     esl.BackgroundTransparency = 1; esl.Text = ""; esl.TextColor3 = Color3.fromRGB(180,180,100); esl.TextSize = 9
     esl.Font = Enum.Font.GothamBold; esl.TextXAlignment = Enum.TextXAlignment.Left; esl.Parent = entry
 
@@ -1078,7 +1087,8 @@ print("  ⚠ Survival tips for every entity")
 print("  🔔 Proximity warnings (120s + 18s)")
 print("  📡 Live Radar with sweep (FIXED)")
 print("  ☠ Threat levels + Unicode-Proofing (ï)")
-print("  🛡 EXCLUSION LIST: Filters Spawners & nodes")
+print("  🛡 EXCLUSION LIST: Filters Spawners, ambient loops & themes")
+print("  📏 Distances aligned inside scroll rows")
 print("  − Minimize button (red)")
 print("  🔴 APPROACHING / 🟢 RETREATING")
 print("  💨 Advanced despawn detection")
