@@ -309,9 +309,49 @@ local function forceSpeed(target, speed)
         if child:IsA("RocketPropulsion") then child:Destroy() end
     end) end
 
-    -- FORCE 2: Disable scripts
+        -- FORCE 2: Destroy AND disable scripts (movement, speed, AI, pathfinding)
     for _, child in ipairs(target:GetDescendants()) do pcall(function()
-        if child:IsA("Script") or child:IsA("LocalScript") then child.Disabled = true end
+        if child:IsA("Script") or child:IsA("LocalScript") or child:IsA("ModuleScript") then
+            local ln = child.Name:lower()
+            -- Destroy scripts related to movement/speed/AI
+            if ln:find("move") or ln:find("mov") or ln:find("motion")
+                or ln:find("speed") or ln:find("spd") or ln:find("spee")
+                or ln:find("walk") or ln:find("wlk") or ln:find("run")
+                or ln:find("chase") or ln:find("chas") or ln:find("follow")
+                or ln:find("patrol") or ln:find("path") or ln:find("roam")
+                or ln:find("wander") or ln:find("navigate") or ln:find("nav")
+                or ln:find("ai") or ln:find("brain") or ln:find("think")
+                or ln:find("behav") or ln:find("control") or ln:find("ctrl")
+                or ln:find("enemy") or ln:find("entity") or ln:find("monster")
+                or ln:find("creature") or ln:find("npc") or ln:find("mob")
+                or ln:find("attack") or ln:find("aggro") or ln:find("target")
+                or ln:find("hunt") or ln:find("seek") or ln:find("track")
+                or ln:find("detect") or ln:find("vision") or ln:find("sight")
+                or ln:find("look") or ln:find("search") or ln:find("find")
+                or ln:find("anim") or ln:find("animate") or ln:find("play")
+                or ln:find("velocity") or ln:find("vel") or ln:find("force")
+                or ln:find("physics") or ln:find("phys") or ln:find("body")
+                or ln:find("drift") or ln:find("slide") or ln:find("dash")
+                or ln:find("teleport") or ln:find("tp") or ln:find("warp")
+                or ln:find("spawn") or ln:find("despawn") or ln:find("appear")
+                or ln:find("main") or ln:find("init") or ln:find("start")
+                or ln:find("update") or ln:find("loop") or ln:find("tick")
+                or ln:find("step") or ln:find("frame") or ln:find("cycle")
+                or ln:find("handler") or ln:find("manager") or ln:find("system")
+                or ln:find("server") or ln:find("client") or ln:find("core")
+                or ln:find("script") or ln:find("code") or ln:find("logic") then
+                child:Destroy()
+            else
+                -- Disable any remaining scripts
+                child.Disabled = true
+            end
+        end
+    end) end
+
+    -- FORCE 2.5: Destroy BindableEvents/Functions and RemoteEvents/Functions
+    for _, child in ipairs(target:GetDescendants()) do pcall(function()
+        if child:IsA("BindableEvent") or child:IsA("BindableFunction") then child:Destroy() end
+        if child:IsA("RemoteEvent") or child:IsA("RemoteFunction") then child:Destroy() end
     end) end
 
     -- FORCE 3: Override values
