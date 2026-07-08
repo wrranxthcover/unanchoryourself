@@ -1,4 +1,4 @@
--- ☠ Entity Scanner ULTRA v9 ☠ - Maximum Overdrive (Radar & Special Characters Patched)
+-- ☠ Entity Scanner ULTRA v9 ☠ - Maximum Overdrive (Spawner Filter & Radar Patched)
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
@@ -125,12 +125,10 @@ local function getSurvivalTip(name)
     if l == "eye" or l == "mouth" then
         return "⚠ Part of a dangerous entity!"
     end
-    return SURVIVAL_TIPS[l] or "⚠ Unknown entity! Stay alert!"
+    return SURVIPS_TIPS[l] or "⚠ Unknown entity! Stay alert!"
 end
 
--- Deep cleaning utility to strip all common, custom, math, and foreign Unicode characters for identification
 local function cleanSymbols(str)
-    -- Normalize/strip common Latin extensions (ï -> i, ÿ -> y, ë -> e, ö -> o, etc.)
     local replacements = {
         ["\195\164"] = "a", ["\195\166"] = "ae", ["\195\182"] = "o", ["\195\188"] = "u",
         ["\195\175"] = "i", ["\195\171"] = "e", ["\195\191"] = "y", ["\195\165"] = "a",
@@ -140,10 +138,7 @@ local function cleanSymbols(str)
     for utf8Char, asciiRepl in pairs(replacements) do
         str = str:gsub(utf8Char, asciiRepl)
     end
-    
-    -- Strip non-alphanumeric, miscellaneous symbols, brackets, dashes, and whitespace
     str = str:gsub("[%s%p%c%s]", "")
-    -- Remove any remaining math/foreign symbol blocks in Lua Unicode bounds
     str = str:gsub("[%z\1-\127]", function(c)
         if c:match("%w") then return c else return "" end
     end)
@@ -151,10 +146,18 @@ local function cleanSymbols(str)
 end
 
 local function matchPat(name)
+    local lowName = name:lower()
+    
+    -- EXCLUSION SYSTEM: Absolutely block spawners, node triggers, configuration folders, templates, and UI triggers
+    if lowName:find("spawn") or lowName:find("template") or lowName:find("node") or lowName:find("trigger") 
+    or lowName:find("config") or lowName:find("setup") or lowName:find("model") or lowName:find("folder") 
+    or lowName:find("point") or lowName:find("marker") or lowName:find("part") or lowName:find("location") then
+        return false
+    end
+
     local cleanName = cleanSymbols(name)
     if KNOWN_ENTITIES[cleanName] then return true end
     
-    -- Detect standard Sub-Floor formats e.g. A-60, A-120, A-200, A-2000, A-ï-60
     local dp = name:find("%-(%d+)$")
     if dp then
         local pre = name:sub(1, dp-1)
@@ -168,14 +171,12 @@ local function matchPat(name)
         end
     end
     
-    -- Detect custom modifier variants e.g. Mob9, MOB18, Mob-ï-2
     local mn = name:match("^[Mm][Oo][Bb](%d+)$")
     if mn then 
         local n = tonumber(mn)
         if n and n >= 1 and n <= 50 then return true end 
     end
     
-    -- Fallback: If it's not a player but contains known entity substrings along with Unicode symbols
     for known in pairs(KNOWN_ENTITIES) do
         if cleanName:find(known) then return true end
     end
@@ -1077,6 +1078,7 @@ print("  ⚠ Survival tips for every entity")
 print("  🔔 Proximity warnings (120s + 18s)")
 print("  📡 Live Radar with sweep (FIXED)")
 print("  ☠ Threat levels + Unicode-Proofing (ï)")
+print("  🛡 EXCLUSION LIST: Filters Spawners & nodes")
 print("  − Minimize button (red)")
 print("  🔴 APPROACHING / 🟢 RETREATING")
 print("  💨 Advanced despawn detection")
