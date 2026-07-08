@@ -43,7 +43,7 @@ local KNOWN_ENTITIES = {
     ["curious light"] = true, ["guiding light"] = true, ["haste"] = true,
     ["eye"] = true, ["mouth"] = true, ["rage"] = true, ["shade"] = true,
     ["turret"] = true, ["siren"] = true, ["ripper"] = true, ["depth"] = true,
-    ["wall"] = true, ["angler"] = true, ["froger"] = true, ["pinkie"] = true,
+    ["angler"] = true, ["froger"] = true, ["pinkie"] = true,
     ["greed"] = true, ["agony"] = true, ["grip"] = true, ["silence"] = true,
 }
 
@@ -223,7 +223,7 @@ for i, info in ipairs(qBtns) do
     qb.TextSize = 6; qb.Font = Enum.Font.GothamBold; qb.Parent = spPanel; Instance.new("UICorner", qb).CornerRadius = UDim.new(0, 3)
     qb.MouseButton1Click:Connect(function() selSpeed = math.clamp(selSpeed+info[3], MIN_SPEED, MAX_SPEED); updateSpUI() end)
 end
-local presets = {{"-10000",-10000},{"0",0},{"5000",5000},{"MAX",100000}}
+local presets = {{"-10000",-10000},{"0",0},{"5000",5000},{"MAX",1000000}}
 for i, info in ipairs(presets) do
     local pb = Instance.new("TextButton"); pb.Size = UDim2.new(0, 28, 0, 13); pb.Position = UDim2.new(0, 133+(i-1)*32, 0, 38)
     pb.BackgroundColor3 = i==4 and Color3.fromRGB(140,0,0) or i==1 and Color3.fromRGB(0,0,140) or Color3.fromRGB(60,60,80)
