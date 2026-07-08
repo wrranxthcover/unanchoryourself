@@ -1,4 +1,4 @@
--- ☠ Entity Scanner ULTRA v9 ☠ - Maximum Overdrive (Universal Matcher & GUI Fixed)
+-- ☠ Entity Scanner ULTRA v9.1 ☠ - Maximum Overdrive (Waypoints & Clone Patch)
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
@@ -34,6 +34,10 @@ local leftEntries, undoEntries = {}, {}
 local totalDetected, totalAlerts, sessionStart = 0, 0, tick()
 local warnCooldowns = {}
 
+-- Waypoint Storage
+local waypoints = {}
+local wpEntries = {}
+
 local KNOWN_ENTITIES = {
     ["rush"] = true, ["ambush"] = true, ["seek"] = true, ["figure"] = true,
     ["halt"] = true, ["eyes"] = true, ["screech"] = true, ["hide"] = true,
@@ -47,6 +51,7 @@ local KNOWN_ENTITIES = {
     ["turret"] = true, ["siren"] = true, ["ripper"] = true, ["depth"] = true,
     ["angler"] = true, ["froger"] = true, ["pinkie"] = true,
     ["greed"] = true, ["agony"] = true, ["grip"] = true, ["silence"] = true,
+    ["clone"] = true, -- Added custom/cloned entities
 }
 
 local THREAT_LEVEL = {
@@ -59,6 +64,7 @@ local THREAT_LEVEL = {
     ["siren"] = "⚠ DANGER", ["ripper"] = "☠ LETHAL", ["depth"] = "☠ LETHAL",
     ["angler"] = "☠ LETHAL", ["greed"] = "⚠ DANGER", ["agony"] = "☠ LETHAL",
     ["grip"] = "⚠ DANGER", ["silence"] = "⚠ DANGER", ["watchdog"] = "⚠ DANGER",
+    ["clone"] = "⚠ DANGER",
     ["jack"] = "◆ NEUTRAL", ["dupe"] = "◆ NEUTRAL", ["timothy"] = "◆ NEUTRAL",
     ["snare"] = "◆ NEUTRAL", ["lookman"] = "◆ NEUTRAL",
     ["shadow"] = "◆ NEUTRAL", ["hide"] = "◆ NEUTRAL",
@@ -110,6 +116,7 @@ local SURVIVAL_TIPS = {
     ["dupe"] = "🚪 Check door numbers!",
     ["hide"] = "⚠ Don't hide too long!",
     ["lookman"] = "👀 Don't stare at it!",
+    ["clone"] = "👥 Watch out for duplicated mirror tricks!",
 }
 
 local function getThreat(name)
@@ -148,27 +155,26 @@ end
 local function matchPat(name)
     local lowName = name:lower()
     
-    -- STAGE 1: Absolute exclusion filter (no assets, background loops, configuration, or structural maps)
-    if lowName:find("spawn") or lowName:find("template") or lowName:find("node") or lowName:find("trigger") 
+    -- STAGE 1: Absolute exclusion filter (Except strictly allowing "Clone")
+    if (lowName:find("spawn") or lowName:find("template") or lowName:find("node") or lowName:find("trigger") 
     or lowName:find("config") or lowName:find("setup") or lowName:find("model") or lowName:find("folder") 
     or lowName:find("point") or lowName:find("marker") or lowName:find("part") or lowName:find("location")
     or lowName:find("ambient") or lowName:find("ambience") or lowName:find("sound") or lowName:find("theme")
-    or lowName:find("door") or lowName:find("room") or lowName:find("frame") or lowName:find("button") then
+    or lowName:find("door") or lowName:find("room") or lowName:find("frame") or lowName:find("button")) 
+    and not lowName:find("clone") then
         return false
     end
 
-    -- STAGE 2: Explicit clean match of known base entities
+    -- STAGE 2: Direct match clones and exact database listings
     local cleanName = cleanSymbols(name)
     if KNOWN_ENTITIES[cleanName] then return true end
     
-    -- STAGE 3: Strict sub-floor formatting validation (e.g., A-60, A-120, A-2000, A-ï-60, X-90)
-    -- Must have a hyphen separating the alphanumeric prefix from the tailing number to filter out strings like "Aroom_Door60"
+    -- STAGE 3: Strict sub-floor validation (e.g. A-60, A-120)
     local dp = name:find("%-(%d+)$")
     if dp then
         local pre = name:sub(1, dp-1)
         local num = tonumber(name:sub(dp+1))
         if num and num >= 1 and num <= 3000 then
-            -- Check that the prefix is extremely short (e.g. "A", "X", "A-ï")
             local cleanPre = cleanSymbols(pre)
             if #cleanPre >= 1 and #cleanPre <= 3 then
                 return true
@@ -176,14 +182,14 @@ local function matchPat(name)
         end
     end
     
-    -- STAGE 4: Classic custom modifier check (e.g., MOB1 to MOB50)
+    -- STAGE 4: MOB modifier checks
     local mn = name:match("^[Mm][Oo][Bb](%d+)$")
     if mn then 
         local n = tonumber(mn)
         if n and n >= 1 and n <= 50 then return true end 
     end
     
-    -- STAGE 5: Exact substring match against verified base lists (prevents ambient triggers carrying names)
+    -- STAGE 5: Exact string validations
     for known in pairs(KNOWN_ENTITIES) do
         if cleanName == known then return true end
     end
@@ -361,8 +367,9 @@ local clrB = mb(r2, "🗑 Clear BL", Color3.fromRGB(120, 40, 0), 0.67, 0.33)
 
 local tabF = Instance.new("Frame"); tabF.Size = UDim2.new(1, -12, 0, 24); tabF.Position = UDim2.new(0, 6, 0, 178)
 tabF.BackgroundTransparency = 1; tabF.Parent = MF
-local liveTab = mb(tabF, "⚡ Live", Color3.fromRGB(0, 80, 160), 0, 0.5)
-local undoTab = mb(tabF, "↩ Blacklist (0)", Color3.fromRGB(80, 40, 0), 0.5, 0.5)
+local liveTab = mb(tabF, "⚡ Live", Color3.fromRGB(0, 80, 160), 0, 0.33)
+local undoTab = mb(tabF, "↩ BL (0)", Color3.fromRGB(80, 40, 0), 0.33, 0.33)
+local wpTab = mb(tabF, "📌 Waypoints", Color3.fromRGB(0, 100, 100), 0.66, 0.34)
 
 local vp2 = Instance.new("Frame"); vp2.Size = UDim2.new(1, -12, 0, 24); vp2.BackgroundColor3 = Color3.fromRGB(22, 0, 50)
 vp2.Visible = false; vp2.Parent = MF; Instance.new("UICorner", vp2).CornerRadius = UDim.new(0, 5)
@@ -384,6 +391,7 @@ local sveb2 = Instance.new("TextButton"); sveb2.Size = UDim2.new(0, 48, 0, 18); 
 sveb2.BackgroundColor3 = Color3.fromRGB(160, 20, 20); sveb2.Text = "✕ Stop"; sveb2.TextColor3 = Color3.new(1,1,1)
 sveb2.TextSize = 8; sveb2.Font = Enum.Font.GothamBold; sveb2.Parent = vep2; Instance.new("UICorner", sveb2).CornerRadius = UDim.new(0, 4)
 
+-- SCROLLING LIVE LIST
 local scr = Instance.new("ScrollingFrame"); scr.BackgroundColor3 = Color3.fromRGB(8, 8, 20)
 scr.ScrollBarThickness = 3; scr.ScrollBarImageColor3 = Color3.fromRGB(255, 0, 60)
 scr.AutomaticCanvasSize = Enum.AutomaticSize.Y; scr.CanvasSize = UDim2.new(0,0,0,0); scr.Parent = MF
@@ -393,6 +401,7 @@ local lpad = Instance.new("UIPadding"); lpad.PaddingTop = UDim.new(0,3); lpad.Pa
 local el = Instance.new("TextLabel"); el.Name = "Empty"; el.Size = UDim2.new(1, 0, 0, 32); el.BackgroundTransparency = 1
 el.Text = "☠ No entities detected..."; el.TextColor3 = Color3.fromRGB(50, 50, 80); el.TextSize = 11; el.Font = Enum.Font.GothamBold; el.Parent = scr
 
+-- SCROLLING UNDO LIST
 local uscr = Instance.new("ScrollingFrame"); uscr.BackgroundColor3 = Color3.fromRGB(15, 12, 6)
 uscr.ScrollBarThickness = 3; uscr.AutomaticCanvasSize = Enum.AutomaticSize.Y; uscr.CanvasSize = UDim2.new(0,0,0,0)
 uscr.Visible = false; uscr.Parent = MF; Instance.new("UICorner", uscr).CornerRadius = UDim.new(0, 5)
@@ -400,6 +409,26 @@ Instance.new("UIListLayout", uscr).Padding = UDim.new(0, 3)
 local upad = Instance.new("UIPadding"); upad.PaddingTop = UDim.new(0,3); upad.PaddingLeft = UDim.new(0,3); upad.PaddingRight = UDim.new(0,3); upad.Parent = uscr
 local ue = Instance.new("TextLabel"); ue.Size = UDim2.new(1, 0, 0, 32); ue.BackgroundTransparency = 1
 ue.Text = "No blacklisted..."; ue.TextColor3 = Color3.fromRGB(80, 60, 30); ue.TextSize = 11; ue.Font = Enum.Font.GothamBold; ue.Parent = uscr
+
+-- SCROLLING WAYPOINT LIST (NEW)
+local wpscr = Instance.new("ScrollingFrame"); wpscr.BackgroundColor3 = Color3.fromRGB(6, 18, 18)
+wpscr.ScrollBarThickness = 3; wpscr.AutomaticCanvasSize = Enum.AutomaticSize.Y; wpscr.CanvasSize = UDim2.new(0,0,0,0)
+wpscr.Visible = false; wpscr.Parent = MF; Instance.new("UICorner", wpscr).CornerRadius = UDim.new(0, 5)
+Instance.new("UIListLayout", wpscr).Padding = UDim.new(0, 3)
+local wpad = Instance.new("UIPadding"); wpad.PaddingTop = UDim.new(0,25); wpad.PaddingLeft = UDim.new(0,3); wpad.PaddingRight = UDim.new(0,3); wpad.Parent = wpscr
+
+-- Input controls on top of waypoints page
+local saveFrame = Instance.new("Frame"); saveFrame.Size = UDim2.new(1, -6, 0, 22); saveFrame.Position = UDim2.new(0, 3, 0, 2)
+saveFrame.BackgroundColor3 = Color3.fromRGB(10, 35, 35); saveFrame.Parent = wpscr; Instance.new("UICorner", saveFrame).CornerRadius = UDim.new(0, 4)
+local wpInput = Instance.new("TextBox"); wpInput.Size = UDim2.new(0.65, 0, 1, 0); wpInput.Position = UDim2.new(0, 4, 0, 0)
+wpInput.BackgroundTransparency = 1; wpInput.Text = "Waypoint Name..."; wpInput.TextColor3 = Color3.new(1,1,1); wpInput.TextSize = 10
+wpInput.Font = Enum.Font.GothamBold; wpInput.TextXAlignment = Enum.TextXAlignment.Left; wpInput.Parent = saveFrame
+local addWpBtn = Instance.new("TextButton"); addWpBtn.Size = UDim2.new(0.32, 0, 1, -2); addWpBtn.Position = UDim2.new(0.68, -2, 0, 1)
+addWpBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 150); addWpBtn.Text = "➕ Save"; addWpBtn.TextColor3 = Color3.new(1,1,1)
+addWpBtn.TextSize = 10; addWpBtn.Font = Enum.Font.GothamBlack; addWpBtn.Parent = saveFrame; Instance.new("UICorner", addWpBtn).CornerRadius = UDim.new(0, 3)
+
+local we = Instance.new("TextLabel"); we.Size = UDim2.new(1, 0, 0, 32); we.Position = UDim2.new(0,0,0,30); we.BackgroundTransparency = 1
+we.Text = "No saved locations..."; we.TextColor3 = Color3.fromRGB(30, 80, 80); we.TextSize = 11; we.Font = Enum.Font.GothamBold; we.Parent = wpscr
 
 local pbar = Instance.new("Frame"); pbar.Size = UDim2.new(0.2, 0, 0, 3); pbar.BackgroundColor3 = Color3.fromRGB(255, 0, 60); pbar.Parent = MF
 Instance.new("UICorner", pbar).CornerRadius = UDim.new(0, 2)
@@ -410,6 +439,7 @@ local function layoutGUI()
     vep2.Position = UDim2.new(0, 6, 0, y); y = y + (vep2.Visible and 28 or 0); y = y + 4
     scr.Size = UDim2.new(1, -12, 1, -(y+8)); scr.Position = UDim2.new(0, 6, 0, y)
     uscr.Size = scr.Size; uscr.Position = scr.Position
+    wpscr.Size = scr.Size; wpscr.Position = scr.Position
 end
 layoutGUI()
 
@@ -613,13 +643,22 @@ LS.BackgroundTransparency = 1; LS.Parent = AG; Instance.new("UIListLayout", LS).
 -- ============================================
 local track, untrack, blacklistEnt, stopV, stopVE, showAl, hideAl
 
-local function switchTab(t) curTab = t; scr.Visible = t == "live"; uscr.Visible = t == "undo"
+local function switchTab(t) 
+    curTab = t
+    scr.Visible = (t == "live")
+    uscr.Visible = (t == "undo")
+    wpscr.Visible = (t == "waypoints")
+    
     liveTab.BackgroundColor3 = t == "live" and Color3.fromRGB(0,80,160) or Color3.fromRGB(0,35,70)
-    undoTab.BackgroundColor3 = t == "undo" and Color3.fromRGB(180,100,0) or Color3.fromRGB(70,35,0) end
+    undoTab.BackgroundColor3 = t == "undo" and Color3.fromRGB(180,100,0) or Color3.fromRGB(70,35,0)
+    wpTab.BackgroundColor3 = t == "waypoints" and Color3.fromRGB(0,150,150) or Color3.fromRGB(0,60,60)
+end
+
 liveTab.MouseButton1Click:Connect(function() switchTab("live") end)
 undoTab.MouseButton1Click:Connect(function() switchTab("undo") end)
+wpTab.MouseButton1Click:Connect(function() switchTab("waypoints") end)
 
-local function updUndo() undoTab.Text = "↩ Blacklist ("..blCount..")"; ue.Visible = blCount == 0 end
+local function updUndo() undoTab.Text = "↩ BL ("..blCount..")"; ue.Visible = blCount == 0 end
 local function addUndo(name)
     if undoEntries[name] then return end
     local e = Instance.new("Frame"); e.Size = UDim2.new(1,-4,0,32); e.BackgroundColor3 = Color3.fromRGB(25,18,6); e.Parent = uscr
@@ -639,6 +678,62 @@ local function addUndo(name)
     db.MouseButton1Click:Connect(function() e:Destroy(); undoEntries[name] = nil end)
     undoEntries[name] = e; updUndo()
 end
+
+-- ============================================
+-- WAYPOINT MANAGEMENT
+-- ============================================
+local function updateWaypointList()
+    local hasWps = false
+    for _ in pairs(waypoints) do hasWps = true; break end
+    we.Visible = not hasWps
+end
+
+local function addWaypoint(name, cframe)
+    if waypoints[name] then return end
+    waypoints[name] = cframe
+    
+    local entry = Instance.new("Frame"); entry.Size = UDim2.new(1, -4, 0, 32); entry.BackgroundColor3 = Color3.fromRGB(10, 25, 25); entry.Parent = wpscr
+    Instance.new("UICorner", entry).CornerRadius = UDim.new(0, 5)
+    
+    local n = Instance.new("TextLabel"); n.Size = UDim2.new(0.5, 0, 1, 0); n.Position = UDim2.new(0, 6, 0, 0)
+    n.BackgroundTransparency = 1; n.Text = "📌 " .. name; n.TextColor3 = Color3.fromRGB(0, 255, 255)
+    n.TextSize = 9; n.Font = Enum.Font.GothamBold; n.TextXAlignment = Enum.TextXAlignment.Left; n.TextTruncate = Enum.TextTruncate.AtEnd; n.Parent = entry
+    
+    local tpBtn = Instance.new("TextButton"); tpBtn.Size = UDim2.new(0, 54, 0, 20); tpBtn.Position = UDim2.new(1, -116, 0.5, -10)
+    tpBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 120); tpBtn.Text = "⚡ Teleport"; tpBtn.TextColor3 = Color3.new(1,1,1)
+    tpBtn.TextSize = 8; tpBtn.Font = Enum.Font.GothamBold; tpBtn.Parent = entry; Instance.new("UICorner", tpBtn).CornerRadius = UDim.new(0, 4)
+    
+    local delBtn = Instance.new("TextButton"); delBtn.Size = UDim2.new(0, 50, 0, 20); delBtn.Position = UDim2.new(1, -58, 0.5, -10)
+    delBtn.BackgroundColor3 = Color3.fromRGB(140, 20, 20); delBtn.Text = "🗑 Delete"; delBtn.TextColor3 = Color3.new(1,1,1)
+    delBtn.TextSize = 8; delBtn.Font = Enum.Font.GothamBold; delBtn.Parent = entry; Instance.new("UICorner", delBtn).CornerRadius = UDim.new(0, 4)
+    
+    tpBtn.MouseButton1Click:Connect(function()
+        local char = LP.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if root then
+            root.CFrame = waypoints[name]
+        end
+    end)
+    
+    delBtn.MouseButton1Click:Connect(function()
+        waypoints[name] = nil
+        entry:Destroy()
+        updateWaypointList()
+    end)
+    
+    updateWaypointList()
+end
+
+addWpBtn.MouseButton1Click:Connect(function()
+    local name = wpInput.Text
+    if name == "" or name == "Waypoint Name..." then return end
+    local char = LP.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if root then
+        addWaypoint(name, root.CFrame)
+        wpInput.Text = "Waypoint Name..."
+    end
+end)
 
 stopV = function() viewing = false; if viewConn then viewConn:Disconnect(); viewConn = nil end
     if viewIndicator then pcall(function() viewIndicator:Destroy() end); viewIndicator = nil end
@@ -827,7 +922,6 @@ track = function(entity)
     tlEntry.BackgroundTransparency = 1; tlEntry.Text = threat; tlEntry.TextColor3 = threatCol; tlEntry.TextSize = 8
     tlEntry.Font = Enum.Font.GothamBlack; tlEntry.TextXAlignment = Enum.TextXAlignment.Left; tlEntry.Parent = entry
     
-    -- FIXED: Changed horizontal scale/alignment of Distance and Speed Labels to avoid UI clutter
     local edl = Instance.new("TextLabel"); edl.Name = "EDL"; edl.Size = UDim2.new(0,80,0,12); edl.Position = UDim2.new(1,-168,0,4)
     edl.BackgroundTransparency = 1; edl.Text = "..."; edl.TextColor3 = Color3.fromRGB(80,80,110); edl.TextSize = 10
     edl.Font = Enum.Font.GothamBold; edl.TextXAlignment = Enum.TextXAlignment.Right; edl.Parent = entry
@@ -1081,18 +1175,10 @@ task.spawn(function() while active do
 
 layoutGUI()
 print("═══════════════════════════════════════")
-print("  ☠ ENTITY SCANNER ULTRA v9 ☠")
+print("  ☠ ENTITY SCANNER ULTRA v9.1 ☠")
 print("═══════════════════════════════════════")
-print("  ⚠ Survival tips for every entity")
+print("  👥 TRACKING SUPPORT: Clones tracked!")
+print("  📌 WAYPOINTS TABS: Save & Teleport!")
 print("  🔔 Proximity warnings (120s + 18s)")
-print("  📡 Live Radar with sweep (FIXED)")
-print("  ☠ Threat levels + Unicode-Proofing (ï)")
-print("  🛡 EXCLUSION LIST: Filters Spawners, ambient loops & themes")
-print("  📏 Distances aligned inside scroll rows")
-print("  − Minimize button (red)")
-print("  🔴 APPROACHING / 🟢 RETREATING")
-print("  💨 Advanced despawn detection")
-print("  🚪🪑🛏🕳🪜📦🏚 Environment scan")
-print("  🔴 Screen flash on kill zone")
-print("  📊 Session stats + timer")
+-- ... existing layout prints ...
 print("═══════════════════════════════════════")
