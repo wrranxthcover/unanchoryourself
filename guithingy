@@ -1,6 +1,7 @@
 --[[
     ☠ ENTITY SCANNER ULTRA v10.1 ☠ - ZERO-LAG OVERLORD EDITION
     Fully optimized to prevent FPS drops while retaining all overpowered features.
+    [FIXED]: Fixed script crash on startup, resolved missing UI buttons, and fully hooked the Close function.
 ]]
 
 local Players = game:GetService("Players")
@@ -229,7 +230,6 @@ local function findNearestSafeClosetOptimized()
     if not root then return nil, math.huge end
     local nearest, minDist = nil, math.huge
     
-    -- Limit spatial searches to direct environment only (no deep map scans)
     for _, v in ipairs(workspace:GetChildren()) do
         if v:IsA("Model") and (v.Name:lower():find("locker") or v.Name:lower():find("closet")) then
             local primary = v.PrimaryPart or v:FindFirstChildWhichIsA("BasePart", true)
@@ -272,7 +272,7 @@ task.spawn(function() while active do
     local t = tick(); local r = math.floor(100+155*((math.sin(t*2)+1)/2))
     local g = math.floor(0+100*((math.sin(t*1.5)+1)/2))
     local b = math.floor(180+75*((math.cos(t*3)+1)/2))
-    mst.Color = Color3.fromRGB(r, g, b); task.wait(0.2) -- Lowered pulse cycle update rate to save FPS
+    mst.Color = Color3.fromRGB(r, g, b); task.wait(0.2)
 end end)
 
 -- Header Design
@@ -303,11 +303,28 @@ local sf = Instance.new("Frame"); sf.Size = UDim2.new(1, -12, 0, 70); sf.Positio
 local sfst = Instance.new("UIStroke"); sfst.Color = Color3.fromRGB(40, 40, 80); sfst.Thickness = 1; sfst.Parent = sf
 
 local rl = Instance.new("TextLabel"); rl.Size = UDim2.new(0.5, -4, 0, 15); rl.Position = UDim2.new(0, 8, 0, 6); rl.BackgroundTransparency = 1; rl.Text = "🌀 OVERLORD ACTIVE"; rl.TextColor3 = Color3.fromRGB(0, 255, 200); rl.TextSize = 11; rl.Font = Enum.Font.GothamBlack; rl.TextXAlignment = Enum.TextXAlignment.Left; rl.Parent = sf
-local cl2 = Instance.new("TextLabel"); cl2.Size = UDim2.new(0.5, -4, 0, 15); cl2.Position = UDim2.new(0, 8, 0, 24); cl2.BackgroundTransparency = 1; cl2.Text = "☠ Threats: 0"; cl2.TextColor3 = Color3.fromRGB(150, 150, 180); cl2.TextSize = 11; cl2.Font = Enum.Font.GothamBold; cl2.TextXAlignment = Enum.TextXAlignment.Left; cl2.Parent = sf
+local cl2 = Instance.new("TextLabel"); cl2.Size = UDim2.new(0.5, -4, 0, 15); cl2.Position = UDim2.new(0, 8, 0, 24); cl2.BackgroundTransparency = 1; cl2.Text = "☠ Threats: 0"; cl2.TextColor3 = Color3.fromRGB(150, 150, 180); cl2.TextSize = 11; cl2.Font = Enum.Font.GothamBold; cl2.TextXAlignment = Enum.TextXAlignment.Left; rl.Parent = sf
 local statL = Instance.new("TextLabel"); statL.Size = UDim2.new(0.5, -4, 0, 13); statL.Position = UDim2.new(0, 8, 0, 48); statL.BackgroundTransparency = 1; statL.Text = "📊 Det: 0 | Warnings: 0"; statL.TextColor3 = Color3.fromRGB(120, 120, 160); statL.TextSize = 9; statL.Font = Enum.Font.GothamSemibold; statL.TextXAlignment = Enum.TextXAlignment.Left; statL.Parent = sf
 local timeL = Instance.new("TextLabel"); timeL.Size = UDim2.new(0.5, -4, 0, 15); timeL.Position = UDim2.new(0.5, 0, 0, 6); timeL.BackgroundTransparency = 1; timeL.Text = "⏱ 00:00"; timeL.TextColor3 = Color3.fromRGB(180, 180, 220); timeL.TextSize = 11; timeL.Font = Enum.Font.GothamSemibold; timeL.TextXAlignment = Enum.TextXAlignment.Right; timeL.Parent = sf
 local threatL = Instance.new("TextLabel"); threatL.Size = UDim2.new(0.5, -4, 0, 15); threatL.Position = UDim2.new(0.5, 0, 0, 24); threatL.BackgroundTransparency = 1; threatL.Text = "🛡 SECURE"; threatL.TextColor3 = Color3.fromRGB(0, 255, 140); threatL.TextSize = 11; threatL.Font = Enum.Font.GothamBlack; threatL.TextXAlignment = Enum.TextXAlignment.Right; threatL.Parent = sf
 local nearL = Instance.new("TextLabel"); nearL.Size = UDim2.new(0.5, -4, 0, 13); nearL.Position = UDim2.new(0.5, 0, 0, 48); nearL.BackgroundTransparency = 1; nearL.Text = "📡 Prox: ---"; nearL.TextColor3 = Color3.fromRGB(120, 120, 160); nearL.TextSize = 9; nearL.Font = Enum.Font.GothamSemibold; nearL.TextXAlignment = Enum.TextXAlignment.Right; nearL.Parent = sf
+
+-- ============================================
+-- [FIXED] MODERN procedural button constructor
+-- ============================================
+local function mb(parent, text, color, posXScale, sizeXScale)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(sizeXScale, -4, 1, 0)
+    btn.Position = UDim2.new(posXScale, 2, 0, 0)
+    btn.BackgroundColor3 = color
+    btn.Text = text
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.TextSize = 9
+    btn.Font = Enum.Font.GothamBold
+    btn.Parent = parent
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
+    return btn
+end
 
 -- Quick Action Buttons Row 1
 local r1 = Instance.new("Frame"); r1.Size = UDim2.new(1, -12, 0, 28); r1.Position = UDim2.new(0, 6, 0, 126); r1.BackgroundTransparency = 1; r1.Parent = MF
@@ -352,9 +369,73 @@ local addWpBtn = Instance.new("TextButton"); addWpBtn.Size = UDim2.new(0.32, 0, 
 
 local we = Instance.new("TextLabel"); we.Size = UDim2.new(1, 0, 0, 32); we.Position = UDim2.new(0,0,0,30); we.BackgroundTransparency = 1; we.Text = "Saved Waypoints empty."; we.TextColor3 = Color3.fromRGB(40, 100, 100); we.TextSize = 11; we.Font = Enum.Font.GothamBold; we.Parent = wpscr
 
+-- ============================================
+-- [FIXED] Dynamic View and Spectator Panels Setup
+-- ============================================
+local vp2 = Instance.new("Frame")
+vp2.Size = UDim2.new(1, -12, 0, 30)
+vp2.Position = UDim2.new(0, 6, 1, -36)
+vp2.BackgroundColor3 = Color3.fromRGB(20, 10, 35)
+vp2.Visible = false
+vp2.Parent = MF
+Instance.new("UICorner", vp2).CornerRadius = UDim.new(0, 6)
+
+local vlb = Instance.new("TextLabel")
+vlb.Size = UDim2.new(0.7, 0, 1, 0)
+vlb.Position = UDim2.new(0, 6, 0, 0)
+vlb.BackgroundTransparency = 1
+vlb.Text = "👁 LOCKED: ---"
+vlb.TextColor3 = Color3.new(1, 1, 1)
+vlb.TextSize = 10
+vlb.Font = Enum.Font.GothamBold
+vlb.TextXAlignment = Enum.TextXAlignment.Left
+vlb.Parent = vp2
+
+local vwB = Instance.new("TextButton")
+vwB.Size = UDim2.new(0.25, 0, 1, -4)
+vwB.Position = UDim2.new(0.75, -2, 0, 2)
+vwB.BackgroundColor3 = Color3.fromRGB(70, 0, 150)
+vwB.Text = "🔓 RELEASE"
+vwB.TextColor3 = Color3.new(1, 1, 1)
+vwB.TextSize = 9
+vwB.Font = Enum.Font.GothamBlack
+vwB.Parent = vp2
+Instance.new("UICorner", vwB).CornerRadius = UDim.new(0, 4)
+
+local vep2 = Instance.new("Frame")
+vep2.Size = UDim2.new(1, -12, 0, 30)
+vep2.Position = UDim2.new(0, 6, 1, -36)
+vep2.BackgroundColor3 = Color3.fromRGB(10, 30, 15)
+vep2.Visible = false
+vep2.Parent = MF
+Instance.new("UICorner", vep2).CornerRadius = UDim.new(0, 6)
+
+local velb2 = Instance.new("TextLabel")
+velb2.Size = UDim2.new(0.7, 0, 1, 0)
+velb2.Position = UDim2.new(0, 6, 0, 0)
+velb2.BackgroundTransparency = 1
+velb2.Text = "🎥 SPECTATING: ---"
+velb2.TextColor3 = Color3.new(1, 1, 1)
+velb2.TextSize = 10
+velb2.Font = Enum.Font.GothamBold
+velb2.TextXAlignment = Enum.TextXAlignment.Left
+velb2.Parent = vep2
+
+local veB = Instance.new("TextButton")
+veB.Size = UDim2.new(0.25, 0, 1, -4)
+veB.Position = UDim2.new(0.75, -2, 0, 2)
+veB.BackgroundColor3 = Color3.fromRGB(30, 60, 30)
+veB.Text = "✕ STOP"
+veB.TextColor3 = Color3.new(1, 1, 1)
+veB.TextSize = 9
+veB.Font = Enum.Font.GothamBlack
+veB.Parent = vep2
+Instance.new("UICorner", veB).CornerRadius = UDim.new(0, 4)
+
 local function layoutGUI()
     local y = 220
-    scr.Size = UDim2.new(1, -12, 1, -(y+8)); scr.Position = UDim2.new(0, 6, 0, y)
+    local reserve = (viewing or viewingEnt) and 44 or 8
+    scr.Size = UDim2.new(1, -12, 1, -(y+reserve)); scr.Position = UDim2.new(0, 6, 0, y)
     uscr.Size = scr.Size; uscr.Position = scr.Position
     wpscr.Size = scr.Size; wpscr.Position = scr.Position
 end
@@ -531,12 +612,21 @@ local function applyItemESP(obj)
             local bg = Instance.new("BillboardGui"); bg.Adornee = primary; bg.Size = UDim2.new(0, 100, 0, 40); bg.AlwaysOnTop = true; bg.Parent = primary
             local tl = Instance.new("TextLabel"); tl.Size = UDim2.new(1, 0, 1, 0); tl.BackgroundTransparency = 1; tl.TextColor3 = Color3.fromRGB(0, 255, 235); tl.TextSize = 10; tl.Font = Enum.Font.GothamBlack; tl.Text = "💎 " .. obj.Name; tl.Parent = bg
             
-            -- Dynamic click interaction directly on live scroll options
             local itemBtn = Instance.new("TextButton"); itemBtn.Size = UDim2.new(1, -10, 0, 24); itemBtn.BackgroundColor3 = Color3.fromRGB(0, 40, 50); itemBtn.Text = "💎 GRAB " .. obj.Name; itemBtn.TextColor3 = Color3.fromRGB(0, 255, 255); itemBtn.Font = Enum.Font.GothamBold; itemBtn.TextSize = 9; itemBtn.Parent = wpscr
             Instance.new("UICorner", itemBtn).CornerRadius = UDim.new(0, 4)
+            
+            local itemConn
+            itemConn = obj.AncestryChanged:Connect(function(_, p)
+                if not p then
+                    pcall(function() itemBtn:Destroy() end)
+                    if itemConn then itemConn:Disconnect() end
+                end
+            end)
+            
             itemBtn.MouseButton1Click:Connect(function()
                 teleportItemToHand(obj)
                 itemBtn:Destroy()
+                if itemConn then itemConn:Disconnect() end
             end)
         end
     end
@@ -617,14 +707,14 @@ end)
 stopV = function() 
     viewing = false; if viewConn then viewConn:Disconnect(); viewConn = nil end
     if viewIndicator then pcall(function() viewIndicator:Destroy() end); viewIndicator = nil end
-    vp2.Visible = false; vwB.BackgroundColor3 = Color3.fromRGB(70,0,150); vwB.Text = "👁 View"
+    vp2.Visible = false; vwB.BackgroundColor3 = Color3.fromRGB(70,0,150); vwB.Text = "🔓 RELEASE"
     viewTarget = nil; layoutGUI() 
 end
 
 stopVE = function() 
     viewingEnt = false; if viewEntConn then viewEntConn:Disconnect(); viewEntConn = nil end
     if savedCamType then Camera.CameraType = savedCamType; savedCamType = nil else Camera.CameraType = Enum.CameraType.Custom end
-    vep2.Visible = false; veB.Text = "🎥 Spectate"; veB.BackgroundColor3 = Color3.fromRGB(30,60,30)
+    vep2.Visible = false; veB.Text = "✕ STOP"; veB.BackgroundColor3 = Color3.fromRGB(30,60,30)
     viewEntTarget = nil; layoutGUI() 
 end
 
@@ -634,8 +724,8 @@ local function startVE(entity)
     local root = data.targetPart; if not root or not root.Parent then root = getPart(entity); data.targetPart = root end
     if not root then return end; if viewing then stopV() end
     viewingEnt = true; viewEntTarget = entity; vep2.Visible = true
-    velb2.Text = "🎥 " .. getDisplayName(entity)
-    veB.Text = "🎥 WATCHING"; veB.BackgroundColor3 = Color3.fromRGB(0,160,60)
+    velb2.Text = "🎥 WATCHING: " .. getDisplayName(entity)
+    veB.Text = "✕ STOP"; veB.BackgroundColor3 = Color3.fromRGB(150,20,20)
     savedCamType = Camera.CameraType; Camera.CameraType = Enum.CameraType.Scriptable
     local ang = 0
     viewEntConn = RunService.Heartbeat:Connect(function(dt)
@@ -653,7 +743,7 @@ local function startV(entity)
     if not root then return end; if viewingEnt then stopVE() end
     viewing = true; viewTarget = entity; vp2.Visible = true
     local dName = getDisplayName(entity)
-    vlb.Text = "👁 LOCKED: " .. dName; vwB.Text = "👁 LOCK ON"; vwB.BackgroundColor3 = Color3.fromRGB(115,0,235)
+    vlb.Text = "👁 LOCKED: " .. dName; vwB.Text = "🔓 RELEASE"; vwB.BackgroundColor3 = Color3.fromRGB(115,0,235)
     local ind = Instance.new("ScreenGui"); ind.Name = "ViewIndicator"; ind.ResetOnSpawn = false; ind.DisplayOrder = 100; ind.Parent = LP.PlayerGui
     local ar = Instance.new("TextLabel"); ar.Size = UDim2.new(0,170,0,50); ar.AnchorPoint = Vector2.new(0.5,0)
     ar.Position = UDim2.new(0.5,0,0,8); ar.BackgroundColor3 = Color3.fromRGB(10,0,30); ar.BackgroundTransparency = 0.15
@@ -668,6 +758,10 @@ local function startV(entity)
         if on then ar.Position = UDim2.new(0, math.clamp(sp.X,90,vpS.X-90), 0, math.clamp(sp.Y,8,55)) end
     end); layoutGUI() 
 end
+
+-- Hook Panel Release Buttons
+vwB.MouseButton1Click:Connect(stopV)
+veB.MouseButton1Click:Connect(stopVE)
 
 local function clrLS() for _, f in pairs(leftEntries) do pcall(function() f:Destroy() end) end; leftEntries = {} end
 local function updLS(rl3, cn)
@@ -785,17 +879,19 @@ task.spawn(function()
     end
 end)
 
-workspace.DescendantAdded:Connect(function(obj) 
+local workspaceConnections = {}
+table.insert(workspaceConnections, workspace.DescendantAdded:Connect(function(obj) 
     if isEnt(obj) then track(obj) end
     applyItemESP(obj)
-end)
-workspace.DescendantRemoving:Connect(function(obj) if tracked[obj] then untrack(obj) end end)
+end))
+table.insert(workspaceConnections, workspace.DescendantRemoving:Connect(function(obj) if tracked[obj] then untrack(obj) end end))
 
 -- ============================================
 -- MAIN HEARTBEAT THREAD (THROTTLED TO 0.1S TO FIX LAG)
 -- ============================================
 local lastUpdate = 0
-RunService.Heartbeat:Connect(function()
+local mainHeartbeatConn
+mainHeartbeatConn = RunService.Heartbeat:Connect(function()
     if not active then return end
     
     -- Sweep execution on radar remains smooth
@@ -857,9 +953,30 @@ namB.MouseButton1Click:Connect(function() namesOn = not namesOn; namB.Text = nam
 radB.MouseButton1Click:Connect(function() radarOn = not radarOn; radB.Text = radarOn and "📡 RADAR ON" or "📡 RADAR OFF"; radB.BackgroundColor3 = radarOn and Color3.fromRGB(130, 0, 180) or Color3.fromRGB(150, 20, 20) end)
 defB.MouseButton1Click:Connect(function() autoDefenseOn = not autoDefenseOn; defB.Text = autoDefenseOn and "🤖 SHIELD ON" or "🤖 SHIELD OFF"; defB.BackgroundColor3 = autoDefenseOn and Color3.fromRGB(220, 100, 0) or Color3.fromRGB(150, 20, 20) end)
 
+-- ============================================
+-- [FIXED] CLEAN SHUTDOWN HANDLER
+-- ============================================
 xbtn.MouseButton1Click:Connect(function() 
-    active = false; stopV(); stopVE()
-    SG:Destroy(); AG:Destroy(); RG:Destroy() 
+    active = false
+    
+    -- Disconnect Loops
+    if mainHeartbeatConn then pcall(function() mainHeartbeatConn:Disconnect() end) end
+    for _, conn in ipairs(workspaceConnections) do
+        pcall(function() conn:Disconnect() end)
+    end
+    
+    stopV()
+    stopVE()
+    
+    -- Wipe tracked instances in memory
+    for ent, _ in pairs(tracked) do
+        pcall(function() untrack(ent) end)
+    end
+    
+    -- Destroy All Screen Elements
+    pcall(function() SG:Destroy() end)
+    pcall(function() AG:Destroy() end)
+    pcall(function() RG:Destroy() end)
 end)
 
 print("═══════════════════════════════════════")
