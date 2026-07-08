@@ -48,10 +48,8 @@ local KNOWN_ENTITIES = {
 }
 
 local function matchPat(name)
-    -- Check known entity names (case-insensitive)
     if KNOWN_ENTITIES[name:lower()] then return true end
 
-    -- Original pattern: prefix-number (like A-60, L-243)
     local dp = name:find("%-(%d+)$")
     if dp then
         local pre = name:sub(1, dp-1)
@@ -65,9 +63,11 @@ local function matchPat(name)
         end
     end
 
-    -- Mob pattern
     local mn = name:match("^[Mm][Oo][Bb](%d+)$")
     if mn then local n = tonumber(mn); if n and n >= 1 and n <= 25 then return true end end
+
+    local fn = name:match("^[Ff][Aa][Cc][Ee]%-?(%d+)$")
+    if fn then local n = tonumber(fn); if n and n >= 1 and n <= 25 then return true end end
 
     return false
 end
@@ -82,7 +82,6 @@ local function getDisplayName(entity)
             if matchPat(parent.Name) then
                 return parent.Name .. "'s " .. entity.Name
             end
-            -- Check grandparent too
             local gp = parent.Parent
             if gp and matchPat(gp.Name) then
                 return gp.Name .. "'s " .. entity.Name
@@ -94,6 +93,7 @@ end
 
 local function getPrefix(name)
     if name:match("^[Mm][Oo][Bb]%d+$") then return "MOB" end
+    if name:match("^[Ff][Aa][Cc][Ee]%-?%d+$") then return "FACE" end
     local l = name:lower(); if l == "eye" or l == "mouth" then return l end
     if KNOWN_ENTITIES[l] then return name end
     local dp = name:find("%-(%d+)$"); if not dp then return name end; return name:sub(1, dp-1)
@@ -657,7 +657,7 @@ track = function(entity)
         forceLastPos=root.Position, lastMoveDir=nil} end
 
     local num = getNum(entity.Name); local pre = getPrefix(entity.Name); local sv = 0
-    if pre == "MOB" then sv = 9e6+num elseif pre == "eye" then sv = 9.5e6 elseif pre == "mouth" then sv = 9500001
+    if pre == "MOB" then sv = 9e6+num elseif pre == "FACE" then sv = 9.2e6+num elseif pre == "eye" then sv = 9.5e6 elseif pre == "mouth" then sv = 9500001
     else for i = 1, #pre do sv = sv + string.byte(pre,i)*(100^(4-i)) end; sv = sv + num end
 
     local entry = Instance.new("Frame"); entry.Size = UDim2.new(1,-4,0,36); entry.BackgroundColor3 = Color3.fromRGB(16,16,34)
@@ -697,6 +697,13 @@ track = function(entity)
     d.dConn = entity.AncestryChanged:Connect(function(_, p) if not p then untrack(entity) end end)
     tracked[entity] = d; entCount += 1; cl2.Text = "Entities: "..entCount; cl2.TextColor3 = Color3.fromRGB(255,50,50); el.Visible = false
 end
+
+-- Reset views on respawn
+LP.CharacterAdded:Connect(function()
+    if viewing then stopV() end
+    if viewingEnt then stopVE() end
+    if speedApplyActive then stopSpeedApply() end
+end)
 
 -- Scan
 for _, obj in ipairs(workspace:GetDescendants()) do if isEnt(obj) then track(obj) end end
@@ -778,7 +785,6 @@ RunService.Heartbeat:Connect(function()
             if d.nameLabel then d.nameLabel.TextColor3 = ec end; if d.entryName then d.entryName.TextColor3 = ec end
             if d.entryStroke then d.entryStroke.Color = ec end; if d.entryDot then d.entryDot.BackgroundColor3 = ec end
 
-            -- Alert for known entities AND pattern-matched entities (not minions alone)
             local shouldAlert = false
             if matchPat(ent.Name) and not isMinion(ent.Name) then shouldAlert = true end
 
@@ -831,8 +837,8 @@ task.spawn(function() while active do
     task.wait(0.066) end end)
 
 layoutGUI()
-print("[Entity Scanner v7] ✅ FORCE 1000x Speed Control + Known Entities")
+print("[Entity Scanner v7] ✅ FORCE Speed Control + Known Entities + Face")
 print("Detects: Rush, Ambush, Seek, Figure, Halt, Eyes, Screech, Hide, Jack, Dupe,")
 print("Glitch, Void, Shadow, Snare, Timothy, Window, Lookman, Watchdog, Blitz,")
-print("A-60, A-90, A-120, Pandemonium, Haste, Rage, Shade, Turret, Siren + more")
-print("10 Force Methods | Every Frame | -100 to 10000")
+print("A-60, A-90, A-120, Pandemonium, Haste, Rage, Shade, Face-1~25 + more")
+print("Respawn resets views | 10 Force Methods | -10000 to 1000000")
