@@ -3,7 +3,6 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local UIS = game:GetService("UserInputService")
-local SoundService = game:GetService("SoundService")
 local LP = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
@@ -47,7 +46,6 @@ local KNOWN_ENTITIES = {
     ["greed"] = true, ["agony"] = true, ["grip"] = true, ["silence"] = true,
 }
 
--- Threat levels for known entities
 local THREAT_LEVEL = {
     ["rush"] = "☠ LETHAL", ["ambush"] = "☠ LETHAL", ["seek"] = "☠ LETHAL",
     ["figure"] = "☠ LETHAL", ["halt"] = "⚠ DANGER", ["screech"] = "⚠ DANGER",
@@ -76,15 +74,11 @@ local THREAT_COLOR = {
 
 local function getThreat(name)
     local l = name:lower()
-    if l == "eye" or l == "mouth" then
-        return "⚠ DANGER"
-    end
+    if l == "eye" or l == "mouth" then return "⚠ DANGER" end
     return THREAT_LEVEL[l] or "? UNKNOWN"
 end
 
-local function getThreatCol(threat)
-    return THREAT_COLOR[threat] or Color3.fromRGB(180, 180, 255)
-end
+local function getThreatCol(threat) return THREAT_COLOR[threat] or Color3.fromRGB(180, 180, 255) end
 
 local function matchPat(name)
     if KNOWN_ENTITIES[name:lower()] then return true end
@@ -140,6 +134,11 @@ local function getCol(name)
     local c = Color3.fromHSV((h%360)/360, 0.85, 1); cCache[name] = c; return c
 end
 
+local function formatTime(s)
+    local m = math.floor(s/60); local sec = math.floor(s%60)
+    return string.format("%02d:%02d", m, sec)
+end
+
 local pChars = {}
 for _, p in ipairs(Players:GetPlayers()) do
     if p.Character then pChars[p.Character] = true end
@@ -167,21 +166,15 @@ local function getPart(obj)
     return obj:FindFirstChildWhichIsA("BasePart", true)
 end
 
-local function formatTime(s)
-    local m = math.floor(s/60); local sec = math.floor(s%60)
-    return string.format("%02d:%02d", m, sec)
-end
-
 -- ============================================
 -- MAIN GUI
 -- ============================================
 local SG = Instance.new("ScreenGui"); SG.Name = "EntityScannerGui"; SG.ResetOnSpawn = false; SG.DisplayOrder = 100; SG.Parent = LP.PlayerGui
-local MF = Instance.new("Frame"); MF.Size = UDim2.new(0, 320, 0, 520); MF.Position = UDim2.new(0, 14, 0.5, -260)
+local MF = Instance.new("Frame"); MF.Size = UDim2.new(0, 330, 0, 540); MF.Position = UDim2.new(0, 14, 0.5, -270)
 MF.BackgroundColor3 = Color3.fromRGB(8, 8, 18); MF.Active = true; MF.Draggable = true; MF.Parent = SG
 Instance.new("UICorner", MF).CornerRadius = UDim.new(0, 10)
 local mst = Instance.new("UIStroke"); mst.Color = Color3.fromRGB(255, 0, 60); mst.Thickness = 2; mst.Parent = MF
 
--- Animated stroke
 task.spawn(function() while active do
     local t = tick()*2; local r = math.floor(120+135*((math.sin(t)+1)/2))
     local g = math.floor(0+30*((math.sin(t*1.3)+1)/2))
@@ -189,8 +182,7 @@ task.spawn(function() while active do
     mst.Color = Color3.fromRGB(r, g, b); task.wait(0.05)
 end end)
 
--- Title bar
-local TB = Instance.new("Frame"); TB.Size = UDim2.new(1, 0, 0, 40); TB.BackgroundColor3 = Color3.fromRGB(120, 0, 20); TB.Parent = MF
+local TB = Instance.new("Frame"); TB.Size = UDim2.new(1, 0, 0, 42); TB.BackgroundColor3 = Color3.fromRGB(120, 0, 20); TB.Parent = MF
 Instance.new("UICorner", TB).CornerRadius = UDim.new(0, 10)
 local tbf = Instance.new("Frame"); tbf.Size = UDim2.new(1, 0, 0, 12); tbf.Position = UDim2.new(0, 0, 1, -12)
 tbf.BackgroundColor3 = TB.BackgroundColor3; tbf.BorderSizePixel = 0; tbf.Parent = TB
@@ -199,119 +191,112 @@ local tbg = Instance.new("UIGradient"); tbg.Color = ColorSequence.new{
     ColorSequenceKeypoint.new(0.5, Color3.fromRGB(120, 0, 60)),
     ColorSequenceKeypoint.new(1, Color3.fromRGB(80, 0, 120))
 }; tbg.Parent = TB
-
 local si = Instance.new("TextLabel"); si.Size = UDim2.new(0, 30, 1, 0); si.Position = UDim2.new(0, 6, 0, 0)
-si.BackgroundTransparency = 1; si.Text = "☠"; si.TextColor3 = Color3.new(1,1,1); si.TextSize = 20
+si.BackgroundTransparency = 1; si.Text = "☠"; si.TextColor3 = Color3.new(1,1,1); si.TextSize = 22
 si.Font = Enum.Font.GothamBlack; si.Parent = TB
-local tl = Instance.new("TextLabel"); tl.Size = UDim2.new(1, -80, 1, 0); tl.Position = UDim2.new(0, 36, 0, 0)
-tl.BackgroundTransparency = 1; tl.Text = "ENTITY SCANNER ULTRA"; tl.TextColor3 = Color3.new(1,1,1); tl.TextSize = 13
+local tl = Instance.new("TextLabel"); tl.Size = UDim2.new(1, -80, 1, 0); tl.Position = UDim2.new(0, 38, 0, 0)
+tl.BackgroundTransparency = 1; tl.Text = "ENTITY SCANNER ULTRA"; tl.TextColor3 = Color3.new(1,1,1); tl.TextSize = 15
 tl.Font = Enum.Font.GothamBlack; tl.TextXAlignment = Enum.TextXAlignment.Left; tl.Parent = TB
-local verL = Instance.new("TextLabel"); verL.Size = UDim2.new(0, 30, 0, 10); verL.Position = UDim2.new(1, -65, 0, 3)
+local verL = Instance.new("TextLabel"); verL.Size = UDim2.new(0, 30, 0, 12); verL.Position = UDim2.new(1, -68, 0, 3)
 verL.BackgroundColor3 = Color3.fromRGB(255, 40, 40); verL.Text = "v8"; verL.TextColor3 = Color3.new(1,1,1)
-verL.TextSize = 7; verL.Font = Enum.Font.GothamBlack; verL.Parent = TB
+verL.TextSize = 8; verL.Font = Enum.Font.GothamBlack; verL.Parent = TB
 Instance.new("UICorner", verL).CornerRadius = UDim.new(0, 3)
-local xbtn = Instance.new("TextButton"); xbtn.Size = UDim2.new(0, 24, 0, 24); xbtn.Position = UDim2.new(1, -30, 0.5, -12)
+local xbtn = Instance.new("TextButton"); xbtn.Size = UDim2.new(0, 26, 0, 26); xbtn.Position = UDim2.new(1, -32, 0.5, -13)
 xbtn.BackgroundColor3 = Color3.fromRGB(200, 30, 30); xbtn.Text = "✕"; xbtn.TextColor3 = Color3.new(1,1,1)
-xbtn.TextSize = 13; xbtn.Font = Enum.Font.GothamBlack; xbtn.Parent = TB; Instance.new("UICorner", xbtn).CornerRadius = UDim.new(0, 6)
+xbtn.TextSize = 14; xbtn.Font = Enum.Font.GothamBlack; xbtn.Parent = TB; Instance.new("UICorner", xbtn).CornerRadius = UDim.new(0, 6)
 
 -- Status panel
-local sf = Instance.new("Frame"); sf.Size = UDim2.new(1, -12, 0, 52); sf.Position = UDim2.new(0, 6, 0, 46)
+local sf = Instance.new("Frame"); sf.Size = UDim2.new(1, -12, 0, 62); sf.Position = UDim2.new(0, 6, 0, 48)
 sf.BackgroundColor3 = Color3.fromRGB(12, 12, 25); sf.Parent = MF; Instance.new("UICorner", sf).CornerRadius = UDim.new(0, 6)
 local sfst = Instance.new("UIStroke"); sfst.Color = Color3.fromRGB(60, 0, 80); sfst.Thickness = 1; sfst.Parent = sf
-
-local rl = Instance.new("TextLabel"); rl.Size = UDim2.new(0.5, -4, 0, 13); rl.Position = UDim2.new(0, 6, 0, 4)
+local rl = Instance.new("TextLabel"); rl.Size = UDim2.new(0.5, -4, 0, 15); rl.Position = UDim2.new(0, 6, 0, 4)
 rl.BackgroundTransparency = 1; rl.Text = "⚡ ACTIVE"; rl.TextColor3 = Color3.fromRGB(0, 255, 100)
-rl.TextSize = 9; rl.Font = Enum.Font.GothamBlack; rl.TextXAlignment = Enum.TextXAlignment.Left; rl.Parent = sf
-local cl2 = Instance.new("TextLabel"); cl2.Size = UDim2.new(0.5, -4, 0, 13); cl2.Position = UDim2.new(0, 6, 0, 18)
-cl2.BackgroundTransparency = 1; cl2.Text = "☠ Entities: 0"; cl2.TextColor3 = Color3.fromRGB(255, 60, 60)
-cl2.TextSize = 9; cl2.Font = Enum.Font.GothamBold; cl2.TextXAlignment = Enum.TextXAlignment.Left; cl2.Parent = sf
-local statL = Instance.new("TextLabel"); statL.Size = UDim2.new(0.5, -4, 0, 13); statL.Position = UDim2.new(0, 6, 0, 33)
+rl.TextSize = 11; rl.Font = Enum.Font.GothamBlack; rl.TextXAlignment = Enum.TextXAlignment.Left; rl.Parent = sf
+local cl2 = Instance.new("TextLabel"); cl2.Size = UDim2.new(0.5, -4, 0, 15); cl2.Position = UDim2.new(0, 6, 0, 21)
+cl2.BackgroundTransparency = 1; cl2.Text = "☠ Entities: 0"; cl2.TextColor3 = Color3.fromRGB(100, 100, 140)
+cl2.TextSize = 11; cl2.Font = Enum.Font.GothamBold; cl2.TextXAlignment = Enum.TextXAlignment.Left; cl2.Parent = sf
+local statL = Instance.new("TextLabel"); statL.Size = UDim2.new(0.5, -4, 0, 13); statL.Position = UDim2.new(0, 6, 0, 40)
 statL.BackgroundTransparency = 1; statL.Text = "📊 0 detected | 0 alerts"; statL.TextColor3 = Color3.fromRGB(120, 120, 180)
-statL.TextSize = 7; statL.Font = Enum.Font.GothamSemibold; statL.TextXAlignment = Enum.TextXAlignment.Left; statL.Parent = sf
-local timeL = Instance.new("TextLabel"); timeL.Size = UDim2.new(0.5, -4, 0, 13); timeL.Position = UDim2.new(0.5, 0, 0, 4)
+statL.TextSize = 9; statL.Font = Enum.Font.GothamSemibold; statL.TextXAlignment = Enum.TextXAlignment.Left; statL.Parent = sf
+local timeL = Instance.new("TextLabel"); timeL.Size = UDim2.new(0.5, -4, 0, 15); timeL.Position = UDim2.new(0.5, 0, 0, 4)
 timeL.BackgroundTransparency = 1; timeL.Text = "⏱ 00:00"; timeL.TextColor3 = Color3.fromRGB(160, 160, 200)
-timeL.TextSize = 9; timeL.Font = Enum.Font.GothamSemibold; timeL.TextXAlignment = Enum.TextXAlignment.Right; timeL.Parent = sf
-local threatL = Instance.new("TextLabel"); threatL.Size = UDim2.new(0.5, -4, 0, 13); threatL.Position = UDim2.new(0.5, 0, 0, 18)
+timeL.TextSize = 11; timeL.Font = Enum.Font.GothamSemibold; timeL.TextXAlignment = Enum.TextXAlignment.Right; timeL.Parent = sf
+local threatL = Instance.new("TextLabel"); threatL.Size = UDim2.new(0.5, -4, 0, 15); threatL.Position = UDim2.new(0.5, 0, 0, 21)
 threatL.BackgroundTransparency = 1; threatL.Text = "🛡 SAFE"; threatL.TextColor3 = Color3.fromRGB(80, 255, 80)
-threatL.TextSize = 9; threatL.Font = Enum.Font.GothamBlack; threatL.TextXAlignment = Enum.TextXAlignment.Right; threatL.Parent = sf
-local nearL = Instance.new("TextLabel"); nearL.Size = UDim2.new(0.5, -4, 0, 13); nearL.Position = UDim2.new(0.5, 0, 0, 33)
+threatL.TextSize = 11; threatL.Font = Enum.Font.GothamBlack; threatL.TextXAlignment = Enum.TextXAlignment.Right; threatL.Parent = sf
+local nearL = Instance.new("TextLabel"); nearL.Size = UDim2.new(0.5, -4, 0, 13); nearL.Position = UDim2.new(0.5, 0, 0, 40)
 nearL.BackgroundTransparency = 1; nearL.Text = "📡 Nearest: ---"; nearL.TextColor3 = Color3.fromRGB(120, 120, 180)
-nearL.TextSize = 7; nearL.Font = Enum.Font.GothamSemibold; nearL.TextXAlignment = Enum.TextXAlignment.Right; nearL.Parent = sf
+nearL.TextSize = 9; nearL.Font = Enum.Font.GothamSemibold; nearL.TextXAlignment = Enum.TextXAlignment.Right; nearL.Parent = sf
 
--- Buttons
 local function mb(par, txt, col, xP, xS)
     local b = Instance.new("TextButton"); b.Size = UDim2.new(xS, -3, 1, 0); b.Position = UDim2.new(xP, 1, 0, 0)
-    b.BackgroundColor3 = col; b.Text = txt; b.TextColor3 = Color3.new(1,1,1); b.TextSize = 9
+    b.BackgroundColor3 = col; b.Text = txt; b.TextColor3 = Color3.new(1,1,1); b.TextSize = 10
     b.Font = Enum.Font.GothamBold; b.BorderSizePixel = 0; b.Parent = par
     Instance.new("UICorner", b).CornerRadius = UDim.new(0, 5); return b
 end
 
-local r1 = Instance.new("Frame"); r1.Size = UDim2.new(1, -12, 0, 26); r1.Position = UDim2.new(0, 6, 0, 102)
+local r1 = Instance.new("Frame"); r1.Size = UDim2.new(1, -12, 0, 28); r1.Position = UDim2.new(0, 6, 0, 114)
 r1.BackgroundTransparency = 1; r1.Parent = MF
 local espB = mb(r1, "👁 ESP: ON", Color3.fromRGB(0, 130, 60), 0, 0.25)
-local namB = mb(r1, "📛 Names: ON", Color3.fromRGB(0, 80, 160), 0.25, 0.25)
-local radB = mb(r1, "📡 Radar: ON", Color3.fromRGB(100, 0, 120), 0.5, 0.25)
+local namB = mb(r1, "📛 Names", Color3.fromRGB(0, 80, 160), 0.25, 0.25)
+local radB = mb(r1, "📡 Radar", Color3.fromRGB(100, 0, 120), 0.5, 0.25)
 local vwB = mb(r1, "👁 View", Color3.fromRGB(70, 0, 150), 0.75, 0.25)
 
-local r2 = Instance.new("Frame"); r2.Size = UDim2.new(1, -12, 0, 26); r2.Position = UDim2.new(0, 6, 0, 131)
+local r2 = Instance.new("Frame"); r2.Size = UDim2.new(1, -12, 0, 28); r2.Position = UDim2.new(0, 6, 0, 145)
 r2.BackgroundTransparency = 1; r2.Parent = MF
 local veB = mb(r2, "🎥 Spectate", Color3.fromRGB(30, 60, 30), 0, 0.35)
 local dbB = mb(r2, "🔎 Scan", Color3.fromRGB(60, 60, 80), 0.35, 0.32)
 local clrB = mb(r2, "🗑 Clear BL", Color3.fromRGB(120, 40, 0), 0.67, 0.33)
 
--- Tabs
-local tabF = Instance.new("Frame"); tabF.Size = UDim2.new(1, -12, 0, 22); tabF.Position = UDim2.new(0, 6, 0, 162)
+local tabF = Instance.new("Frame"); tabF.Size = UDim2.new(1, -12, 0, 24); tabF.Position = UDim2.new(0, 6, 0, 178)
 tabF.BackgroundTransparency = 1; tabF.Parent = MF
 local liveTab = mb(tabF, "⚡ Live", Color3.fromRGB(0, 80, 160), 0, 0.5)
 local undoTab = mb(tabF, "↩ Blacklist (0)", Color3.fromRGB(80, 40, 0), 0.5, 0.5)
 
--- View panels
-local vp2 = Instance.new("Frame"); vp2.Size = UDim2.new(1, -12, 0, 22); vp2.BackgroundColor3 = Color3.fromRGB(22, 0, 50)
+local vp2 = Instance.new("Frame"); vp2.Size = UDim2.new(1, -12, 0, 24); vp2.BackgroundColor3 = Color3.fromRGB(22, 0, 50)
 vp2.Visible = false; vp2.Parent = MF; Instance.new("UICorner", vp2).CornerRadius = UDim.new(0, 5)
 local vst2 = Instance.new("UIStroke"); vst2.Color = Color3.fromRGB(120, 0, 240); vst2.Thickness = 1; vst2.Parent = vp2
 local vlb = Instance.new("TextLabel"); vlb.Size = UDim2.new(0.65, 0, 1, 0); vlb.Position = UDim2.new(0, 6, 0, 0)
 vlb.BackgroundTransparency = 1; vlb.Text = "👁 None"; vlb.TextColor3 = Color3.fromRGB(170, 120, 255)
-vlb.TextSize = 8; vlb.Font = Enum.Font.GothamBold; vlb.TextXAlignment = Enum.TextXAlignment.Left; vlb.Parent = vp2
-local svb2 = Instance.new("TextButton"); svb2.Size = UDim2.new(0, 44, 0, 16); svb2.Position = UDim2.new(1, -48, 0.5, -8)
+vlb.TextSize = 10; vlb.Font = Enum.Font.GothamBold; vlb.TextXAlignment = Enum.TextXAlignment.Left; vlb.Parent = vp2
+local svb2 = Instance.new("TextButton"); svb2.Size = UDim2.new(0, 48, 0, 18); svb2.Position = UDim2.new(1, -52, 0.5, -9)
 svb2.BackgroundColor3 = Color3.fromRGB(160, 20, 20); svb2.Text = "✕ Stop"; svb2.TextColor3 = Color3.new(1,1,1)
-svb2.TextSize = 7; svb2.Font = Enum.Font.GothamBold; svb2.Parent = vp2; Instance.new("UICorner", svb2).CornerRadius = UDim.new(0, 4)
+svb2.TextSize = 8; svb2.Font = Enum.Font.GothamBold; svb2.Parent = vp2; Instance.new("UICorner", svb2).CornerRadius = UDim.new(0, 4)
 
-local vep2 = Instance.new("Frame"); vep2.Size = UDim2.new(1, -12, 0, 22); vep2.BackgroundColor3 = Color3.fromRGB(0, 25, 10)
+local vep2 = Instance.new("Frame"); vep2.Size = UDim2.new(1, -12, 0, 24); vep2.BackgroundColor3 = Color3.fromRGB(0, 25, 10)
 vep2.Visible = false; vep2.Parent = MF; Instance.new("UICorner", vep2).CornerRadius = UDim.new(0, 5)
 local vest2 = Instance.new("UIStroke"); vest2.Color = Color3.fromRGB(0, 200, 80); vest2.Thickness = 1; vest2.Parent = vep2
 local velb2 = Instance.new("TextLabel"); velb2.Size = UDim2.new(0.65, 0, 1, 0); velb2.Position = UDim2.new(0, 6, 0, 0)
 velb2.BackgroundTransparency = 1; velb2.Text = "🎥 None"; velb2.TextColor3 = Color3.fromRGB(80, 255, 140)
-velb2.TextSize = 8; velb2.Font = Enum.Font.GothamBold; velb2.TextXAlignment = Enum.TextXAlignment.Left; velb2.Parent = vep2
-local sveb2 = Instance.new("TextButton"); sveb2.Size = UDim2.new(0, 44, 0, 16); sveb2.Position = UDim2.new(1, -48, 0.5, -8)
+velb2.TextSize = 10; velb2.Font = Enum.Font.GothamBold; velb2.TextXAlignment = Enum.TextXAlignment.Left; velb2.Parent = vep2
+local sveb2 = Instance.new("TextButton"); sveb2.Size = UDim2.new(0, 48, 0, 18); sveb2.Position = UDim2.new(1, -52, 0.5, -9)
 sveb2.BackgroundColor3 = Color3.fromRGB(160, 20, 20); sveb2.Text = "✕ Stop"; sveb2.TextColor3 = Color3.new(1,1,1)
-sveb2.TextSize = 7; sveb2.Font = Enum.Font.GothamBold; sveb2.Parent = vep2; Instance.new("UICorner", sveb2).CornerRadius = UDim.new(0, 4)
+sveb2.TextSize = 8; sveb2.Font = Enum.Font.GothamBold; sveb2.Parent = vep2; Instance.new("UICorner", sveb2).CornerRadius = UDim.new(0, 4)
 
--- Scroll frames
 local scr = Instance.new("ScrollingFrame"); scr.BackgroundColor3 = Color3.fromRGB(8, 8, 20)
 scr.ScrollBarThickness = 3; scr.ScrollBarImageColor3 = Color3.fromRGB(255, 0, 60)
 scr.AutomaticCanvasSize = Enum.AutomaticSize.Y; scr.CanvasSize = UDim2.new(0,0,0,0); scr.Parent = MF
 Instance.new("UICorner", scr).CornerRadius = UDim.new(0, 5)
-local scrLayout = Instance.new("UIListLayout"); scrLayout.Padding = UDim.new(0, 3); scrLayout.Parent = scr
+Instance.new("UIListLayout", scr).Padding = UDim.new(0, 3)
 local lpad = Instance.new("UIPadding"); lpad.PaddingTop = UDim.new(0,3); lpad.PaddingLeft = UDim.new(0,3); lpad.PaddingRight = UDim.new(0,3); lpad.Parent = scr
-local el = Instance.new("TextLabel"); el.Name = "Empty"; el.Size = UDim2.new(1, 0, 0, 30); el.BackgroundTransparency = 1
-el.Text = "☠ No entities detected..."; el.TextColor3 = Color3.fromRGB(50, 50, 80); el.TextSize = 9; el.Font = Enum.Font.GothamBold; el.Parent = scr
+local el = Instance.new("TextLabel"); el.Name = "Empty"; el.Size = UDim2.new(1, 0, 0, 32); el.BackgroundTransparency = 1
+el.Text = "☠ No entities detected..."; el.TextColor3 = Color3.fromRGB(50, 50, 80); el.TextSize = 11; el.Font = Enum.Font.GothamBold; el.Parent = scr
 
 local uscr = Instance.new("ScrollingFrame"); uscr.BackgroundColor3 = Color3.fromRGB(15, 12, 6)
 uscr.ScrollBarThickness = 3; uscr.AutomaticCanvasSize = Enum.AutomaticSize.Y; uscr.CanvasSize = UDim2.new(0,0,0,0)
 uscr.Visible = false; uscr.Parent = MF; Instance.new("UICorner", uscr).CornerRadius = UDim.new(0, 5)
 Instance.new("UIListLayout", uscr).Padding = UDim.new(0, 3)
 local upad = Instance.new("UIPadding"); upad.PaddingTop = UDim.new(0,3); upad.PaddingLeft = UDim.new(0,3); upad.PaddingRight = UDim.new(0,3); upad.Parent = uscr
-local ue = Instance.new("TextLabel"); ue.Size = UDim2.new(1, 0, 0, 30); ue.BackgroundTransparency = 1
-ue.Text = "No blacklisted entities..."; ue.TextColor3 = Color3.fromRGB(80, 60, 30); ue.TextSize = 9; ue.Font = Enum.Font.GothamBold; ue.Parent = uscr
+local ue = Instance.new("TextLabel"); ue.Size = UDim2.new(1, 0, 0, 32); ue.BackgroundTransparency = 1
+ue.Text = "No blacklisted entities..."; ue.TextColor3 = Color3.fromRGB(80, 60, 30); ue.TextSize = 11; ue.Font = Enum.Font.GothamBold; ue.Parent = uscr
 
--- Progress bar
 local pbar = Instance.new("Frame"); pbar.Size = UDim2.new(0.2, 0, 0, 3); pbar.BackgroundColor3 = Color3.fromRGB(255, 0, 60); pbar.Parent = MF
 Instance.new("UICorner", pbar).CornerRadius = UDim.new(0, 2)
 
 local function layoutGUI()
-    local y = 162 + 26
-    vp2.Position = UDim2.new(0, 6, 0, y); y = y + (vp2.Visible and 26 or 0)
-    vep2.Position = UDim2.new(0, 6, 0, y); y = y + (vep2.Visible and 26 or 0); y = y + 4
+    local y = 178 + 28
+    vp2.Position = UDim2.new(0, 6, 0, y); y = y + (vp2.Visible and 28 or 0)
+    vep2.Position = UDim2.new(0, 6, 0, y); y = y + (vep2.Visible and 28 or 0); y = y + 4
     scr.Size = UDim2.new(1, -12, 1, -(y+8)); scr.Position = UDim2.new(0, 6, 0, y)
     uscr.Size = scr.Size; uscr.Position = scr.Position
 end
@@ -321,32 +306,27 @@ layoutGUI()
 -- RADAR
 -- ============================================
 local RG = Instance.new("ScreenGui"); RG.Name = "EntityRadarGui"; RG.ResetOnSpawn = false; RG.DisplayOrder = 90; RG.Parent = LP.PlayerGui
-local radarFrame = Instance.new("Frame"); radarFrame.Size = UDim2.new(0, 140, 0, 140)
-radarFrame.Position = UDim2.new(1, -155, 0, 15); radarFrame.BackgroundColor3 = Color3.fromRGB(5, 5, 15)
+local radarFrame = Instance.new("Frame"); radarFrame.Size = UDim2.new(0, 150, 0, 150)
+radarFrame.Position = UDim2.new(1, -165, 0, 15); radarFrame.BackgroundColor3 = Color3.fromRGB(5, 5, 15)
 radarFrame.BackgroundTransparency = 0.15; radarFrame.Parent = RG
 Instance.new("UICorner", radarFrame).CornerRadius = UDim.new(0.5, 0)
 local rSt = Instance.new("UIStroke"); rSt.Color = Color3.fromRGB(255, 0, 60); rSt.Thickness = 2; rSt.Parent = radarFrame
--- Crosshair
-local rCH = Instance.new("Frame"); rCH.Size = UDim2.new(0, 2, 1, -10); rCH.Position = UDim2.new(0.5, -1, 0, 5)
+local rCH = Instance.new("Frame"); rCH.Size = UDim2.new(0, 1, 1, -10); rCH.Position = UDim2.new(0.5, 0, 0, 5)
 rCH.BackgroundColor3 = Color3.fromRGB(40, 40, 60); rCH.BackgroundTransparency = 0.5; rCH.BorderSizePixel = 0; rCH.Parent = radarFrame
-local rCH2 = Instance.new("Frame"); rCH2.Size = UDim2.new(1, -10, 0, 2); rCH2.Position = UDim2.new(0, 5, 0.5, -1)
+local rCH2 = Instance.new("Frame"); rCH2.Size = UDim2.new(1, -10, 0, 1); rCH2.Position = UDim2.new(0, 5, 0.5, 0)
 rCH2.BackgroundColor3 = Color3.fromRGB(40, 40, 60); rCH2.BackgroundTransparency = 0.5; rCH2.BorderSizePixel = 0; rCH2.Parent = radarFrame
--- Center dot (you)
 local rCenter = Instance.new("Frame"); rCenter.Size = UDim2.new(0, 6, 0, 6); rCenter.AnchorPoint = Vector2.new(0.5, 0.5)
 rCenter.Position = UDim2.new(0.5, 0, 0.5, 0); rCenter.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
 rCenter.Parent = radarFrame; Instance.new("UICorner", rCenter).CornerRadius = UDim.new(1, 0)
--- Range rings
 for _, r in ipairs({0.25, 0.45}) do
     local ring = Instance.new("Frame"); ring.Size = UDim2.new(r*2, 0, r*2, 0); ring.AnchorPoint = Vector2.new(0.5, 0.5)
     ring.Position = UDim2.new(0.5, 0, 0.5, 0); ring.BackgroundTransparency = 1; ring.Parent = radarFrame
     Instance.new("UICorner", ring).CornerRadius = UDim.new(0.5, 0)
     local rs = Instance.new("UIStroke"); rs.Color = Color3.fromRGB(30, 30, 50); rs.Thickness = 1; rs.Transparency = 0.5; rs.Parent = ring
 end
--- Radar label
-local radarTitle = Instance.new("TextLabel"); radarTitle.Size = UDim2.new(1, 0, 0, 12); radarTitle.Position = UDim2.new(0, 0, 1, 4)
+local radarTitle = Instance.new("TextLabel"); radarTitle.Size = UDim2.new(1, 0, 0, 14); radarTitle.Position = UDim2.new(0, 0, 1, 4)
 radarTitle.BackgroundTransparency = 1; radarTitle.Text = "📡 RADAR | 200s range"; radarTitle.TextColor3 = Color3.fromRGB(120, 120, 160)
-radarTitle.TextSize = 7; radarTitle.Font = Enum.Font.GothamBold; radarTitle.Parent = radarFrame
--- Sweep line
+radarTitle.TextSize = 9; radarTitle.Font = Enum.Font.GothamBold; radarTitle.Parent = radarFrame
 local sweepLine = Instance.new("Frame"); sweepLine.Size = UDim2.new(0, 1, 0.5, 0)
 sweepLine.AnchorPoint = Vector2.new(0.5, 1); sweepLine.Position = UDim2.new(0.5, 0, 0.5, 0)
 sweepLine.BackgroundColor3 = Color3.fromRGB(0, 255, 80); sweepLine.BackgroundTransparency = 0.4
@@ -362,29 +342,21 @@ local function updateRadar()
     local char = LP.Character; local mr = char and char:FindFirstChild("HumanoidRootPart")
     if not mr then return end
     local myP = mr.Position; local camCF = Camera.CFrame
-    local forward = Vector3.new(camCF.LookVector.X, 0, camCF.LookVector.Z).Unit
-
-    -- Sweep animation
-    sweepAngle = sweepAngle + 2
-    if sweepAngle >= 360 then sweepAngle = 0 end
+    local forward = Vector3.new(camCF.LookVector.X, 0, camCF.LookVector.Z)
+    if forward.Magnitude > 0 then forward = forward.Unit else forward = Vector3.new(0,0,-1) end
+    sweepAngle = sweepAngle + 2; if sweepAngle >= 360 then sweepAngle = 0 end
     sweepLine.Rotation = sweepAngle
-
-    -- Clean old dots
     for name, dot in pairs(radarDots) do
-        if not tracked[dot._entity] then dot:Destroy(); radarDots[name] = nil end
+        if not dot._entity or not tracked[dot._entity] then dot:Destroy(); radarDots[name] = nil end
     end
-
     for ent, d in pairs(tracked) do
         local tp = d.targetPart
         if tp and tp.Parent then
-            local offset = tp.Position - myP
-            local dist = offset.Magnitude
+            local offset = tp.Position - myP; local dist = offset.Magnitude
             if dist <= RADAR_RANGE then
-                local rel = Vector2.new(
-                    forward:Cross(offset.Unit).Y,
-                    -forward:Dot(offset.Unit)
-                ) * (dist / RADAR_RANGE) * 0.45
-
+                local flatOff = Vector3.new(offset.X, 0, offset.Z)
+                if flatOff.Magnitude > 0 then flatOff = flatOff.Unit else flatOff = Vector3.zero end
+                local rel = Vector2.new(forward:Cross(flatOff).Y, -forward:Dot(flatOff)) * (dist / RADAR_RANGE) * 0.45
                 local dotKey = tostring(ent)
                 local dot = radarDots[dotKey]
                 if not dot then
@@ -394,9 +366,8 @@ local function updateRadar()
                     dot._entity = ent; radarDots[dotKey] = dot
                 end
                 dot.Position = UDim2.new(0.5 + rel.X, 0, 0.5 + rel.Y, 0)
-                local threat = getThreat(ent.Name)
-                dot.BackgroundColor3 = getThreatCol(threat)
-                dot.Size = dist < KILL_ZONE and UDim2.new(0, 8, 0, 8) or dist < DANGER_CLOSE and UDim2.new(0, 6, 0, 6) or UDim2.new(0, 4, 0, 4)
+                dot.BackgroundColor3 = getThreatCol(getThreat(ent.Name))
+                dot.Size = dist < KILL_ZONE and UDim2.new(0, 9, 0, 9) or dist < DANGER_CLOSE and UDim2.new(0, 7, 0, 7) or UDim2.new(0, 5, 0, 5)
             else
                 local dotKey = tostring(ent)
                 if radarDots[dotKey] then radarDots[dotKey]:Destroy(); radarDots[dotKey] = nil end
@@ -406,10 +377,10 @@ local function updateRadar()
 end
 
 -- ============================================
--- ALERT SYSTEM
+-- ALERT
 -- ============================================
 local AG = Instance.new("ScreenGui"); AG.Name = "RedAlertGui"; AG.ResetOnSpawn = false; AG.DisplayOrder = 200; AG.Parent = LP.PlayerGui
-local AF = Instance.new("Frame"); AF.Size = UDim2.new(0,0,0,85); AF.AnchorPoint = Vector2.new(0.5,0)
+local AF = Instance.new("Frame"); AF.Size = UDim2.new(0,0,0,95); AF.AnchorPoint = Vector2.new(0.5,0)
 AF.Position = UDim2.new(0.5,0,0,10); AF.BackgroundColor3 = Color3.fromRGB(120,0,0); AF.ClipsDescendants = true; AF.Visible = false; AF.Parent = AG
 Instance.new("UICorner", AF).CornerRadius = UDim.new(0, 10)
 local astk = Instance.new("UIStroke"); astk.Color = Color3.fromRGB(255,0,0); astk.Thickness = 2.5; astk.Parent = AF
@@ -418,29 +389,27 @@ local alertGrad = Instance.new("UIGradient"); alertGrad.Color = ColorSequence.ne
     ColorSequenceKeypoint.new(0.5, Color3.fromRGB(120, 0, 0)),
     ColorSequenceKeypoint.new(1, Color3.fromRGB(80, 0, 30))
 }; alertGrad.Parent = AF
-
-local an = Instance.new("TextLabel"); an.Size = UDim2.new(1,0,0,24); an.Position = UDim2.new(0,0,0,3)
-an.BackgroundTransparency = 1; an.TextColor3 = Color3.new(1,1,1); an.TextSize = 22; an.Font = Enum.Font.GothamBlack
+local an = Instance.new("TextLabel"); an.Size = UDim2.new(1,0,0,26); an.Position = UDim2.new(0,0,0,3)
+an.BackgroundTransparency = 1; an.TextColor3 = Color3.new(1,1,1); an.TextSize = 24; an.Font = Enum.Font.GothamBlack
 an.TextStrokeTransparency = 0; an.TextStrokeColor3 = Color3.fromRGB(80,0,0); an.Parent = AF
-local athreat = Instance.new("TextLabel"); athreat.Size = UDim2.new(1,0,0,14); athreat.Position = UDim2.new(0,0,0,25)
-athreat.BackgroundTransparency = 1; athreat.TextSize = 10; athreat.Font = Enum.Font.GothamBlack; athreat.Parent = AF
-local asp = Instance.new("TextLabel"); asp.Size = UDim2.new(1,0,0,12); asp.Position = UDim2.new(0,0,0,38)
-asp.BackgroundTransparency = 1; asp.TextColor3 = Color3.fromRGB(255,255,100); asp.TextSize = 9; asp.Font = Enum.Font.GothamBold; asp.Parent = AF
-local ahc = Instance.new("Frame"); ahc.Size = UDim2.new(1,0,0,16); ahc.Position = UDim2.new(0,0,0,52)
+local athreat = Instance.new("TextLabel"); athreat.Size = UDim2.new(1,0,0,14); athreat.Position = UDim2.new(0,0,0,27)
+athreat.BackgroundTransparency = 1; athreat.TextSize = 12; athreat.Font = Enum.Font.GothamBlack; athreat.Parent = AF
+local asp = Instance.new("TextLabel"); asp.Size = UDim2.new(1,0,0,13); asp.Position = UDim2.new(0,0,0,40)
+asp.BackgroundTransparency = 1; asp.TextColor3 = Color3.fromRGB(255,255,100); asp.TextSize = 11; asp.Font = Enum.Font.GothamBold; asp.Parent = AF
+local ahc = Instance.new("Frame"); ahc.Size = UDim2.new(1,0,0,16); ahc.Position = UDim2.new(0,0,0,55)
 ahc.BackgroundTransparency = 1; ahc.ClipsDescendants = true; ahc.Parent = AF
 local ht = "☠ HIDE NOW! ☠ DANGER! ☠ HIDE NOW! ☠ DANGER! ☠ HIDE NOW! "
 local ah1 = Instance.new("TextLabel"); ah1.Size = UDim2.new(3,0,1,0); ah1.BackgroundTransparency = 1; ah1.Text = ht
-ah1.TextColor3 = Color3.fromRGB(255,60,60); ah1.TextSize = 12; ah1.Font = Enum.Font.GothamBlack; ah1.TextStrokeTransparency = 0.2
+ah1.TextColor3 = Color3.fromRGB(255,60,60); ah1.TextSize = 14; ah1.Font = Enum.Font.GothamBlack; ah1.TextStrokeTransparency = 0.2
 ah1.TextXAlignment = Enum.TextXAlignment.Left; ah1.Parent = ahc
 local ah2 = ah1:Clone(); ah2.Position = UDim2.new(0,500,0,0); ah2.Parent = ahc
-local ad = Instance.new("TextLabel"); ad.Size = UDim2.new(1,0,0,12); ad.Position = UDim2.new(0,0,1,-14)
-ad.BackgroundTransparency = 1; ad.TextColor3 = Color3.fromRGB(255,180,180); ad.TextSize = 9; ad.Font = Enum.Font.GothamBold; ad.Parent = AF
+local ad = Instance.new("TextLabel"); ad.Size = UDim2.new(1,0,0,14); ad.Position = UDim2.new(0,0,1,-16)
+ad.BackgroundTransparency = 1; ad.TextColor3 = Color3.fromRGB(255,180,180); ad.TextSize = 11; ad.Font = Enum.Font.GothamBold; ad.Parent = AF
 
--- Screen flash for danger close
 local flashFrame = Instance.new("Frame"); flashFrame.Size = UDim2.new(1,0,1,0); flashFrame.BackgroundColor3 = Color3.fromRGB(255,0,0)
 flashFrame.BackgroundTransparency = 1; flashFrame.ZIndex = 100; flashFrame.Parent = AG
 
-local LS = Instance.new("Frame"); LS.Size = UDim2.new(0,180,0,350); LS.Position = UDim2.new(0,8,0,105)
+local LS = Instance.new("Frame"); LS.Size = UDim2.new(0,190,0,350); LS.Position = UDim2.new(0,8,0,115)
 LS.BackgroundTransparency = 1; LS.Parent = AG; Instance.new("UIListLayout", LS).Padding = UDim.new(0, 3)
 
 -- ============================================
@@ -457,17 +426,17 @@ undoTab.MouseButton1Click:Connect(function() switchTab("undo") end)
 local function updUndo() undoTab.Text = "↩ Blacklist ("..blCount..")"; ue.Visible = blCount == 0 end
 local function addUndo(name)
     if undoEntries[name] then return end
-    local e = Instance.new("Frame"); e.Size = UDim2.new(1,-4,0,30); e.BackgroundColor3 = Color3.fromRGB(25,18,6); e.Parent = uscr
+    local e = Instance.new("Frame"); e.Size = UDim2.new(1,-4,0,32); e.BackgroundColor3 = Color3.fromRGB(25,18,6); e.Parent = uscr
     Instance.new("UICorner", e).CornerRadius = UDim.new(0, 5)
     local n = Instance.new("TextLabel"); n.Size = UDim2.new(0.4,0,1,0); n.Position = UDim2.new(0,6,0,0)
     n.BackgroundTransparency = 1; n.Text = "✕ "..name; n.TextColor3 = Color3.fromRGB(255,150,50)
-    n.TextSize = 8; n.Font = Enum.Font.GothamBold; n.TextXAlignment = Enum.TextXAlignment.Left; n.TextTruncate = Enum.TextTruncate.AtEnd; n.Parent = e
-    local rb = Instance.new("TextButton"); rb.Size = UDim2.new(0,52,0,18); rb.Position = UDim2.new(1,-112,0.5,-9)
+    n.TextSize = 9; n.Font = Enum.Font.GothamBold; n.TextXAlignment = Enum.TextXAlignment.Left; n.TextTruncate = Enum.TextTruncate.AtEnd; n.Parent = e
+    local rb = Instance.new("TextButton"); rb.Size = UDim2.new(0,54,0,20); rb.Position = UDim2.new(1,-116,0.5,-10)
     rb.BackgroundColor3 = Color3.fromRGB(0,120,60); rb.Text = "↩ Restore"; rb.TextColor3 = Color3.new(1,1,1)
-    rb.TextSize = 7; rb.Font = Enum.Font.GothamBold; rb.Parent = e; Instance.new("UICorner", rb).CornerRadius = UDim.new(0,4)
-    local db = Instance.new("TextButton"); db.Size = UDim2.new(0,48,0,18); db.Position = UDim2.new(1,-56,0.5,-9)
+    rb.TextSize = 8; rb.Font = Enum.Font.GothamBold; rb.Parent = e; Instance.new("UICorner", rb).CornerRadius = UDim.new(0,4)
+    local db = Instance.new("TextButton"); db.Size = UDim2.new(0,50,0,20); db.Position = UDim2.new(1,-58,0.5,-10)
     db.BackgroundColor3 = Color3.fromRGB(140,20,20); db.Text = "🗑 Delete"; db.TextColor3 = Color3.new(1,1,1)
-    db.TextSize = 7; db.Font = Enum.Font.GothamBold; db.Parent = e; Instance.new("UICorner", db).CornerRadius = UDim.new(0,4)
+    db.TextSize = 8; db.Font = Enum.Font.GothamBold; db.Parent = e; Instance.new("UICorner", db).CornerRadius = UDim.new(0,4)
     rb.MouseButton1Click:Connect(function() bl[name] = nil; blCount -= 1; updUndo(); e:Destroy(); undoEntries[name] = nil
         for _, obj in ipairs(workspace:GetDescendants()) do if obj.Name == name and matchPat(obj.Name) and not pChars[obj] and not tracked[obj] then
             task.defer(function() if obj.Parent then track(obj) end end) end end end)
@@ -506,8 +475,7 @@ local function startVE(entity) if viewingEnt then stopVE() end
         local c = LP.Character; local mr = c and c:FindFirstChild("HumanoidRootPart")
         if mr then
             local distT = math.floor((mr.Position-tp).Magnitude)
-            local threat = getThreat(entity.Name)
-            velb2.Text = "🎥 " .. getDisplayName(entity) .. " | " .. distT .. "s | " .. threat
+            velb2.Text = "🎥 " .. getDisplayName(entity) .. " | " .. distT .. "s | " .. getThreat(entity.Name)
         end
     end); layoutGUI() end
 
@@ -517,12 +485,11 @@ local function startV(entity) if viewing then stopV() end
     if not root then return end; if viewingEnt then stopVE() end
     viewing = true; viewTarget = entity; vp2.Visible = true
     local dName = getDisplayName(entity)
-    vlb.Text = "👁 " .. dName
-    vwB.Text = "👁 ON"; vwB.BackgroundColor3 = Color3.fromRGB(115,0,235)
+    vlb.Text = "👁 " .. dName; vwB.Text = "👁 ON"; vwB.BackgroundColor3 = Color3.fromRGB(115,0,235)
     local ind = Instance.new("ScreenGui"); ind.Name = "ViewIndicator"; ind.ResetOnSpawn = false; ind.DisplayOrder = 100; ind.Parent = LP.PlayerGui
-    local ar = Instance.new("TextLabel"); ar.Size = UDim2.new(0,160,0,46); ar.AnchorPoint = Vector2.new(0.5,0)
+    local ar = Instance.new("TextLabel"); ar.Size = UDim2.new(0,170,0,50); ar.AnchorPoint = Vector2.new(0.5,0)
     ar.Position = UDim2.new(0.5,0,0,8); ar.BackgroundColor3 = Color3.fromRGB(10,0,30); ar.BackgroundTransparency = 0.15
-    ar.Text = "☠ " .. dName; ar.TextColor3 = getCol(entity.Name); ar.TextSize = 11; ar.Font = Enum.Font.GothamBlack
+    ar.Text = "☠ " .. dName; ar.TextColor3 = getCol(entity.Name); ar.TextSize = 12; ar.Font = Enum.Font.GothamBlack
     ar.TextStrokeTransparency = 0.2; ar.Parent = ind; Instance.new("UICorner", ar).CornerRadius = UDim.new(0,8)
     local arSt = Instance.new("UIStroke"); arSt.Color = getCol(entity.Name); arSt.Thickness = 1.5; arSt.Parent = ar
     viewIndicator = ind; local fs3 = 0
@@ -533,19 +500,18 @@ local function startV(entity) if viewing then stopV() end
         local sp, on = Camera:WorldToScreenPoint(root.Position); local vpS = Camera.ViewportSize
         local c = LP.Character; local mr = c and c:FindFirstChild("HumanoidRootPart"); local dt2 = "?"
         if mr then dt2 = math.floor((mr.Position-root.Position).Magnitude).."s" end
-        local threat = getThreat(entity.Name)
-        ar.Text = "☠ " .. dName .. "\n" .. dt2 .. " | " .. threat
-        if on then ar.Position = UDim2.new(0, math.clamp(sp.X,80,vpS.X-80), 0, math.clamp(sp.Y,8,50))
+        ar.Text = "☠ " .. dName .. "\n" .. dt2 .. " | " .. getThreat(entity.Name)
+        if on then ar.Position = UDim2.new(0, math.clamp(sp.X,90,vpS.X-90), 0, math.clamp(sp.Y,8,55))
         else local dir = (root.Position-Camera.CFrame.Position).Unit; local d2 = Camera.CFrame.RightVector:Dot(dir)
-            ar.Position = UDim2.new(d2>0 and 1 or 0, d2>0 and -90 or 10, 0, 8) end
+            ar.Position = UDim2.new(d2>0 and 1 or 0, d2>0 and -95 or 10, 0, 8) end
     end); layoutGUI() end
 
 local function clrLS() for _, f in pairs(leftEntries) do pcall(function() f:Destroy() end) end; leftEntries = {} end
 local function updLS(rl3, cn)
     for n, f in pairs(leftEntries) do if not rl3[n] or n == cn then pcall(function() f:Destroy() end); leftEntries[n] = nil end end
     local ct = 0; for n in pairs(rl3) do if n ~= cn then ct += 1 end end
-    local eh = ct<=3 and 26 or ct<=6 and 22 or ct<=10 and 18 or 15
-    local fz = ct<=3 and 10 or ct<=6 and 9 or ct<=10 and 8 or 7
+    local eh = ct<=3 and 28 or ct<=6 and 24 or ct<=10 and 20 or 16
+    local fz = ct<=3 and 11 or ct<=6 and 10 or ct<=10 and 9 or 8
     for n, dist in pairs(rl3) do if n == cn then continue end
         if leftEntries[n] then leftEntries[n].LayoutOrder = dist; local d2 = leftEntries[n]:FindFirstChild("DL"); if d2 then d2.Text = dist.."s" end
         else local f = Instance.new("Frame"); f.Size = UDim2.new(1,0,0,eh); f.BackgroundColor3 = Color3.fromRGB(100,0,0)
@@ -562,24 +528,16 @@ local function updLS(rl3, cn)
 showAl = function(name, dist, allR, spTxt, threat)
     totalAlerts += 1
     if alertOn and alertEnt == name then
-        ad.Text = "📏 " .. dist .. "s away"
-        asp.Text = spTxt or ""
-        athreat.Text = threat or "? UNKNOWN"
-        athreat.TextColor3 = getThreatCol(threat or "? UNKNOWN")
+        ad.Text = "📏 " .. dist .. "s away"; asp.Text = spTxt or ""
+        athreat.Text = threat or "? UNKNOWN"; athreat.TextColor3 = getThreatCol(threat or "? UNKNOWN")
         updLS(allR, name)
-        -- Screen flash for danger close
-        if dist < KILL_ZONE then
-            flashFrame.BackgroundTransparency = 0.85
-            TweenService:Create(flashFrame, TweenInfo.new(0.3), {BackgroundTransparency = 1}):Play()
-        end
-        return
-    end
-    alertEnt = name; an.Text = "☠ "..name
-    ad.Text = "📏 " .. dist .. "s away"; asp.Text = spTxt or ""
-    athreat.Text = threat or "? UNKNOWN"
-    athreat.TextColor3 = getThreatCol(threat or "? UNKNOWN")
-    if not alertOn then AF.Size = UDim2.new(0,0,0,85); AF.Visible = true; alertOn = true
-        TweenService:Create(AF, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(0,440,0,85)}):Play() end
+        if dist < KILL_ZONE then flashFrame.BackgroundTransparency = 0.85
+            TweenService:Create(flashFrame, TweenInfo.new(0.3), {BackgroundTransparency = 1}):Play() end
+        return end
+    alertEnt = name; an.Text = "☠ "..name; ad.Text = "📏 " .. dist .. "s away"; asp.Text = spTxt or ""
+    athreat.Text = threat or "? UNKNOWN"; athreat.TextColor3 = getThreatCol(threat or "? UNKNOWN")
+    if not alertOn then AF.Size = UDim2.new(0,0,0,95); AF.Visible = true; alertOn = true
+        TweenService:Create(AF, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(0,450,0,95)}):Play() end
     alertOn = true
     if alertScrConn then alertScrConn:Disconnect() end; local sx, tw = 0, 500
     alertScrConn = RunService.Heartbeat:Connect(function(dt) if not alertOn then return end; sx = sx-dt*180; if sx < -tw then sx = sx+tw end
@@ -587,15 +545,12 @@ showAl = function(name, dist, allR, spTxt, threat)
     if alertPulseConn then alertPulseConn:Disconnect() end
     alertPulseConn = RunService.Heartbeat:Connect(function() if not alertOn then return end; local p = (math.sin(tick()*10)+1)/2
         astk.Color = Color3.fromRGB(math.floor(180+75*p),0,0); AF.BackgroundColor3 = Color3.fromRGB(math.floor(80+60*p),0,0) end)
-    -- Screen flash
-    if dist < KILL_ZONE then
-        flashFrame.BackgroundTransparency = 0.8
-        TweenService:Create(flashFrame, TweenInfo.new(0.5), {BackgroundTransparency = 1}):Play()
-    end
+    if dist < KILL_ZONE then flashFrame.BackgroundTransparency = 0.8
+        TweenService:Create(flashFrame, TweenInfo.new(0.5), {BackgroundTransparency = 1}):Play() end
     updLS(allR, name) end
 
 hideAl = function() if not alertOn then return end; alertOn = false; alertEnt = nil
-    TweenService:Create(AF, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {Size = UDim2.new(0,0,0,85)}):Play()
+    TweenService:Create(AF, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {Size = UDim2.new(0,0,0,95)}):Play()
     task.delay(0.25, function() if not alertOn then AF.Visible = false end end)
     if alertScrConn then alertScrConn:Disconnect(); alertScrConn = nil end
     if alertPulseConn then alertPulseConn:Disconnect(); alertPulseConn = nil end; clrLS() end
@@ -603,8 +558,6 @@ hideAl = function() if not alertOn then return end; alertOn = false; alertEnt = 
 untrack = function(entity) local d = tracked[entity]; if not d then return end
     pcall(function() if d.highlight then d.highlight:Destroy() end end)
     pcall(function() if d.billboard then d.billboard:Destroy() end end)
-    pcall(function() if d.beam then d.beam:Destroy() end end)
-    pcall(function() if d.beamAtt then d.beamAtt:Destroy() end end)
     if d.dConn then d.dConn:Disconnect() end; if d.cConn then d.cConn:Disconnect() end
     pcall(function() if d.entry then d.entry:Destroy() end end)
     spd[entity] = nil; tracked[entity] = nil; entCount = math.max(0, entCount-1)
@@ -631,19 +584,19 @@ track = function(entity)
     local root = getPart(entity); d.targetPart = root
 
     local function sBB(part) if d.billboard or not part then return end
-        local bb = Instance.new("BillboardGui"); bb.Adornee = part; bb.Size = UDim2.new(0,140,0,65)
-        bb.StudsOffset = Vector3.new(0,4,0); bb.AlwaysOnTop = true; bb.MaxDistance = 800; bb.Enabled = namesOn; bb.Parent = part
-        local nt = Instance.new("TextLabel"); nt.Name = "NT"; nt.Size = UDim2.new(1,0,0,14); nt.BackgroundTransparency = 1
-        nt.Text = "☠ " .. displayName; nt.TextColor3 = color; nt.TextSize = 12; nt.Font = Enum.Font.GothamBlack
+        local bb = Instance.new("BillboardGui"); bb.Adornee = part; bb.Size = UDim2.new(0,160,0,80)
+        bb.StudsOffset = Vector3.new(0,4.5,0); bb.AlwaysOnTop = true; bb.MaxDistance = 800; bb.Enabled = namesOn; bb.Parent = part
+        local nt = Instance.new("TextLabel"); nt.Name = "NT"; nt.Size = UDim2.new(1,0,0,16); nt.BackgroundTransparency = 1
+        nt.Text = "☠ " .. displayName; nt.TextColor3 = color; nt.TextSize = 14; nt.Font = Enum.Font.GothamBlack
         nt.TextStrokeTransparency = 0; nt.TextStrokeColor3 = Color3.fromRGB(0,0,0); nt.Parent = bb
-        local tl2 = Instance.new("TextLabel"); tl2.Name = "TL"; tl2.Size = UDim2.new(1,0,0,11); tl2.Position = UDim2.new(0,0,0,14)
-        tl2.BackgroundTransparency = 1; tl2.Text = threat; tl2.TextColor3 = threatCol; tl2.TextSize = 8
+        local tl2 = Instance.new("TextLabel"); tl2.Name = "TL"; tl2.Size = UDim2.new(1,0,0,13); tl2.Position = UDim2.new(0,0,0,16)
+        tl2.BackgroundTransparency = 1; tl2.Text = threat; tl2.TextColor3 = threatCol; tl2.TextSize = 10
         tl2.Font = Enum.Font.GothamBlack; tl2.TextStrokeTransparency = 0.2; tl2.Parent = bb
-        local dt3 = Instance.new("TextLabel"); dt3.Name = "DL"; dt3.Size = UDim2.new(1,0,0,11); dt3.Position = UDim2.new(0,0,0,25)
-        dt3.BackgroundTransparency = 1; dt3.Text = "?"; dt3.TextColor3 = Color3.fromRGB(180,180,180); dt3.TextSize = 9
+        local dt3 = Instance.new("TextLabel"); dt3.Name = "DL"; dt3.Size = UDim2.new(1,0,0,13); dt3.Position = UDim2.new(0,0,0,29)
+        dt3.BackgroundTransparency = 1; dt3.Text = "?"; dt3.TextColor3 = Color3.fromRGB(180,180,180); dt3.TextSize = 11
         dt3.Font = Enum.Font.GothamBold; dt3.TextStrokeTransparency = 0.3; dt3.Parent = bb
-        local sl = Instance.new("TextLabel"); sl.Name = "SL"; sl.Size = UDim2.new(1,0,0,12); sl.Position = UDim2.new(0,0,0,36)
-        sl.BackgroundTransparency = 1; sl.Text = ""; sl.TextColor3 = Color3.fromRGB(255,255,100); sl.TextSize = 8
+        local sl = Instance.new("TextLabel"); sl.Name = "SL"; sl.Size = UDim2.new(1,0,0,14); sl.Position = UDim2.new(0,0,0,42)
+        sl.BackgroundTransparency = 1; sl.Text = ""; sl.TextColor3 = Color3.fromRGB(255,255,100); sl.TextSize = 10
         sl.Font = Enum.Font.GothamBold; sl.TextStrokeTransparency = 0.2; sl.Parent = bb
         d.billboard = bb; d.distLabel = dt3; d.nameLabel = nt; d.speedLabel = sl; d.threatLabel = tl2 end
     if root then sBB(root) end
@@ -655,45 +608,40 @@ track = function(entity)
         for _, ch in ipairs(entity:GetChildren()) do if isMinion(ch.Name) and not tracked[ch] then task.defer(function() if ch.Parent then track(ch) end end) end end end
 
     if root then spd[entity] = {lP=root.Position, lT=tick(), sp=0, sa={}, pP=root.Position, pT=tick(),
-        idleCheck=0, idleState="■ Idle", idleCol=Color3.fromRGB(100,100,100), lSize=root.Size,
-        forceLastPos=root.Position, lastMoveDir=nil, maxSpeed=0, totalDist=0} end
+        idleCheck=0, idleState="■ Stationary", idleCol=Color3.fromRGB(100,100,100), lSize=root.Size,
+        forceLastPos=root.Position, lastMoveDir=nil, maxSpeed=0, totalDist=0,
+        wasCollidable=root.CanCollide, wasAnchored=root.Anchored} end
 
     local num = getNum(entity.Name); local pre = getPrefix(entity.Name); local sv = 0
     if pre == "MOB" then sv = 9e6+num elseif pre == "FACE" then sv = 9.2e6+num elseif pre == "eye" then sv = 9.5e6 elseif pre == "mouth" then sv = 9500001
     else for i = 1, #pre do sv = sv + string.byte(pre,i)*(100^(4-i)) end; sv = sv + num end
 
-    local entry = Instance.new("Frame"); entry.Size = UDim2.new(1,-4,0,42); entry.BackgroundColor3 = Color3.fromRGB(12,12,28)
+    local entry = Instance.new("Frame"); entry.Size = UDim2.new(1,-4,0,50); entry.BackgroundColor3 = Color3.fromRGB(12,12,28)
     entry.LayoutOrder = sv; entry.Parent = scr; Instance.new("UICorner", entry).CornerRadius = UDim.new(0,5)
     local es = Instance.new("UIStroke"); es.Color = color; es.Thickness = 1; es.Transparency = 0.4; es.Parent = entry
-
-    -- Threat indicator bar
     local tBar = Instance.new("Frame"); tBar.Size = UDim2.new(0, 3, 1, -6); tBar.Position = UDim2.new(0, 3, 0, 3)
     tBar.BackgroundColor3 = threatCol; tBar.Parent = entry; Instance.new("UICorner", tBar).CornerRadius = UDim.new(0, 2)
-
-    local nl2 = Instance.new("TextLabel"); nl2.Name = "NL"; nl2.Size = UDim2.new(0.38,0,0,13); nl2.Position = UDim2.new(0,12,0,2)
-    nl2.BackgroundTransparency = 1; nl2.Text = displayName; nl2.TextColor3 = color; nl2.TextSize = 9; nl2.Font = Enum.Font.GothamBlack
+    local nl2 = Instance.new("TextLabel"); nl2.Name = "NL"; nl2.Size = UDim2.new(0.4,0,0,15); nl2.Position = UDim2.new(0,14,0,2)
+    nl2.BackgroundTransparency = 1; nl2.Text = displayName; nl2.TextColor3 = color; nl2.TextSize = 11; nl2.Font = Enum.Font.GothamBlack
     nl2.TextXAlignment = Enum.TextXAlignment.Left; nl2.TextTruncate = Enum.TextTruncate.AtEnd; nl2.Parent = entry
-
-    local tlEntry = Instance.new("TextLabel"); tlEntry.Name = "TLE"; tlEntry.Size = UDim2.new(0.25,0,0,10); tlEntry.Position = UDim2.new(0.38,0,0,3)
-    tlEntry.BackgroundTransparency = 1; tlEntry.Text = threat; tlEntry.TextColor3 = threatCol; tlEntry.TextSize = 6
+    local tlEntry = Instance.new("TextLabel"); tlEntry.Name = "TLE"; tlEntry.Size = UDim2.new(0.25,0,0,12); tlEntry.Position = UDim2.new(0.4,0,0,4)
+    tlEntry.BackgroundTransparency = 1; tlEntry.Text = threat; tlEntry.TextColor3 = threatCol; tlEntry.TextSize = 8
     tlEntry.Font = Enum.Font.GothamBlack; tlEntry.TextXAlignment = Enum.TextXAlignment.Left; tlEntry.Parent = entry
-
-    local edl = Instance.new("TextLabel"); edl.Name = "EDL"; edl.Size = UDim2.new(0.25,0,0,10); edl.Position = UDim2.new(0,12,0,16)
-    edl.BackgroundTransparency = 1; edl.Text = "..."; edl.TextColor3 = Color3.fromRGB(80,80,110); edl.TextSize = 8
+    local edl = Instance.new("TextLabel"); edl.Name = "EDL"; edl.Size = UDim2.new(0.3,0,0,12); edl.Position = UDim2.new(0,14,0,18)
+    edl.BackgroundTransparency = 1; edl.Text = "..."; edl.TextColor3 = Color3.fromRGB(80,80,110); edl.TextSize = 10
     edl.Font = Enum.Font.GothamBold; edl.TextXAlignment = Enum.TextXAlignment.Left; edl.Parent = entry
-
-    local esl = Instance.new("TextLabel"); esl.Name = "ESL"; esl.Size = UDim2.new(0.5,0,0,10); esl.Position = UDim2.new(0,12,0,28)
-    esl.BackgroundTransparency = 1; esl.Text = ""; esl.TextColor3 = Color3.fromRGB(180,180,100); esl.TextSize = 7
+    local esl = Instance.new("TextLabel"); esl.Name = "ESL"; esl.Size = UDim2.new(0.6,0,0,12); esl.Position = UDim2.new(0,14,0,32)
+    esl.BackgroundTransparency = 1; esl.Text = ""; esl.TextColor3 = Color3.fromRGB(180,180,100); esl.TextSize = 9
     esl.Font = Enum.Font.GothamBold; esl.TextXAlignment = Enum.TextXAlignment.Left; esl.Parent = entry
 
-    local xbb = Instance.new("TextButton"); xbb.Name = "XB"; xbb.Size = UDim2.new(0,16,0,16); xbb.Position = UDim2.new(1,-78,0.5,-8)
-    xbb.BackgroundColor3 = Color3.fromRGB(140,20,20); xbb.Text = "✕"; xbb.TextColor3 = Color3.new(1,1,1); xbb.TextSize = 8
+    local xbb = Instance.new("TextButton"); xbb.Name = "XB"; xbb.Size = UDim2.new(0,18,0,18); xbb.Position = UDim2.new(1,-82,0.5,-9)
+    xbb.BackgroundColor3 = Color3.fromRGB(140,20,20); xbb.Text = "✕"; xbb.TextColor3 = Color3.new(1,1,1); xbb.TextSize = 9
     xbb.Font = Enum.Font.GothamBlack; xbb.Parent = entry; Instance.new("UICorner", xbb).CornerRadius = UDim.new(0,4)
-    local vb2 = Instance.new("TextButton"); vb2.Name = "VB"; vb2.Size = UDim2.new(0,20,0,16); vb2.Position = UDim2.new(1,-58,0.5,-8)
-    vb2.BackgroundColor3 = Color3.fromRGB(70,0,150); vb2.Text = "👁"; vb2.TextColor3 = Color3.new(1,1,1); vb2.TextSize = 9
+    local vb2 = Instance.new("TextButton"); vb2.Name = "VB"; vb2.Size = UDim2.new(0,22,0,18); vb2.Position = UDim2.new(1,-60,0.5,-9)
+    vb2.BackgroundColor3 = Color3.fromRGB(70,0,150); vb2.Text = "👁"; vb2.TextColor3 = Color3.new(1,1,1); vb2.TextSize = 10
     vb2.Font = Enum.Font.GothamBold; vb2.Parent = entry; Instance.new("UICorner", vb2).CornerRadius = UDim.new(0,4)
-    local veb3 = Instance.new("TextButton"); veb3.Name = "VEB"; veb3.Size = UDim2.new(0,20,0,16); veb3.Position = UDim2.new(1,-34,0.5,-8)
-    veb3.BackgroundColor3 = Color3.fromRGB(20,80,40); veb3.Text = "🎥"; veb3.TextColor3 = Color3.new(1,1,1); veb3.TextSize = 9
+    local veb3 = Instance.new("TextButton"); veb3.Name = "VEB"; veb3.Size = UDim2.new(0,22,0,18); veb3.Position = UDim2.new(1,-34,0.5,-9)
+    veb3.BackgroundColor3 = Color3.fromRGB(20,80,40); veb3.Text = "🎥"; veb3.TextColor3 = Color3.new(1,1,1); veb3.TextSize = 10
     veb3.Font = Enum.Font.GothamBold; veb3.Parent = entry; Instance.new("UICorner", veb3).CornerRadius = UDim.new(0,4)
 
     xbb.MouseButton1Click:Connect(function() blacklistEnt(entity.Name) end)
@@ -755,8 +703,7 @@ RunService.Heartbeat:Connect(function()
 
             if dist < nearestDist then nearestDist = dist; nearestName = getDisplayName(ent) end
             if (threatPriority[threat] or 0) > (threatPriority[highestThreat] or 0) and dist < RED_THRESH then
-                highestThreat = threat
-            end
+                highestThreat = threat end
 
             local sd = spd[ent]; local sTxt, sCol = "", Color3.fromRGB(180,180,100)
             if sd then local dt = now - sd.lT
@@ -764,36 +711,136 @@ RunService.Heartbeat:Connect(function()
                     local s = (tp.Position-sd.lP).Magnitude/dt
                     sd.totalDist = (sd.totalDist or 0) + (tp.Position-sd.lP).Magnitude
                     sd.lP = tp.Position; sd.lT = now
-                    table.insert(sd.sa, s); if #sd.sa > 5 then table.remove(sd.sa, 1) end
+                    table.insert(sd.sa, s); if #sd.sa > 8 then table.remove(sd.sa, 1) end
                     local avg = 0; for _, v in ipairs(sd.sa) do avg += v end; avg = avg/#sd.sa; sd.sp = avg
                     if avg > (sd.maxSpeed or 0) then sd.maxSpeed = avg end
-                    if avg >= FAST_THRESH then sTxt = "⚡ FAST "..math.floor(avg).." [max:"..math.floor(sd.maxSpeed or 0).."]"; sCol = Color3.fromRGB(255,60,60)
-                    elseif avg >= SLOW_THRESH then sTxt = "→ Moving "..math.floor(avg); sCol = Color3.fromRGB(255,200,80)
-                    elseif avg >= 0.5 then sTxt = "🐌 Slow "..string.format("%.1f", avg); sCol = Color3.fromRGB(120,180,120)
+
+                    if avg >= FAST_THRESH then
+                        sTxt = "⚡ RUSHING "..math.floor(avg).." [peak:"..math.floor(sd.maxSpeed or 0).."]"
+                        sCol = Color3.fromRGB(255,40,40)
+                    elseif avg >= SLOW_THRESH then
+                        local approaching = false
+                        if sd.pP then
+                            local oldDist = (myP - sd.pP).Magnitude
+                            local newDist = (myP - tp.Position).Magnitude
+                            approaching = newDist < oldDist
+                        end
+                        if approaching then
+                            sTxt = "🔴 APPROACHING "..math.floor(avg)
+                            sCol = Color3.fromRGB(255,100,50)
+                        else
+                            sTxt = "🟢 RETREATING "..math.floor(avg)
+                            sCol = Color3.fromRGB(80,200,80)
+                        end
+                    elseif avg >= 0.5 then
+                        sTxt = "🐌 Creeping "..string.format("%.1f", avg)
+                        sCol = Color3.fromRGB(120,180,120)
                     else
-                        if not sd.idleCheck or now - sd.idleCheck > 1 then sd.idleCheck = now
-                            sd.idleState = "■ Idle"; sd.idleCol = Color3.fromRGB(100,100,100)
+                        if not sd.idleCheck or now - sd.idleCheck > 0.8 then
+                            sd.idleCheck = now
+                            sd.idleState = "■ Stationary"
+                            sd.idleCol = Color3.fromRGB(100,100,100)
+
                             local desp = false
-                            if tp.Transparency > 0.3 then desp = true end
+                            local despReason = ""
+
+                            if tp.Transparency > 0.3 then desp = true; despReason = "fading" end
                             if not sd.lSize then sd.lSize = tp.Size end
-                            if tp.Size.Magnitude < sd.lSize.Magnitude * 0.8 then desp = true end; sd.lSize = tp.Size
-                            if ent.Parent and ent.Parent.Name:lower():find("debris") then desp = true end
-                            local hum = ent:FindFirstChildWhichIsA("Humanoid"); if hum and hum.Health <= 0 then desp = true end
-                            if tp.Position.Y < -50 then desp = true end
-                            if desp then sd.idleState = "💨 Despawning!"; sd.idleCol = Color3.fromRGB(150,80,255)
-                            else local nL, nT = false, false
-                                local ok, nearby = pcall(function() return workspace:GetPartBoundsInRadius(tp.Position, 8) end)
-                                if ok and nearby then for _, part in ipairs(nearby) do if part ~= tp then local pn = part.Name:lower()
-                                    if pn:find("locker") or pn:find("closet") or pn:find("wardrobe") or pn:find("cabinet") or pn:find("hide") then nL = true end
-                                    if pn:find("table") or pn:find("desk") or pn:find("shelf") or pn:find("drawer") then nT = true end
-                                end end end
-                                if nL then sd.idleState = "🚪 Near Locker!"; sd.idleCol = Color3.fromRGB(255,150,50)
-                                elseif nT then sd.idleState = "🪑 Near Table!"; sd.idleCol = Color3.fromRGB(200,180,80) end
+                            if tp.Size.Magnitude < sd.lSize.Magnitude * 0.8 then desp = true; despReason = "shrinking" end
+                            sd.lSize = tp.Size
+
+                            if ent.Parent then
+                                local pn = ent.Parent.Name:lower()
+                                if pn:find("debris") or pn:find("trash") or pn:find("remove")
+                                    or pn:find("destroy") or pn:find("dead") or pn:find("gone")
+                                    or pn:find("delete") or pn:find("cleanup") then
+                                    desp = true; despReason = "in " .. ent.Parent.Name
+                                end
                             end
-                        end; sTxt = sd.idleState or "■ Idle"; sCol = sd.idleCol or Color3.fromRGB(100,100,100) end end
-            else spd[ent] = {lP=tp.Position, lT=now, sp=0, sa={}, pP=tp.Position, pT=now,
-                idleCheck=0, idleState="■ Idle", idleCol=Color3.fromRGB(100,100,100), lSize=tp.Size,
-                forceLastPos=tp.Position, lastMoveDir=nil, maxSpeed=0, totalDist=0} end
+
+                            local hum = ent:FindFirstChildWhichIsA("Humanoid")
+                            if hum then
+                                if hum.Health <= 0 then desp = true; despReason = "dead" end
+                                pcall(function()
+                                    if hum:GetState() == Enum.HumanoidStateType.Dead then desp = true; despReason = "dead state" end
+                                end)
+                            end
+
+                            if tp.Position.Y < -50 then desp = true; despReason = "fell off map" end
+                            if sd.pP and (tp.Position - sd.pP).Magnitude > 500 then desp = true; despReason = "teleported away" end
+
+                            if not tp.CanCollide and tp.Transparency < 0.1 then
+                                if sd.wasCollidable == nil then sd.wasCollidable = true end
+                                if sd.wasCollidable then desp = true; despReason = "no collision" end
+                            end
+                            sd.wasCollidable = tp.CanCollide
+
+                            if tp.Anchored and not sd.wasAnchored then
+                                sd.idleState = "🔒 Frozen/Anchored"
+                                sd.idleCol = Color3.fromRGB(100,150,255)
+                            end
+                            sd.wasAnchored = tp.Anchored
+
+                            if desp then
+                                sd.idleState = "💨 Despawning! (" .. despReason .. ")"
+                                sd.idleCol = Color3.fromRGB(150,80,255)
+                            elseif sd.idleState == "■ Stationary" then
+                                local nLocker, nTable, nDoor, nBed, nVent = false, false, false, false, false
+                                local nStairs, nWindow, nChest, nHallway = false, false, false, false
+
+                                local ok, nearby = pcall(function() return workspace:GetPartBoundsInRadius(tp.Position, 12) end)
+                                if ok and nearby then
+                                    for _, part in ipairs(nearby) do
+                                        if part ~= tp and not part:IsDescendantOf(ent) then
+                                            local pn = part.Name:lower()
+                                            if pn:find("locker") or pn:find("closet") or pn:find("wardrobe")
+                                                or pn:find("cabinet") or pn:find("hide") or pn:find("hiding")
+                                                or pn:find("safe") or pn:find("shelter") then nLocker = true end
+                                            if pn:find("table") or pn:find("desk") or pn:find("shelf")
+                                                or pn:find("drawer") or pn:find("counter") or pn:find("workbench")
+                                                or pn:find("bench") then nTable = true end
+                                            if pn:find("door") or pn:find("gate") or pn:find("entrance")
+                                                or pn:find("exit") or pn:find("portal") then nDoor = true end
+                                            if pn:find("bed") or pn:find("mattress") or pn:find("pillow")
+                                                or pn:find("blanket") or pn:find("sleep") then nBed = true end
+                                            if pn:find("vent") or pn:find("crawl") or pn:find("grate")
+                                                or pn:find("pipe") or pn:find("duct") then nVent = true end
+                                            if pn:find("stair") or pn:find("step") or pn:find("ladder")
+                                                or pn:find("climb") then nStairs = true end
+                                            if pn:find("window") or pn:find("glass") or pn:find("pane") then nWindow = true end
+                                            if pn:find("chest") or pn:find("crate") or pn:find("box")
+                                                or pn:find("loot") or pn:find("item") or pn:find("pickup") then nChest = true end
+                                            if pn:find("hall") or pn:find("corridor") or pn:find("passage")
+                                                or pn:find("tunnel") or pn:find("path") then nHallway = true end
+                                        end
+                                    end
+                                end
+
+                                if nLocker then sd.idleState = "🚪 Checking Locker!"; sd.idleCol = Color3.fromRGB(255,120,30)
+                                elseif nTable then sd.idleState = "🪑 Near Table/Desk!"; sd.idleCol = Color3.fromRGB(200,180,60)
+                                elseif nDoor then sd.idleState = "🚪 At Door/Gate!"; sd.idleCol = Color3.fromRGB(180,140,255)
+                                elseif nBed then sd.idleState = "🛏 Near Bed!"; sd.idleCol = Color3.fromRGB(140,180,255)
+                                elseif nVent then sd.idleState = "🕳 Near Vent!"; sd.idleCol = Color3.fromRGB(160,160,160)
+                                elseif nStairs then sd.idleState = "🪜 At Stairs!"; sd.idleCol = Color3.fromRGB(180,200,140)
+                                elseif nWindow then sd.idleState = "🪟 Near Window!"; sd.idleCol = Color3.fromRGB(140,200,255)
+                                elseif nChest then sd.idleState = "📦 Near Chest!"; sd.idleCol = Color3.fromRGB(255,220,80)
+                                elseif nHallway then sd.idleState = "🏚 In Hallway!"; sd.idleCol = Color3.fromRGB(160,140,120) end
+
+                                local yPos = tp.Position.Y
+                                if yPos > 30 then sd.idleState = (sd.idleState or "■ Stationary") .. " [HIGH]"
+                                elseif yPos < -10 then sd.idleState = (sd.idleState or "■ Stationary") .. " [BELOW]" end
+                            end
+                        end
+                        sTxt = sd.idleState or "■ Stationary"
+                        sCol = sd.idleCol or Color3.fromRGB(100,100,100)
+                    end
+                end
+            else
+                spd[ent] = {lP=tp.Position, lT=now, sp=0, sa={}, pP=tp.Position, pT=now,
+                    idleCheck=0, idleState="■ Stationary", idleCol=Color3.fromRGB(100,100,100), lSize=tp.Size,
+                    forceLastPos=tp.Position, lastMoveDir=nil, maxSpeed=0, totalDist=0,
+                    wasCollidable=tp.CanCollide, wasAnchored=tp.Anchored}
+            end
 
             local tc = dist<KILL_ZONE and Color3.fromRGB(255,30,30) or dist<DANGER_CLOSE and Color3.fromRGB(255,180,30) or Color3.fromRGB(140,140,160)
             if d.distLabel then d.distLabel.Text = dist.."s"; d.distLabel.TextColor3 = tc end
@@ -801,7 +848,6 @@ RunService.Heartbeat:Connect(function()
             if d.speedLabel then d.speedLabel.Text = sTxt; d.speedLabel.TextColor3 = sCol end
             if d.entrySpeed then d.entrySpeed.Text = sTxt; d.entrySpeed.TextColor3 = sCol end
 
-            -- Dynamic highlight color based on distance
             local ec
             if dist < KILL_ZONE then ec = Color3.fromRGB(255, 0, 0)
             elseif dist < DANGER_CLOSE then local t = (dist-KILL_ZONE)/(DANGER_CLOSE-KILL_ZONE); ec = Color3.fromRGB(255, math.floor(180*t), 0)
@@ -825,10 +871,9 @@ RunService.Heartbeat:Connect(function()
         end
     end
 
-    -- Update status panel
     timeL.Text = "⏱ " .. formatTime(tick() - sessionStart)
     statL.Text = "📊 " .. totalDetected .. " detected | " .. totalAlerts .. " alerts"
-    nearL.Text = "📡 Nearest: " .. (nearestDist < math.huge and (nearestName .. " " .. nearestDist .. "s") or "---")
+    nearL.Text = "📡 " .. (nearestDist < math.huge and (nearestName .. " " .. nearestDist .. "s") or "---")
     threatL.Text = "🛡 " .. highestThreat; threatL.TextColor3 = getThreatCol(highestThreat)
 
     if cRN then showAl(cRN, cRD, allR, cRS, cRT) else hideAl() end
@@ -836,15 +881,15 @@ RunService.Heartbeat:Connect(function()
 end)
 
 -- ============================================
--- BUTTON CONNECTIONS
+-- BUTTONS
 -- ============================================
 espB.MouseButton1Click:Connect(function() espOn = not espOn; espB.Text = espOn and "👁 ESP: ON" or "👁 ESP: OFF"
     espB.BackgroundColor3 = espOn and Color3.fromRGB(0,130,60) or Color3.fromRGB(100,28,28)
     for _, d in pairs(tracked) do if d.highlight then d.highlight.Enabled = espOn end end end)
-namB.MouseButton1Click:Connect(function() namesOn = not namesOn; namB.Text = namesOn and "📛 Names: ON" or "📛 Names: OFF"
+namB.MouseButton1Click:Connect(function() namesOn = not namesOn; namB.Text = namesOn and "📛 Names" or "📛 OFF"
     namB.BackgroundColor3 = namesOn and Color3.fromRGB(0,80,160) or Color3.fromRGB(100,28,28)
     for _, d in pairs(tracked) do if d.billboard then d.billboard.Enabled = namesOn end end end)
-radB.MouseButton1Click:Connect(function() radarOn = not radarOn; radB.Text = radarOn and "📡 Radar: ON" or "📡 Radar: OFF"
+radB.MouseButton1Click:Connect(function() radarOn = not radarOn; radB.Text = radarOn and "📡 Radar" or "📡 OFF"
     radB.BackgroundColor3 = radarOn and Color3.fromRGB(100,0,120) or Color3.fromRGB(60,28,28)
     radarFrame.Visible = radarOn end)
 vwB.MouseButton1Click:Connect(function() if viewing then stopV(); return end
@@ -875,7 +920,6 @@ xbtn.MouseButton1Click:Connect(function() active = false; stopV(); stopVE(); hid
     for _, dot in pairs(radarDots) do pcall(function() dot:Destroy() end) end
     SG:Destroy(); AG:Destroy(); RG:Destroy() end)
 
--- Animated elements
 local pD, pP2 = 1, 0
 task.spawn(function() while active do
     pP2 += 0.012*pD; if pP2 >= 0.84 then pD = -1 elseif pP2 <= 0 then pD = 1 end
@@ -889,11 +933,17 @@ print("════════════════════════�
 print("  ☠ ENTITY SCANNER ULTRA v8 ☠")
 print("═══════════════════════════════════════")
 print("  📡 Live Radar with sweep animation")
-print("  ☠ Threat level system (LETHAL/DANGER/NEUTRAL/SAFE)")
-print("  ⚡ Max speed tracking per entity")
-print("  🔴 Screen flash on danger close")
-print("  👁 ESP + Names + View + Spectate")
-print("  📊 Session stats (detections/alerts/time)")
-print("  🎯 Dynamic highlight colors by distance")
-print("  📛 " .. tostring(#(function() local c=0; for _ in pairs(KNOWN_ENTITIES) do c+=1 end; return setmetatable({},{__len=function() return c end}) end)()) .. "+ known entities")
+print("  ☠ Threat levels (LETHAL/DANGER/NEUTRAL/SAFE)")
+print("  🔴 APPROACHING / 🟢 RETREATING detection")
+print("  💨 Despawn: fade/shrink/dead/fell/teleport/nocollide")
+print("  🚪 Locker/Closet/Wardrobe/Cabinet/Hiding")
+print("  🪑 Table/Desk/Shelf/Counter/Bench")
+print("  🚪 Door/Gate/Entrance/Exit/Portal")
+print("  🛏 Bed/Mattress | 🕳 Vent/Crawl/Pipe")
+print("  🪜 Stairs/Ladder | 🪟 Window/Glass")
+print("  📦 Chest/Crate/Loot | 🏚 Hallway/Corridor")
+print("  🔒 Frozen/Anchored detection")
+print("  ⚡ Peak speed tracking per entity")
+print("  🔴 Screen flash on kill zone (<18s)")
+print("  📊 Session stats + timer")
 print("═══════════════════════════════════════")
