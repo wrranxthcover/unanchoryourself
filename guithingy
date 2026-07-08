@@ -1,4 +1,4 @@
--- ☠ Entity Scanner ULTRA v9 ☠ - Maximum Overdrive (Radar Fixed)
+-- ☠ Entity Scanner ULTRA v9 ☠ - Maximum Overdrive (Radar & Special Characters Patched)
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
@@ -128,22 +128,58 @@ local function getSurvivalTip(name)
     return SURVIVAL_TIPS[l] or "⚠ Unknown entity! Stay alert!"
 end
 
+-- Deep cleaning utility to strip all common, custom, math, and foreign Unicode characters for identification
+local function cleanSymbols(str)
+    -- Normalize/strip common Latin extensions (ï -> i, ÿ -> y, ë -> e, ö -> o, etc.)
+    local replacements = {
+        ["\195\164"] = "a", ["\195\166"] = "ae", ["\195\182"] = "o", ["\195\188"] = "u",
+        ["\195\175"] = "i", ["\195\171"] = "e", ["\195\191"] = "y", ["\195\165"] = "a",
+        ["\195\184"] = "o", ["\194\175"] = "i", ["\195\143"] = "X", ["\195\145"] = "N",
+        ["\197\147"] = "oe", ["\195\159"] = "ss"
+    }
+    for utf8Char, asciiRepl in pairs(replacements) do
+        str = str:gsub(utf8Char, asciiRepl)
+    end
+    
+    -- Strip non-alphanumeric, miscellaneous symbols, brackets, dashes, and whitespace
+    str = str:gsub("[%s%p%c%s]", "")
+    -- Remove any remaining math/foreign symbol blocks in Lua Unicode bounds
+    str = str:gsub("[%z\1-\127]", function(c)
+        if c:match("%w") then return c else return "" end
+    end)
+    return str:lower()
+end
+
 local function matchPat(name)
-    if KNOWN_ENTITIES[name:lower()] then return true end
+    local cleanName = cleanSymbols(name)
+    if KNOWN_ENTITIES[cleanName] then return true end
+    
+    -- Detect standard Sub-Floor formats e.g. A-60, A-120, A-200, A-2000, A-ï-60
     local dp = name:find("%-(%d+)$")
     if dp then
         local pre = name:sub(1, dp-1)
         local num = tonumber(name:sub(dp+1))
         if num and num >= 1 and num <= 2000 then
             local c = pre:gsub("\195\175","X"):gsub("\195\143","X")
-            if #c >= 1 and #c <= 3 then
+            if #c >= 1 and #c <= 5 then
                 local st = c:gsub("X","")
                 if st == "" or st:match("^[A-Za-z]+$") then return true end
             end
         end
     end
+    
+    -- Detect custom modifier variants e.g. Mob9, MOB18, Mob-ï-2
     local mn = name:match("^[Mm][Oo][Bb](%d+)$")
-    if mn then local n = tonumber(mn); if n and n >= 1 and n <= 25 then return true end end
+    if mn then 
+        local n = tonumber(mn)
+        if n and n >= 1 and n <= 50 then return true end 
+    end
+    
+    -- Fallback: If it's not a player but contains known entity substrings along with Unicode symbols
+    for known in pairs(KNOWN_ENTITIES) do
+        if cleanName:find(known) then return true end
+    end
+    
     return false
 end
 
@@ -415,7 +451,7 @@ local function showWarning(name, dist, tip, threat)
 end
 
 -- ============================================
--- RADAR (FIXED)
+-- RADAR (FIXED + Z-INDEX ALIGNED)
 -- ============================================
 local RG = Instance.new("ScreenGui"); RG.Name = "EntityRadarGui"; RG.ResetOnSpawn = false; RG.DisplayOrder = 90; RG.Parent = LP.PlayerGui
 local radarFrame = Instance.new("Frame"); radarFrame.Size = UDim2.new(0, 150, 0, 150)
@@ -486,7 +522,7 @@ local function updateRadar()
             if dist <= RADAR_RANGE and dist > 0.5 then
                 local flatOff = Vector3.new(offset.X, 0, offset.Z)
                 
-                -- Calculate relative position (Right = X, Forward = -Y)
+                -- Calculate relative coordinate system (Right = X, Forward = -Y)
                 local relX = rightVec:Dot(flatOff) / RADAR_RANGE * 0.45
                 local relY = -forward:Dot(flatOff) / RADAR_RANGE * 0.45
                 
@@ -499,7 +535,7 @@ local function updateRadar()
                     dot.AnchorPoint = Vector2.new(0.5, 0.5)
                     dot.BorderSizePixel = 0
                     dot.BackgroundTransparency = 0
-                    dot.ZIndex = 10 -- Render above the radar background/crosshairs
+                    dot.ZIndex = 10 -- Render on top of Radar interface elements
                     dot.Parent = radarFrame
                     Instance.new("UICorner", dot).CornerRadius = UDim.new(1, 0)
                     dot._entity = ent
@@ -517,7 +553,6 @@ local function updateRadar()
                     dot.Size = UDim2.new(0, 5, 0, 5)
                 end
             else
-                -- Entity out of range, remove dot
                 local dotKey = tostring(ent)
                 if radarDots[dotKey] then 
                     pcall(function() radarDots[dotKey]:Destroy() end)
@@ -527,7 +562,6 @@ local function updateRadar()
         end
     end
     
-    -- Update radar title with entity count
     local dotCount = 0
     for _ in pairs(radarDots) do dotCount = dotCount + 1 end
     radarTitle.Text = "📡 RADAR | " .. RADAR_RANGE .. "s | " .. dotCount .. " entities"
@@ -1042,7 +1076,7 @@ print("════════════════════════�
 print("  ⚠ Survival tips for every entity")
 print("  🔔 Proximity warnings (120s + 18s)")
 print("  📡 Live Radar with sweep (FIXED)")
-print("  ☠ Threat levels + dynamic colors")
+print("  ☠ Threat levels + Unicode-Proofing (ï)")
 print("  − Minimize button (red)")
 print("  🔴 APPROACHING / 🟢 RETREATING")
 print("  💨 Advanced despawn detection")
