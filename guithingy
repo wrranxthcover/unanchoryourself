@@ -1,6 +1,7 @@
 --[[
-    ☠ ENTITY SCANNER ULTRA v10.1 ☠ - STEALTH EDITION
-    A premium, military-grade tactical HUD. High-performance, zero-lag, clean aesthetics.
+    ☠ ENTITY SCANNER ULTRA v10.2 ☠ - TACTICAL HUD EDITION
+    Engineered for high-speed games like Rooms Re-Established & Doors.
+    High-fidelity, real-time physics telemetry paired with a professional military HUD.
 ]]
 
 local Players = game:GetService("Players")
@@ -19,15 +20,14 @@ end
 local FAST_THRESH = 35
 local SLOW_THRESH = 5
 local RED_THRESH = 10000
-local DANGER_CLOSE = 60
-local KILL_ZONE = 20
-local WARN_ZONE = 130
 
 -- Tactical Color Scheme
-local COLOR_BG = Color3.fromRGB(10, 11, 14)       -- Gunmetal Obsidian
-local COLOR_PANEL = Color3.fromRGB(18, 20, 26)    -- Dark Slate
-local COLOR_ACCENT = Color3.fromRGB(0, 160, 220)   -- Stealth Cobalt Blue
-local COLOR_TEXT_Muted = Color3.fromRGB(110, 115, 125)
+local COLOR_BG = Color3.fromRGB(12, 13, 17)       -- Deep Matte Charcoal
+local COLOR_PANEL = Color3.fromRGB(20, 22, 28)    -- Tactical Grey
+local COLOR_BORDER = Color3.fromRGB(35, 38, 48)   -- Slate Divider
+local COLOR_ACCENT = Color3.fromRGB(0, 180, 220)   -- Cyan Telemetry Accent
+local COLOR_ALERT = Color3.fromRGB(255, 60, 60)    -- Combat Warning Red
+local COLOR_TEXT_MUTED = Color3.fromRGB(120, 125, 135)
 
 -- State Control
 local active = true
@@ -43,7 +43,7 @@ local viewingEnt, viewEntTarget, viewEntConn, savedCamType = false, nil, nil, ni
 local tracked, entCount = {}, 0
 local bl, blCount = {}, 0
 local spd = {}
-local alertOn, alertEnt, alertScrConn, alertPulseConn = false, nil, nil, nil
+local alertOn, alertEnt, alertScrConn = false, nil, nil, nil
 local leftEntries, undoEntries = {}, {}
 local totalDetected, totalAlerts, sessionStart = 0, 0, tick()
 local warnCooldowns = {}
@@ -51,71 +51,48 @@ local waypoints = {}
 local itemTracked = {}
 
 local KNOWN_ENTITIES = {
+    -- Classic Doors
     ["rush"] = true, ["ambush"] = true, ["seek"] = true, ["figure"] = true,
     ["halt"] = true, ["eyes"] = true, ["screech"] = true, ["hide"] = true,
-    ["jack"] = true, ["dupe"] = true, ["glitch"] = true, ["void"] = true,
-    ["shadow"] = true, ["snare"] = true, ["timothy"] = true,
-    ["lookman"] = true, ["watchdog"] = true, ["blitz"] = true, ["pandemonium"] = true,
+    -- Rooms & Rooms Re-Established (Fully Mapped)
     ["a-60"] = true, ["a-90"] = true, ["a-120"] = true, ["a-200"] = true,
-    ["el goblino"] = true, ["bob"] = true, ["grumble"] = true, ["jeff"] = true,
-    ["curious light"] = true, ["guiding light"] = true, ["haste"] = true,
-    ["eye"] = true, ["mouth"] = true, ["rage"] = true, ["shade"] = true,
-    ["turret"] = true, ["siren"] = true, ["ripper"] = true, ["depth"] = true,
-    ["angler"] = true, ["froger"] = true, ["pinkie"] = true,
-    ["greed"] = true, ["agony"] = true, ["grip"] = true, ["silence"] = true,
-    ["clone"] = true, ["vacuum"] = true, ["giggle"] = true, ["dread"] = true,
+    ["a-270"] = true, ["a-300"] = true, ["x-60"] = true, ["x-120"] = true,
+    ["x-200"] = true, ["x-300"] = true, ["v-60"] = true, ["v-120"] = true,
+    ["giggle"] = true, ["grumble"] = true, ["dread"] = true, ["haste"] = true,
 }
 
 local THREAT_LEVEL = {
     ["rush"] = "LETHAL", ["ambush"] = "LETHAL", ["seek"] = "LETHAL",
     ["figure"] = "LETHAL", ["halt"] = "DANGER", ["screech"] = "DANGER",
-    ["eyes"] = "DANGER", ["glitch"] = "DANGER", ["void"] = "DANGER",
-    ["blitz"] = "LETHAL", ["pandemonium"] = "LETHAL", ["haste"] = "LETHAL",
-    ["a-60"] = "LETHAL", ["a-90"] = "LETHAL", ["a-120"] = "LETHAL", ["a-200"] = "LETHAL",
-    ["rage"] = "LETHAL", ["shade"] = "DANGER", ["turret"] = "DANGER",
-    ["siren"] = "DANGER", ["ripper"] = "LETHAL", ["depth"] = "LETHAL",
-    ["angler"] = "LETHAL", ["greed"] = "DANGER", ["agony"] = "LETHAL",
-    ["grip"] = "DANGER", ["silence"] = "DANGER", ["watchdog"] = "DANGER",
-    ["clone"] = "DANGER", ["vacuum"] = "LETHAL", ["giggle"] = "DANGER",
-    ["dread"] = "LETHAL",
-    ["jack"] = "NEUTRAL", ["dupe"] = "NEUTRAL", ["timothy"] = "NEUTRAL",
-    ["snare"] = "NEUTRAL", ["lookman"] = "NEUTRAL",
-    ["shadow"] = "NEUTRAL", ["hide"] = "NEUTRAL",
-    ["bob"] = "SAFE", ["el goblino"] = "SAFE", ["grumble"] = "SAFE",
-    ["jeff"] = "SAFE", ["guiding light"] = "SAFE", ["curious light"] = "SAFE",
-    ["froger"] = "SAFE", ["pinkie"] = "SAFE",
+    ["eyes"] = "DANGER", 
+    ["a-60"] = "LETHAL", ["a-90"] = "CRITICAL", ["a-120"] = "LETHAL", ["a-200"] = "LETHAL",
+    ["a-270"] = "LETHAL", ["a-300"] = "LETHAL", ["x-60"] = "LETHAL", ["x-120"] = "LETHAL",
+    ["giggle"] = "DANGER", ["dread"] = "LETHAL", ["haste"] = "LETHAL",
 }
 
 local THREAT_COLOR = {
-    ["LETHAL"] = Color3.fromRGB(240, 50, 50),
+    ["CRITICAL"] = Color3.fromRGB(255, 30, 30),
+    ["LETHAL"] = Color3.fromRGB(240, 80, 50),
     ["DANGER"] = Color3.fromRGB(240, 130, 0),
-    ["NEUTRAL"] = Color3.fromRGB(220, 200, 50),
     ["SAFE"] = Color3.fromRGB(0, 180, 100),
     ["UNKNOWN"] = Color3.fromRGB(120, 130, 150),
 }
 
 local SURVIVAL_TIPS = {
-    ["rush"] = "SEEK CLOSEST LOCKER INSTANTLY",
-    ["ambush"] = "LOCKER NAVIGATION REQUIRED (REPEATED WAVES)",
-    ["seek"] = "SPRINT: FOLLOW ILLUMINATED CORRIDORS",
-    ["figure"] = "CROUCH REQUIRED: MAINTAIN ABSOLUTE SILENCE",
-    ["halt"] = "MANEUVER: INVERT MOVEMENT DIRECTION ON GREEN PULSE",
-    ["screech"] = "DIRECT EYE CONTACT REQUIRED IMMEDIATELY",
-    ["eyes"] = "AVOID SIGHTLINE: LOOK DOWNWARDS",
-    ["blitz"] = "SEEK INSTANT SHELTER (CRITICAL VELOCITY)",
-    ["glitch"] = "REGROUP WITH COOPERATIVE SQUAD IMMEDIATELY",
-    ["a-60"] = "SHELTER IMMEDIATELY",
-    ["a-90"] = "MOTION DISRUPT: CEASE ALL MOVEMENT",
-    ["a-120"] = "FIND HIDING SPOT PREVENTATIVE MEASURE",
-    ["haste"] = "PUZZLE DECRYPT SPEED RUN ENFORCED",
-    ["vacuum"] = "SPATIAL AWARENESS: VENT DECOMPRESSION IN EFFECT",
-    ["dread"] = "STAY WITHIN LIGHT SOURCES PREVENTATIVELY",
-    ["clone"] = "DISREGARD SIGNALS: DECOY IDENTIFIED",
+    ["rush"] = "SHELTER IMMEDIATELY: LOCKER CHANNELS",
+    ["ambush"] = "SHELTER IMMEDIATELY (REPEATED WAVES EXPECTED)",
+    ["seek"] = "SPRINT: RUN ALONG ILLUMINATED TRACKS",
+    ["figure"] = "CEASE ROTATION AND WALKING PATTERNS",
+    ["halt"] = "INVERT WALKING VECTOR ON SIGNAL",
+    ["a-60"] = "CRITICAL VELOCITY: RUN FOR LOCKER",
+    ["a-90"] = "CEASE INPUT: INVOLUNTARY DISRUPTION ACTIVE",
+    ["a-120"] = "FIND NEAREST HIDEOUT LOCATION PRE-EMPTIVELY",
+    ["a-270"] = "LOUD OUTBREAK DETECTED: HIDE IMMEDIATELY",
+    ["a-300"] = "EXTREME VELOCITY: SECURE LOCKER SPACE IMMEDIATELY",
 }
 
 local function getThreat(name)
     local l = name:lower()
-    if l == "eye" or l == "mouth" then return "DANGER" end
     return THREAT_LEVEL[l] or "UNKNOWN"
 end
 
@@ -123,7 +100,7 @@ local function getThreatCol(threat) return THREAT_COLOR[threat] or THREAT_COLOR[
 
 local function getSurvivalTip(name)
     local l = name:lower()
-    return SURVIVAL_TIPS[l] or "UNKNOWN VECTOR. EXECUTE PRECAUTIONARY TACTICS."
+    return SURVIVAL_TIPS[l] or "ALERT: VECTOR DETECTED. RETREAT TO SECURITY."
 end
 
 local function cleanSymbols(str)
@@ -164,16 +141,7 @@ local function matchPat(name)
     return false
 end
 
-local function isMinion(name) local l = name:lower(); return l == "eye" or l == "mouth" end
-
 local function getDisplayName(entity)
-    local l = entity.Name:lower()
-    if l == "eye" or l == "mouth" then
-        local parent = entity.Parent
-        if parent then
-            if matchPat(parent.Name) then return parent.Name .. " " .. entity.Name end
-        end
-    end
     return entity.Name:upper()
 end
 
@@ -187,7 +155,7 @@ end
 local function getCol(name)
     local p = getPrefix(name); local h = 0
     for i = 1, #p do h = h + string.byte(p,i)*14 + i*53 end
-    return Color3.fromHSV((h%360)/360, 0.65, 0.95)
+    return Color3.fromHSV((h%360)/360, 0.7, 0.9)
 end
 
 local function formatTime(s)
@@ -223,7 +191,7 @@ local lastClosetScan = 0
 local cachedCloset = nil
 
 local function findNearestSafeClosetOptimized()
-    if tick() - lastClosetScan < 1.0 and cachedCloset then
+    if tick() - lastClosetScan < 0.5 and cachedCloset then
         return cachedCloset, (LP.Character.HumanoidRootPart.Position - cachedCloset.PrimaryPart.Position).Magnitude
     end
     
@@ -248,126 +216,130 @@ end
 
 local function executeAutoDefend()
     local closet, dist = findNearestSafeClosetOptimized()
-    if closet and dist < 120 then
+    if closet and dist < 150 then
         local targetPart = closet.PrimaryPart or closet:FindFirstChildWhichIsA("BasePart", true)
         if targetPart then
             local char = LP.Character
             if char and char:FindFirstChild("HumanoidRootPart") then
                 char.HumanoidRootPart.CFrame = targetPart.CFrame * CFrame.new(0, 0, 1.5)
-                showWarning("DEFENSE SYS", "0", "TELEPORTED TO EMERGENCY BUNKER", "SAFE")
+                showWarning("DEF SYS", "0", "TELEPORTED TO EMERGENCY BUNKER", "SAFE")
             end
         end
     end
 end
 
 -- ============================================
--- MAIN GUI GENERATOR (STEALTH TERMINAL LOOK)
+-- MAIN GUI GENERATOR (STEALTH MILITARY TERMINAL)
 -- ============================================
 local SG = Instance.new("ScreenGui"); SG.Name = "EntityScannerGui"; SG.ResetOnSpawn = false; SG.DisplayOrder = 100; SG.Parent = LP.PlayerGui
 local MF = Instance.new("Frame"); MF.Size = UDim2.new(0, 340, 0, 560); MF.Position = UDim2.new(0, 14, 0.5, -280)
 MF.BackgroundColor3 = COLOR_BG; MF.Active = true; MF.Draggable = true; MF.ClipsDescendants = true; MF.Parent = SG
-Instance.new("UICorner", MF).CornerRadius = UDim.new(0, 4)
-local mst = Instance.new("UIStroke"); mst.Color = Color3.fromRGB(35, 38, 45); mst.Thickness = 1; mst.Parent = MF
+Instance.new("UICorner", MF).CornerRadius = UDim.new(0, 3)
+local mst = Instance.new("UIStroke"); mst.Color = COLOR_BORDER; mst.Thickness = 1; mst.Parent = MF
 
--- Tactical Title Bar
-local TB = Instance.new("Frame"); TB.Size = UDim2.new(1, 0, 0, 38); TB.BackgroundColor3 = COLOR_PANEL; TB.Parent = MF
-Instance.new("UICorner", TB).CornerRadius = UDim.new(0, 4)
+-- Tactical Header
+local TB = Instance.new("Frame"); TB.Size = UDim2.new(1, 0, 0, 36); TB.BackgroundColor3 = COLOR_PANEL; TB.Parent = MF
+Instance.new("UICorner", TB).CornerRadius = UDim.new(0, 3)
 local tbf = Instance.new("Frame"); tbf.Size = UDim2.new(1, 0, 0, 6); tbf.Position = UDim2.new(0, 0, 1, -6); tbf.BackgroundColor3 = COLOR_PANEL; tbf.BorderSizePixel = 0; tbf.Parent = TB
 
-local tl = Instance.new("TextLabel"); tl.Size = UDim2.new(1, -100, 1, 0); tl.Position = UDim2.new(0, 12, 0, 0); tl.BackgroundTransparency = 1; tl.Text = "STEALTH DISPATCH [v10.1]"; tl.TextColor3 = COLOR_ACCENT; tl.TextSize = 12; tl.Font = Enum.Font.Code; tl.TextXAlignment = Enum.TextXAlignment.Left; tl.Parent = TB
+local tl = Instance.new("TextLabel"); tl.Size = UDim2.new(1, -100, 1, 0); tl.Position = UDim2.new(0, 12, 0, 0); tl.BackgroundTransparency = 1; tl.Text = "TACTICAL SCANNER [v10.2]"; tl.TextColor3 = COLOR_ACCENT; tl.TextSize = 11; tl.Font = Enum.Font.Code; tl.TextXAlignment = Enum.TextXAlignment.Left; tl.Parent = TB
 
--- Window Management Buttons
-local minBtn = Instance.new("TextButton"); minBtn.Size = UDim2.new(0, 24, 0, 24); minBtn.Position = UDim2.new(1, -58, 0.5, -12); minBtn.BackgroundColor3 = Color3.fromRGB(24, 26, 32); minBtn.BorderSizePixel = 0; minBtn.Text = "-"; minBtn.TextColor3 = COLOR_TEXT_Muted; minBtn.TextSize = 12; minBtn.Font = Enum.Font.Code; minBtn.Parent = TB; Instance.new("UICorner", minBtn).CornerRadius = UDim.new(0, 3)
-local xbtn = Instance.new("TextButton"); xbtn.Size = UDim2.new(0, 24, 0, 24); xbtn.Position = UDim2.new(1, -30, 0.5, -12); xbtn.BackgroundColor3 = Color3.fromRGB(35, 15, 15); xbtn.BorderSizePixel = 0; xbtn.Text = "X"; xbtn.TextColor3 = Color3.fromRGB(220, 80, 80); xbtn.TextSize = 10; xbtn.Font = Enum.Font.Code; xbtn.Parent = TB; Instance.new("UICorner", xbtn).CornerRadius = UDim.new(0, 3)
+-- Control Buttons
+local minBtn = Instance.new("TextButton"); minBtn.Size = UDim2.new(0, 24, 0, 24); minBtn.Position = UDim2.new(1, -58, 0.5, -12); minBtn.BackgroundColor3 = Color3.fromRGB(24, 26, 32); minBtn.BorderSizePixel = 0; minBtn.Text = "-"; minBtn.TextColor3 = COLOR_TEXT_MUTED; minBtn.TextSize = 12; minBtn.Font = Enum.Font.Code; minBtn.Parent = TB; Instance.new("UICorner", minBtn).CornerRadius = UDim.new(0, 2)
+local xbtn = Instance.new("TextButton"); xbtn.Size = UDim2.new(0, 24, 0, 24); xbtn.Position = UDim2.new(1, -30, 0.5, -12); xbtn.BackgroundColor3 = Color3.fromRGB(35, 15, 15); xbtn.BorderSizePixel = 0; xbtn.Text = "X"; xbtn.TextColor3 = COLOR_ALERT; xbtn.TextSize = 10; xbtn.Font = Enum.Font.Code; xbtn.Parent = TB; Instance.new("UICorner", xbtn).CornerRadius = UDim.new(0, 2)
 
 minBtn.MouseButton1Click:Connect(function()
     minimized = not minimized
-    TweenService:Create(MF, TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Size = minimized and UDim2.new(0, 340, 0, 38) or UDim2.new(0, 340, 0, 560)}):Play()
+    TweenService:Create(MF, TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Size = minimized and UDim2.new(0, 340, 0, 36) or UDim2.new(0, 340, 0, 560)}):Play()
     minBtn.Text = minimized and "+" or "-"
 end)
 
--- Telemetry Panel Widget
-local sf = Instance.new("Frame"); sf.Size = UDim2.new(1, -12, 0, 70); sf.Position = UDim2.new(0, 6, 0, 44); sf.BackgroundColor3 = COLOR_PANEL; sf.Parent = MF; Instance.new("UICorner", sf).CornerRadius = UDim.new(0, 4)
-local sfst = Instance.new("UIStroke"); sfst.Color = Color3.fromRGB(30, 33, 40); sfst.Thickness = 1; sfst.Parent = sf
+-- Live System Telemetry Banner
+local sf = Instance.new("Frame"); sf.Size = UDim2.new(1, -12, 0, 70); sf.Position = UDim2.new(0, 6, 0, 42); sf.BackgroundColor3 = COLOR_PANEL; sf.Parent = MF; Instance.new("UICorner", sf).CornerRadius = UDim.new(0, 3)
+local sfst = Instance.new("UIStroke"); sfst.Color = COLOR_BORDER; sfst.Thickness = 1; sfst.Parent = sf
 
-local rl = Instance.new("TextLabel"); rl.Size = UDim2.new(0.5, -4, 0, 15); rl.Position = UDim2.new(0, 8, 0, 6); rl.BackgroundTransparency = 1; rl.Text = "SYSTEM: ONLINE"; rl.TextColor3 = COLOR_ACCENT; rl.TextSize = 10; rl.Font = Enum.Font.Code; rl.TextXAlignment = Enum.TextXAlignment.Left; rl.Parent = sf
-local cl2 = Instance.new("TextLabel"); cl2.Size = UDim2.new(0.5, -4, 0, 15); cl2.Position = UDim2.new(0, 8, 0, 24); cl2.BackgroundTransparency = 1; cl2.Text = "ACTIVE THREATS: 0"; cl2.TextColor3 = COLOR_TEXT_Muted; cl2.TextSize = 10; cl2.Font = Enum.Font.Code; cl2.TextXAlignment = Enum.TextXAlignment.Left; rl.Parent = sf
-local statL = Instance.new("TextLabel"); statL.Size = UDim2.new(0.5, -4, 0, 13); statL.Position = UDim2.new(0, 8, 0, 48); statL.BackgroundTransparency = 1; statL.Text = "DET: 0 | ALERTS: 0"; statL.TextColor3 = COLOR_TEXT_Muted; statL.TextSize = 9; statL.Font = Enum.Font.Code; statL.TextXAlignment = Enum.TextXAlignment.Left; statL.Parent = sf
-local timeL = Instance.new("TextLabel"); timeL.Size = UDim2.new(0.5, -4, 0, 15); timeL.Position = UDim2.new(0.5, 0, 0, 6); timeL.BackgroundTransparency = 1; timeL.Text = "SYS_T: 00:00"; timeL.TextColor3 = COLOR_TEXT_Muted; timeL.TextSize = 10; timeL.Font = Enum.Font.Code; timeL.TextXAlignment = Enum.TextXAlignment.Right; timeL.Parent = sf
-local threatL = Instance.new("TextLabel"); threatL.Size = UDim2.new(0.5, -4, 0, 15); threatL.Position = UDim2.new(0.5, 0, 0, 24); threatL.BackgroundTransparency = 1; threatL.Text = "STATUS: SECURE"; threatL.TextColor3 = THREAT_COLOR["SAFE"]; threatL.TextSize = 10; threatL.Font = Enum.Font.Code; threatL.TextXAlignment = Enum.TextXAlignment.Right; threatL.Parent = sf
-local nearL = Instance.new("TextLabel"); nearL.Size = UDim2.new(0.5, -4, 0, 13); nearL.Position = UDim2.new(0.5, 0, 0, 48); nearL.BackgroundTransparency = 1; nearL.Text = "PROX: NULL"; nearL.TextColor3 = COLOR_TEXT_Muted; nearL.TextSize = 9; nearL.Font = Enum.Font.Code; nearL.TextXAlignment = Enum.TextXAlignment.Right; nearL.Parent = sf
+local rl = Instance.new("TextLabel"); rl.Size = UDim2.new(0.5, -4, 0, 15); rl.Position = UDim2.new(0, 8, 0, 6); rl.BackgroundTransparency = 1; rl.Text = "SYSTEM: ACTIVE_LINK"; rl.TextColor3 = COLOR_ACCENT; rl.TextSize = 9; rl.Font = Enum.Font.Code; rl.TextXAlignment = Enum.TextXAlignment.Left; rl.Parent = sf
+local cl2 = Instance.new("TextLabel"); cl2.Size = UDim2.new(0.5, -4, 0, 15); cl2.Position = UDim2.new(0, 8, 0, 24); cl2.BackgroundTransparency = 1; cl2.Text = "ACTIVE TARGETS: 0"; cl2.TextColor3 = COLOR_TEXT_MUTED; cl2.TextSize = 9; rl.Font = Enum.Font.Code; cl2.TextXAlignment = Enum.TextXAlignment.Left; cl2.Parent = sf
+local statL = Instance.new("TextLabel"); statL.Size = UDim2.new(0.5, -4, 0, 13); statL.Position = UDim2.new(0, 8, 0, 48); statL.BackgroundTransparency = 1; statL.Text = "DET: 0 | ALERTS: 0"; statL.TextColor3 = COLOR_TEXT_MUTED; statL.TextSize = 8; statL.Font = Enum.Font.Code; statL.TextXAlignment = Enum.TextXAlignment.Left; statL.Parent = sf
+local timeL = Instance.new("TextLabel"); timeL.Size = UDim2.new(0.5, -4, 0, 15); timeL.Position = UDim2.new(0.5, 0, 0, 6); timeL.BackgroundTransparency = 1; timeL.Text = "SYS_T: 00:00"; timeL.TextColor3 = COLOR_TEXT_MUTED; timeL.TextSize = 9; timeL.Font = Enum.Font.Code; timeL.TextXAlignment = Enum.TextXAlignment.Right; timeL.Parent = sf
+local threatL = Instance.new("TextLabel"); threatL.Size = UDim2.new(0.5, -4, 0, 15); threatL.Position = UDim2.new(0.5, 0, 0, 24); threatL.BackgroundTransparency = 1; threatL.Text = "STATUS: SECURE"; threatL.TextColor3 = THREAT_COLOR["SAFE"]; threatL.TextSize = 9; threatL.Font = Enum.Font.Code; threatL.TextXAlignment = Enum.TextXAlignment.Right; threatL.Parent = sf
+local nearL = Instance.new("TextLabel"); nearL.Size = UDim2.new(0.5, -4, 0, 13); nearL.Position = UDim2.new(0.5, 0, 0, 48); nearL.BackgroundTransparency = 1; nearL.Text = "PROX_DIST: NULL"; nearL.TextColor3 = COLOR_TEXT_MUTED; nearL.TextSize = 8; nearL.Font = Enum.Font.Code; nearL.TextXAlignment = Enum.TextXAlignment.Right; nearL.Parent = sf
 
--- Procedural Button Constructor (Premium Matte UI Look)
+-- Procedural Premium Button Builder
 local function mb(parent, text, color, posXScale, sizeXScale)
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(sizeXScale, -4, 1, 0)
     btn.Position = UDim2.new(posXScale, 2, 0, 0)
-    btn.BackgroundColor3 = Color3.fromRGB(24, 26, 32)
+    btn.BackgroundColor3 = Color3.fromRGB(25, 27, 34)
     btn.BorderSizePixel = 0
     btn.Text = text:upper()
-    btn.TextColor3 = Color3.fromRGB(210, 215, 220)
-    btn.TextSize = 9
+    btn.TextColor3 = Color3.fromRGB(200, 205, 210)
+    btn.TextSize = 8
     btn.Font = Enum.Font.Code
     btn.Parent = parent
     
     local bs = Instance.new("UIStroke")
-    bs.Color = Color3.fromRGB(40, 44, 52)
+    bs.Color = COLOR_BORDER
     bs.Thickness = 1
     bs.Parent = btn
     
     local line = Instance.new("Frame")
-    line.Size = UDim2.new(1, 0, 0, 2)
-    line.Position = UDim2.new(0, 0, 1, -2)
+    line.Size = UDim2.new(1, 0, 0, 1)
+    line.Position = UDim2.new(0, 0, 1, -1)
     line.BackgroundColor3 = color
     line.BorderSizePixel = 0
     line.Parent = btn
     
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 3)
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 2)
+    
+    btn.MouseEnter:Connect(function()
+        btn.BackgroundColor3 = Color3.fromRGB(35, 38, 48)
+    end)
+    btn.MouseLeave:Connect(function()
+        btn.BackgroundColor3 = Color3.fromRGB(25, 27, 34)
+    end)
+    
     return btn
 end
 
--- Quick Action Row 1
-local r1 = Instance.new("Frame"); r1.Size = UDim2.new(1, -12, 0, 26); r1.Position = UDim2.new(0, 6, 0, 120); r1.BackgroundTransparency = 1; r1.Parent = MF
+-- Controls Matrix Rows
+local r1 = Instance.new("Frame"); r1.Size = UDim2.new(1, -12, 0, 24); r1.Position = UDim2.new(0, 6, 0, 118); r1.BackgroundTransparency = 1; r1.Parent = MF
 local espB = mb(r1, "ESP: ON", COLOR_ACCENT, 0, 0.25)
 local namB = mb(r1, "TAGS: ON", COLOR_ACCENT, 0.25, 0.25)
 local radB = mb(r1, "RADAR: ON", COLOR_ACCENT, 0.5, 0.25)
 local defB = mb(r1, "SHIELD: ON", Color3.fromRGB(180, 130, 0), 0.75, 0.25)
 
--- Row 2 Controls
-local r2 = Instance.new("Frame"); r2.Size = UDim2.new(1, -12, 0, 26); r2.Position = UDim2.new(0, 6, 0, 150); r2.BackgroundTransparency = 1; r2.Parent = MF
+local r2 = Instance.new("Frame"); r2.Size = UDim2.new(1, -12, 0, 24); r2.Position = UDim2.new(0, 6, 0, 146); r2.BackgroundTransparency = 1; r2.Parent = MF
 local itemEspB = mb(r2, "LOOT ESP: ON", Color3.fromRGB(0, 160, 150), 0, 0.35)
-local dbB = mb(r2, "DEEP SCAN", Color3.fromRGB(80, 85, 95), 0.35, 0.30)
+local dbB = mb(r2, "FORCE SCAN", Color3.fromRGB(80, 85, 95), 0.35, 0.30)
 local clrB = mb(r2, "CLEAR BL", Color3.fromRGB(150, 50, 50), 0.65, 0.35)
 
--- Tab Navigation Panel
-local tabF = Instance.new("Frame"); tabF.Size = UDim2.new(1, -12, 0, 24); tabF.Position = UDim2.new(0, 6, 0, 182); tabF.BackgroundTransparency = 1; tabF.Parent = MF
-local liveTab = mb(tabF, "SCANNER", COLOR_ACCENT, 0, 0.33)
-local undoTab = mb(tabF, "BLACKLIST", Color3.fromRGB(100, 110, 120), 0.33, 0.33)
-local wpTab = mb(tabF, "WAYPOINTS", Color3.fromRGB(100, 110, 120), 0.66, 0.34)
+local tabF = Instance.new("Frame"); tabF.Size = UDim2.new(1, -12, 0, 22); tabF.Position = UDim2.new(0, 6, 0, 176); tabF.BackgroundTransparency = 1; tabF.Parent = MF
+local liveTab = mb(tabF, "SCAN_HUD", COLOR_ACCENT, 0, 0.33)
+local undoTab = mb(tabF, "BLACKLIST", COLOR_TEXT_MUTED, 0.33, 0.33)
+local wpTab = mb(tabF, "WAYPOINTS", COLOR_TEXT_MUTED, 0.66, 0.34)
 
--- Scrolling Live List View
-local scr = Instance.new("ScrollingFrame"); scr.BackgroundColor3 = COLOR_PANEL; scr.ScrollBarThickness = 2; scr.ScrollBarImageColor3 = Color3.fromRGB(45, 50, 58)
+-- Dynamic Scrolling Content Viewports
+local scr = Instance.new("ScrollingFrame"); scr.BackgroundColor3 = COLOR_PANEL; scr.ScrollBarThickness = 1; scr.ScrollBarImageColor3 = COLOR_BORDER
 scr.AutomaticCanvasSize = Enum.AutomaticSize.Y; scr.CanvasSize = UDim2.new(0,0,0,0); scr.Parent = MF
-Instance.new("UICorner", scr).CornerRadius = UDim.new(0, 3); Instance.new("UIListLayout", scr).Padding = UDim.new(0, 3)
-local lpad = Instance.new("UIPadding"); lpad.PaddingTop = UDim.new(0,3); lpad.PaddingLeft = UDim.new(0,3); lpad.PaddingRight = UDim.new(0,3); lpad.Parent = scr
-local el = Instance.new("TextLabel"); el.Name = "Empty"; el.Size = UDim2.new(1, 0, 0, 32); el.BackgroundTransparency = 1; el.Text = "SECURE AREA... NO ENTITY DETECTED"; el.TextColor3 = COLOR_TEXT_Muted; el.TextSize = 9; el.Font = Enum.Font.Code; el.Parent = scr
+Instance.new("UICorner", scr).CornerRadius = UDim.new(0, 2); Instance.new("UIListLayout", scr).Padding = UDim.new(0, 2)
+local lpad = Instance.new("UIPadding"); lpad.PaddingTop = UDim.new(0,2); lpad.PaddingLeft = UDim.new(0,2); lpad.PaddingRight = UDim.new(0,2); lpad.Parent = scr
+local el = Instance.new("TextLabel"); el.Name = "Empty"; el.Size = UDim2.new(1, 0, 0, 30); el.BackgroundTransparency = 1; el.Text = "SECURE // NO TARGET SIGNALS IN RANGE"; el.TextColor3 = COLOR_TEXT_MUTED; el.TextSize = 8; el.Font = Enum.Font.Code; el.Parent = scr
 
--- Scrolling Blacklist View
-local uscr = Instance.new("ScrollingFrame"); uscr.BackgroundColor3 = COLOR_PANEL; uscr.ScrollBarThickness = 2; uscr.AutomaticCanvasSize = Enum.AutomaticSize.Y; uscr.CanvasSize = UDim2.new(0,0,0,0); uscr.Visible = false; uscr.Parent = MF
-Instance.new("UICorner", uscr).CornerRadius = UDim.new(0, 3); Instance.new("UIListLayout", uscr).Padding = UDim.new(0, 3)
-local upad = Instance.new("UIPadding"); upad.PaddingTop = UDim.new(0,3); upad.PaddingLeft = UDim.new(0,3); upad.PaddingRight = UDim.new(0,3); upad.Parent = uscr
-local ue = Instance.new("TextLabel"); ue.Size = UDim2.new(1, 0, 0, 32); ue.BackgroundTransparency = 1; ue.Text = "BLACKLIST EMPTY"; ue.TextColor3 = COLOR_TEXT_Muted; ue.TextSize = 9; ue.Font = Enum.Font.Code; ue.Parent = uscr
+local uscr = Instance.new("ScrollingFrame"); uscr.BackgroundColor3 = COLOR_PANEL; uscr.ScrollBarThickness = 1; uscr.AutomaticCanvasSize = Enum.AutomaticSize.Y; uscr.CanvasSize = UDim2.new(0,0,0,0); uscr.Visible = false; uscr.Parent = MF
+Instance.new("UICorner", uscr).CornerRadius = UDim.new(0, 2); Instance.new("UIListLayout", uscr).Padding = UDim.new(0, 2)
+local upad = Instance.new("UIPadding"); upad.PaddingTop = UDim.new(0,2); upad.PaddingLeft = UDim.new(0,2); upad.PaddingRight = UDim.new(0,2); upad.Parent = uscr
+local ue = Instance.new("TextLabel"); ue.Size = UDim2.new(1, 0, 0, 30); ue.BackgroundTransparency = 1; ue.Text = "BLACKLIST TERMINAL EMPTY"; ue.TextColor3 = COLOR_TEXT_MUTED; ue.TextSize = 8; ue.Font = Enum.Font.Code; ue.Parent = uscr
 
--- Scrolling Waypoints (Tactical Coordinate Saver)
-local wpscr = Instance.new("ScrollingFrame"); wpscr.BackgroundColor3 = COLOR_PANEL; wpscr.ScrollBarThickness = 2; wpscr.AutomaticCanvasSize = Enum.AutomaticSize.Y; wpscr.CanvasSize = UDim2.new(0,0,0,0); wpscr.Visible = false; wpscr.Parent = MF
-Instance.new("UICorner", wpscr).CornerRadius = UDim.new(0, 3); Instance.new("UIListLayout", wpscr).Padding = UDim.new(0, 3)
-local wpad = Instance.new("UIPadding"); wpad.PaddingTop = UDim.new(0,28); wpad.PaddingLeft = UDim.new(0,3); wpad.PaddingRight = UDim.new(0,3); wpad.Parent = wpscr
+local wpscr = Instance.new("ScrollingFrame"); wpscr.BackgroundColor3 = COLOR_PANEL; wpscr.ScrollBarThickness = 1; wpscr.AutomaticCanvasSize = Enum.AutomaticSize.Y; wpscr.CanvasSize = UDim2.new(0,0,0,0); wpscr.Visible = false; wpscr.Parent = MF
+Instance.new("UICorner", wpscr).CornerRadius = UDim.new(0, 2); Instance.new("UIListLayout", wpscr).Padding = UDim.new(0, 2)
+local wpad = Instance.new("UIPadding"); wpad.PaddingTop = UDim.new(0,26); wpad.PaddingLeft = UDim.new(0,2); wpad.PaddingRight = UDim.new(0,2); wpad.Parent = wpscr
 
-local saveFrame = Instance.new("Frame"); saveFrame.Size = UDim2.new(1, -6, 0, 24); saveFrame.Position = UDim2.new(0, 3, 0, 2); saveFrame.BackgroundColor3 = Color3.fromRGB(24, 26, 32); saveFrame.Parent = wpscr; Instance.new("UICorner", saveFrame).CornerRadius = UDim.new(0, 3)
-local wpInput = Instance.new("TextBox"); wpInput.Size = UDim2.new(0.65, 0, 1, 0); wpInput.Position = UDim2.new(0, 6, 0, 0); wpInput.BackgroundTransparency = 1; wpInput.Text = "LOC_COORD_LBL..."; wpInput.TextColor3 = Color3.new(1,1,1); wpInput.TextSize = 9; wpInput.Font = Enum.Font.Code; wpInput.TextXAlignment = Enum.TextXAlignment.Left; wpInput.Parent = saveFrame
-local addWpBtn = Instance.new("TextButton"); addWpBtn.Size = UDim2.new(0.32, 0, 1, -2); addWpBtn.Position = UDim2.new(0.68, -2, 0, 1); addWpBtn.BackgroundColor3 = Color3.fromRGB(30, 35, 45); addWpBtn.Text = "SAVE_LOC"; addWpBtn.TextColor3 = COLOR_ACCENT; addWpBtn.TextSize = 9; addWpBtn.Font = Enum.Font.Code; addWpBtn.Parent = saveFrame; Instance.new("UICorner", addWpBtn).CornerRadius = UDim.new(0, 2)
+local saveFrame = Instance.new("Frame"); saveFrame.Size = UDim2.new(1, -4, 0, 22); saveFrame.Position = UDim2.new(0, 2, 0, 2); saveFrame.BackgroundColor3 = Color3.fromRGB(24, 26, 32); saveFrame.Parent = wpscr; Instance.new("UICorner", saveFrame).CornerRadius = UDim.new(0, 2)
+local wpInput = Instance.new("TextBox"); wpInput.Size = UDim2.new(0.65, 0, 1, 0); wpInput.Position = UDim2.new(0, 6, 0, 0); wpInput.BackgroundTransparency = 1; wpInput.Text = "LOC_COORD_LABEL..."; wpInput.TextColor3 = Color3.new(1,1,1); wpInput.TextSize = 8; wpInput.Font = Enum.Font.Code; wpInput.TextXAlignment = Enum.TextXAlignment.Left; wpInput.Parent = saveFrame
+local addWpBtn = Instance.new("TextButton"); addWpBtn.Size = UDim2.new(0.32, 0, 1, -2); addWpBtn.Position = UDim2.new(0.68, -2, 0, 1); addWpBtn.BackgroundColor3 = COLOR_BG; addWpBtn.Text = "SAVE_COORD"; addWpBtn.TextColor3 = COLOR_ACCENT; addWpBtn.TextSize = 8; addWpBtn.Font = Enum.Font.Code; addWpBtn.Parent = saveFrame; Instance.new("UICorner", addWpBtn).CornerRadius = UDim.new(0, 2)
 
-local we = Instance.new("TextLabel"); we.Size = UDim2.new(1, 0, 0, 32); we.Position = UDim2.new(0,0,0,30); we.BackgroundTransparency = 1; we.Text = "NO COORDINATES SAVED"; we.TextColor3 = COLOR_TEXT_Muted; we.TextSize = 9; we.Font = Enum.Font.Code; we.Parent = wpscr
+local we = Instance.new("TextLabel"); we.Size = UDim2.new(1, 0, 0, 30); we.Position = UDim2.new(0,0,0,30); we.BackgroundTransparency = 1; we.Text = "COORDINATE BANK DEVOID"; we.TextColor3 = COLOR_TEXT_MUTED; we.TextSize = 8; we.Font = Enum.Font.Code; we.Parent = wpscr
 
 -- ============================================
 -- Dynamic View and Spectator Panels Setup
@@ -378,16 +350,16 @@ vp2.Position = UDim2.new(0, 6, 1, -36)
 vp2.BackgroundColor3 = Color3.fromRGB(15, 17, 24)
 vp2.Visible = false
 vp2.Parent = MF
-Instance.new("UICorner", vp2).CornerRadius = UDim.new(0, 3)
-Instance.new("UIStroke", vp2).Color = Color3.fromRGB(30, 33, 40)
+Instance.new("UICorner", vp2).CornerRadius = UDim.new(0, 2)
+Instance.new("UIStroke", vp2).Color = COLOR_BORDER
 
 local vlb = Instance.new("TextLabel")
 vlb.Size = UDim2.new(0.7, 0, 1, 0)
 vlb.Position = UDim2.new(0, 8, 0, 0)
 vlb.BackgroundTransparency = 1
-vlb.Text = "LOCK: NULL"
+vlb.Text = "LOCK_TARGET: NULL"
 vlb.TextColor3 = Color3.fromRGB(200, 205, 210)
-vlb.TextSize = 9
+vlb.TextSize = 8
 vlb.Font = Enum.Font.Code
 vlb.TextXAlignment = Enum.TextXAlignment.Left
 vlb.Parent = vp2
@@ -397,10 +369,7 @@ vwB.Size = UDim2.new(0.25, 0, 1, -4)
 vwB.Position = UDim2.new(0.75, -2, 0, 2)
 vwB.BackgroundColor3 = Color3.fromRGB(35, 15, 15)
 vwB.Text = "RELEASE"
-vwB.TextColor3 = Color3.fromRGB(240, 80, 80)
-vwB.TextSize = 8
-vwB.Font = Enum.Font.Code
-vwB.Parent = vp2
+vwB.TextColor3 = COLOR_ALERT; vwB.TextSize = 8; vwB.Font = Enum.Font.Code; vwB.Parent = vp2
 Instance.new("UICorner", vwB).CornerRadius = UDim.new(0, 2)
 
 local vep2 = Instance.new("Frame")
@@ -409,16 +378,16 @@ vep2.Position = UDim2.new(0, 6, 1, -36)
 vep2.BackgroundColor3 = Color3.fromRGB(15, 17, 24)
 vep2.Visible = false
 vep2.Parent = MF
-Instance.new("UICorner", vep2).CornerRadius = UDim.new(0, 3)
-Instance.new("UIStroke", vep2).Color = Color3.fromRGB(30, 33, 40)
+Instance.new("UICorner", vep2).CornerRadius = UDim.new(0, 2)
+Instance.new("UIStroke", vep2).Color = COLOR_BORDER
 
 local velb2 = Instance.new("TextLabel")
 velb2.Size = UDim2.new(0.7, 0, 1, 0)
 velb2.Position = UDim2.new(0, 8, 0, 0)
 velb2.BackgroundTransparency = 1
-velb2.Text = "CAM_SPECTATE: ---"
+velb2.Text = "SPECTATE: NULL"
 velb2.TextColor3 = Color3.fromRGB(200, 205, 210)
-velb2.TextSize = 9
+velb2.TextSize = 8
 velb2.Font = Enum.Font.Code
 velb2.TextXAlignment = Enum.TextXAlignment.Left
 velb2.Parent = vep2
@@ -428,14 +397,11 @@ veB.Size = UDim2.new(0.25, 0, 1, -4)
 veB.Position = UDim2.new(0.75, -2, 0, 2)
 veB.BackgroundColor3 = Color3.fromRGB(35, 15, 15)
 veB.Text = "STOP"
-veB.TextColor3 = Color3.fromRGB(240, 80, 80)
-veB.TextSize = 8
-veB.Font = Enum.Font.Code
-veB.Parent = vep2
+veB.TextColor3 = COLOR_ALERT; veB.TextSize = 8; veB.Font = Enum.Font.Code; veB.Parent = vep2
 Instance.new("UICorner", veB).CornerRadius = UDim.new(0, 2)
 
 local function layoutGUI()
-    local y = 214
+    local y = 204
     local reserve = (viewing or viewingEnt) and 44 or 8
     scr.Size = UDim2.new(1, -12, 1, -(y+reserve)); scr.Position = UDim2.new(0, 6, 0, y)
     uscr.Size = scr.Size; uscr.Position = scr.Position
@@ -444,42 +410,39 @@ end
 layoutGUI()
 
 -- ============================================
--- WARNING POPUP SYSTEM
+-- WARNING POPUP SYSTEM (INSTANT TRIGGER)
 -- ============================================
 local warnGui = Instance.new("Frame"); warnGui.Size = UDim2.new(0, 340, 0, 0); warnGui.AnchorPoint = Vector2.new(0.5, 1)
 warnGui.Position = UDim2.new(0.5, 0, 1, -20); warnGui.BackgroundColor3 = COLOR_PANEL
 warnGui.BackgroundTransparency = 0.05; warnGui.ClipsDescendants = true; warnGui.Parent = SG
-Instance.new("UICorner", warnGui).CornerRadius = UDim.new(0, 3)
-local warnStroke = Instance.new("UIStroke"); warnStroke.Color = Color3.fromRGB(240, 50, 50); warnStroke.Thickness = 1; warnStroke.Parent = warnGui
+Instance.new("UICorner", warnGui).CornerRadius = UDim.new(0, 2)
+local warnStroke = Instance.new("UIStroke"); warnStroke.Color = COLOR_ALERT; warnStroke.Thickness = 1; warnStroke.Parent = warnGui
 local warnTitle = Instance.new("TextLabel"); warnTitle.Size = UDim2.new(1, 0, 0, 20); warnTitle.Position = UDim2.new(0, 0, 0, 4)
-warnTitle.BackgroundTransparency = 1; warnTitle.TextColor3 = Color3.fromRGB(240, 80, 80); warnTitle.TextSize = 10
+warnTitle.BackgroundTransparency = 1; warnTitle.TextColor3 = COLOR_ALERT; warnTitle.TextSize = 10
 warnTitle.Font = Enum.Font.Code; warnTitle.Parent = warnGui
 local warnTip = Instance.new("TextLabel"); warnTip.Size = UDim2.new(1, -10, 0, 18); warnTip.Position = UDim2.new(0, 5, 0, 24)
 warnTip.BackgroundTransparency = 1; warnTip.TextColor3 = Color3.fromRGB(200, 205, 210); warnTip.TextSize = 9
 warnTip.Font = Enum.Font.Code; warnTip.TextWrapped = true; warnTip.Parent = warnGui
 local warnDist = Instance.new("TextLabel"); warnDist.Size = UDim2.new(1, 0, 0, 14); warnDist.Position = UDim2.new(0, 0, 0, 44)
-warnDist.BackgroundTransparency = 1; warnDist.TextColor3 = COLOR_TEXT_Muted; warnDist.TextSize = 9
+warnDist.BackgroundTransparency = 1; warnDist.TextColor3 = COLOR_TEXT_MUTED; warnDist.TextSize = 9
 warnDist.Font = Enum.Font.Code; warnDist.Parent = warnGui
 local warnActive = false
 
 local function showWarning(name, dist, tip, threat)
-    local now = tick()
-    if warnCooldowns[name] and now - warnCooldowns[name] < 3 then
-        if warnActive then warnDist.Text = "RANGE: " .. dist .. " STUDS | THREAT: " .. threat end
-        return
-    end
-    warnCooldowns[name] = now
-    warnTitle.Text = "[!] DETECTION WARNING: " .. name:upper()
+    warnTitle.Text = "[!] DETECTION: " .. name:upper()
     warnTip.Text = tip
-    warnDist.Text = "RANGE: " .. dist .. " STUDS | THREAT: " .. threat
+    warnDist.Text = "RANGE: " .. dist .. " STUDS | TYPE: " .. threat
     warnStroke.Color = getThreatCol(threat)
+    
     if not warnActive then
         warnActive = true
         warnGui.Size = UDim2.new(0, 340, 0, 0)
-        TweenService:Create(warnGui, TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Size = UDim2.new(0, 340, 0, 65)}):Play()
+        TweenService:Create(warnGui, TweenInfo.new(0.15, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Size = UDim2.new(0, 340, 0, 65)}):Play()
     end
+    
+    local cooldownKey = name
     task.delay(4, function()
-        if warnActive and warnTitle.Text:find(name:upper()) then
+        if warnActive and warnTitle.Text:find(cooldownKey:upper()) then
             warnActive = false
             TweenService:Create(warnGui, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {Size = UDim2.new(0, 340, 0, 0)}):Play()
         end
@@ -513,7 +476,7 @@ for _, r in ipairs({0.25, 0.45}) do
 end
 
 local radarTitle = Instance.new("TextLabel"); radarTitle.Size = UDim2.new(1, 0, 0, 14); radarTitle.Position = UDim2.new(0, 0, 1, 4)
-radarTitle.BackgroundTransparency = 1; radarTitle.Text = "LIDAR SCANNING"; radarTitle.TextColor3 = COLOR_TEXT_Muted
+radarTitle.BackgroundTransparency = 1; radarTitle.Text = "LIDAR SCANNING"; radarTitle.TextColor3 = COLOR_TEXT_MUTED
 radarTitle.TextSize = 8; radarTitle.Font = Enum.Font.Code; radarTitle.Parent = radarFrame
 
 local sweepLine = Instance.new("Frame"); sweepLine.Size = UDim2.new(0, 1, 0.5, 0)
@@ -522,7 +485,7 @@ sweepLine.BackgroundColor3 = COLOR_ACCENT; sweepLine.BackgroundTransparency = 0.
 sweepLine.BorderSizePixel = 0; sweepLine.ZIndex = 7; sweepLine.Parent = radarFrame
 
 local radarDots = {}
-local RADAR_RANGE = 200
+local RADAR_RANGE = 250
 local sweepAngle = 0
 
 local function updateRadar()
@@ -538,7 +501,7 @@ local function updateRadar()
     local rightVec = Vector3.new(camCF.RightVector.X, 0, camCF.RightVector.Z)
     if rightVec.Magnitude > 0.01 then rightVec = rightVec.Unit else rightVec = Vector3.new(1,0,0) end
 
-    sweepAngle = sweepAngle + 3; if sweepAngle >= 360 then sweepAngle = 0 end
+    sweepAngle = sweepAngle + 4; if sweepAngle >= 360 then sweepAngle = 0 end
     sweepLine.Rotation = sweepAngle
 
     for name, dot in pairs(radarDots) do
@@ -571,23 +534,23 @@ local function updateRadar()
     end
     
     local dotCount = 0; for _ in pairs(radarDots) do dotCount += 1 end
-    radarTitle.Text = "LIDAR MODE // RNG:" .. RADAR_RANGE .. " // ACT:" .. dotCount
+    radarTitle.Text = "LIDAR RNG:" .. RADAR_RANGE .. " // ACT_SIG:" .. dotCount
 end
 
 -- ============================================
--- RED ALERT SIGNALLER (TACTICAL RETICLE)
+-- RED ALERT SIGNALLER (REAL-TIME OVERLAY)
 -- ============================================
 local AG = Instance.new("ScreenGui"); AG.Name = "RedAlertGui"; AG.ResetOnSpawn = false; AG.DisplayOrder = 200; AG.Parent = LP.PlayerGui
 local AF = Instance.new("Frame"); AF.Size = UDim2.new(0,0,0,95); AF.AnchorPoint = Vector2.new(0.5,0)
 AF.Position = UDim2.new(0.5,0,0,10); AF.BackgroundColor3 = Color3.fromRGB(18, 10, 10); AF.ClipsDescendants = true; AF.Visible = false; AF.Parent = AG
-Instance.new("UICorner", AF).CornerRadius = UDim.new(0, 3)
-local astk = Instance.new("UIStroke"); astk.Color = Color3.fromRGB(240, 50, 50); astk.Thickness = 1.5; astk.Parent = AF
+Instance.new("UICorner", AF).CornerRadius = UDim.new(0, 2)
+local astk = Instance.new("UIStroke"); astk.Color = COLOR_ALERT; astk.Thickness = 1.5; astk.Parent = AF
 local an = Instance.new("TextLabel"); an.Size = UDim2.new(1,0,0,26); an.Position = UDim2.new(0,0,0,3); an.BackgroundTransparency = 1; an.TextColor3 = Color3.new(1,1,1); an.TextSize = 14; an.Font = Enum.Font.Code; an.Parent = AF
 local athreat = Instance.new("TextLabel"); athreat.Size = UDim2.new(1,0,0,14); athreat.Position = UDim2.new(0,0,0,27); athreat.BackgroundTransparency = 1; athreat.TextSize = 10; athreat.Font = Enum.Font.Code; athreat.Parent = AF
 local asp = Instance.new("TextLabel"); asp.Size = UDim2.new(1,0,0,13); asp.Position = UDim2.new(0,0,0,40); asp.BackgroundTransparency = 1; asp.TextColor3 = Color3.fromRGB(240,160,50); asp.TextSize = 9; asp.Font = Enum.Font.Code; asp.Parent = AF
 local ahc = Instance.new("Frame"); ahc.Size = UDim2.new(1,0,0,16); ahc.Position = UDim2.new(0,0,0,55); ahc.BackgroundTransparency = 1; pcall(function() ahc.ClipsDescendants = true end); ahc.Parent = AF
-local ht = "SYS_ALERT_WARNING // TAKING SHELTER IS HIGHLY ADVISED // "
-local ah1 = Instance.new("TextLabel"); ah1.Size = UDim2.new(3,0,1,0); ah1.BackgroundTransparency = 1; ah1.Text = ht; ah1.TextColor3 = Color3.fromRGB(240,50,50); ah1.TextSize = 10; ah1.Font = Enum.Font.Code; ah1.Parent = ahc
+local ht = "OUTBREAK WARNING // TAKE SHELTER PRE-EMPTIVELY // OUTBREAK WARNING // "
+local ah1 = Instance.new("TextLabel"); ah1.Size = UDim2.new(3,0,1,0); ah1.BackgroundTransparency = 1; ah1.Text = ht; ah1.TextColor3 = COLOR_ALERT; ah1.TextSize = 10; ah1.Font = Enum.Font.Code; ah1.Parent = ahc
 local ah2 = ah1:Clone(); ah2.Position = UDim2.new(0,500,0,0); ah2.Parent = ahc
 local ad = Instance.new("TextLabel"); ad.Size = UDim2.new(1,0,0,14); ad.Position = UDim2.new(0,0,1,-16); ad.BackgroundTransparency = 1; ad.TextColor3 = Color3.fromRGB(200,180,180); ad.TextSize = 9; ad.Font = Enum.Font.Code; ad.Parent = AF
 local flashFrame = Instance.new("Frame"); flashFrame.Size = UDim2.new(1,0,1,0); flashFrame.BackgroundColor3 = Color3.fromRGB(240,0,0); flashFrame.BackgroundTransparency = 1; flashFrame.ZIndex = 100; flashFrame.Parent = AG
@@ -601,7 +564,7 @@ local function teleportItemToHand(item)
     local part = item:FindFirstChildWhichIsA("BasePart", true) or item
     if root and part then
         part.CFrame = root.CFrame * CFrame.new(0, 0, -2)
-        showWarning("REQUISITION SYS", "0", "ITEM GRABBED", "SAFE")
+        showWarning("REQUISITION SYS", "0", "ITEM INTERCEPTED", "SAFE")
     end
 end
 
@@ -612,7 +575,7 @@ local function applyItemESP(obj)
         if primary and not itemTracked[obj] then
             itemTracked[obj] = true
             local bg = Instance.new("BillboardGui"); bg.Adornee = primary; bg.Size = UDim2.new(0, 100, 0, 40); bg.AlwaysOnTop = true; bg.Parent = primary
-            local tl = Instance.new("TextLabel"); tl.Size = UDim2.new(1, 0, 1, 0); tl.BackgroundTransparency = 1; tl.TextColor3 = Color3.fromRGB(0, 200, 235); tl.TextSize = 8; tl.Font = Enum.Font.Code; tl.Text = "[REQUISITION: " .. obj.Name:upper() .. "]"; tl.Parent = bg
+            local tl = Instance.new("TextLabel"); tl.Size = UDim2.new(1, 0, 1, 0); tl.BackgroundTransparency = 1; tl.TextColor3 = Color3.fromRGB(0, 200, 235); tl.TextSize = 8; tl.Font = Enum.Font.Code; tl.Text = "[ITEM: " .. obj.Name:upper() .. "]"; tl.Parent = bg
             
             local itemBtn = Instance.new("TextButton"); itemBtn.Size = UDim2.new(1, -10, 0, 24); itemBtn.BackgroundColor3 = COLOR_PANEL; itemBtn.Text = "GRAB_" .. obj.Name:upper(); itemBtn.TextColor3 = Color3.fromRGB(0, 255, 255); itemBtn.Font = Enum.Font.Code; itemBtn.TextSize = 8; itemBtn.Parent = wpscr
             Instance.new("UICorner", itemBtn).CornerRadius = UDim.new(0, 2)
@@ -658,10 +621,10 @@ local function updUndo() undoTab.Text = "BL ["..blCount.."]"; ue.Visible = blCou
 local function addUndo(name)
     if undoEntries[name] then return end
     local e = Instance.new("Frame"); e.Size = UDim2.new(1,-4,0,32); e.BackgroundColor3 = Color3.fromRGB(24, 26, 32); e.Parent = uscr
-    Instance.new("UICorner", e).CornerRadius = UDim.new(0, 3)
-    local n = Instance.new("TextLabel"); n.Size = UDim2.new(0.4,0,1,0); n.Position = UDim2.new(0,6,0,0); n.BackgroundTransparency = 1; n.Text = "BL_SIG: "..name:upper(); n.TextColor3 = COLOR_TEXT_Muted; n.TextSize = 8; n.Font = Enum.Font.Code; n.Parent = e
+    Instance.new("UICorner", e).CornerRadius = UDim.new(0, 2)
+    local n = Instance.new("TextLabel"); n.Size = UDim2.new(0.4,0,1,0); n.Position = UDim2.new(0,6,0,0); n.BackgroundTransparency = 1; n.Text = "BL_SIG: "..name:upper(); n.TextColor3 = COLOR_TEXT_MUTED; n.TextSize = 8; n.Font = Enum.Font.Code; n.Parent = e
     local rb = Instance.new("TextButton"); rb.Size = UDim2.new(0,54,0,20); rb.Position = UDim2.new(1,-116,0.5,-10); rb.BackgroundColor3 = Color3.fromRGB(15, 30, 20); rb.Text = "RESTORE"; rb.TextColor3 = Color3.fromRGB(100, 220, 140); rb.TextSize = 8; rb.Font = Enum.Font.Code; rb.Parent = e; Instance.new("UICorner", rb).CornerRadius = UDim.new(0,2)
-    local db = Instance.new("TextButton"); db.Size = UDim2.new(0,50,0,20); db.Position = UDim2.new(1,-58,0.5,-10); db.BackgroundColor3 = Color3.fromRGB(35, 15, 15); db.Text = "DELETE"; db.TextColor3 = Color3.fromRGB(240, 80, 80); db.TextSize = 8; db.Font = Enum.Font.Code; db.Parent = e; Instance.new("UICorner", db).CornerRadius = UDim.new(0,2)
+    local db = Instance.new("TextButton"); db.Size = UDim2.new(0,50,0,20); db.Position = UDim2.new(1,-58,0.5,-10); db.BackgroundColor3 = Color3.fromRGB(35, 15, 15); db.Text = "DELETE"; db.TextColor3 = COLOR_ALERT; db.TextSize = 8; db.Font = Enum.Font.Code; db.Parent = e; Instance.new("UICorner", db).CornerRadius = UDim.new(0,2)
     
     rb.MouseButton1Click:Connect(function() 
         bl[name] = nil; blCount -= 1; updUndo(); e:Destroy(); undoEntries[name] = nil
@@ -681,11 +644,11 @@ local function addWaypoint(name, cframe)
     we.Visible = false
     
     local entry = Instance.new("Frame"); entry.Size = UDim2.new(1, -4, 0, 32); entry.BackgroundColor3 = COLOR_PANEL; entry.Parent = wpscr
-    Instance.new("UICorner", entry).CornerRadius = UDim.new(0, 3)
+    Instance.new("UICorner", entry).CornerRadius = UDim.new(0, 2)
     
     local n = Instance.new("TextLabel"); n.Size = UDim2.new(0.5, 0, 1, 0); n.Position = UDim2.new(0, 6, 0, 0); n.BackgroundTransparency = 1; n.Text = "COORD: " .. name:upper(); n.TextColor3 = COLOR_ACCENT; n.TextSize = 8; n.Font = Enum.Font.Code; n.Parent = entry
     local tpBtn = Instance.new("TextButton"); tpBtn.Size = UDim2.new(0, 54, 0, 20); tpBtn.Position = UDim2.new(1, -116, 0.5, -10); tpBtn.BackgroundColor3 = COLOR_BG; tpBtn.Text = "WARP"; tpBtn.TextColor3 = COLOR_ACCENT; tpBtn.TextSize = 8; tpBtn.Font = Enum.Font.Code; tpBtn.Parent = entry; Instance.new("UICorner", tpBtn).CornerRadius = UDim.new(0, 2)
-    local delBtn = Instance.new("TextButton"); delBtn.Size = UDim2.new(0, 50, 0, 20); delBtn.Position = UDim2.new(1, -58, 0.5, -10); delBtn.BackgroundColor3 = Color3.fromRGB(35, 15, 15); delBtn.Text = "REMOVE"; delBtn.TextColor3 = Color3.fromRGB(240, 80, 80); delBtn.TextSize = 8; delBtn.Font = Enum.Font.Code; delBtn.Parent = entry; Instance.new("UICorner", delBtn).CornerRadius = UDim.new(0, 2)
+    local delBtn = Instance.new("TextButton"); delBtn.Size = UDim2.new(0, 50, 0, 20); delBtn.Position = UDim2.new(1, -58, 0.5, -10); delBtn.BackgroundColor3 = Color3.fromRGB(35, 15, 15); delBtn.Text = "REMOVE"; delBtn.TextColor3 = COLOR_ALERT; delBtn.TextSize = 8; delBtn.Font = Enum.Font.Code; delBtn.Parent = entry; Instance.new("UICorner", delBtn).CornerRadius = UDim.new(0, 2)
     
     tpBtn.MouseButton1Click:Connect(function()
         local char = LP.Character; local root = char and char:FindFirstChild("HumanoidRootPart")
@@ -698,11 +661,11 @@ end
 
 addWpBtn.MouseButton1Click:Connect(function()
     local name = wpInput.Text
-    if name == "" or name == "LOC_COORD_LBL..." then return end
+    if name == "" or name == "LOC_COORD_LABEL..." then return end
     local char = LP.Character; local root = char and char:FindFirstChild("HumanoidRootPart")
     if root then
         addWaypoint(name, root.CFrame)
-        wpInput.Text = "LOC_COORD_LBL..."
+        wpInput.Text = "LOC_COORD_LABEL..."
     end
 end)
 
@@ -726,7 +689,7 @@ local function startVE(entity)
     local root = data.targetPart; if not root or not root.Parent then root = getPart(entity); data.targetPart = root end
     if not root then return end; if viewing then stopV() end
     viewingEnt = true; viewEntTarget = entity; vep2.Visible = true
-    velb2.Text = "CAM_SPECTATE: " .. getDisplayName(entity)
+    velb2.Text = "CAM_WATCHING: " .. getDisplayName(entity)
     veB.Text = "STOP"; veB.BackgroundColor3 = Color3.fromRGB(35,15,15)
     savedCamType = Camera.CameraType; Camera.CameraType = Enum.CameraType.Scriptable
     local ang = 0
@@ -749,19 +712,18 @@ local function startV(entity)
     local ind = Instance.new("ScreenGui"); ind.Name = "ViewIndicator"; ind.ResetOnSpawn = false; ind.DisplayOrder = 100; ind.Parent = LP.PlayerGui
     local ar = Instance.new("TextLabel"); ar.Size = UDim2.new(0,150,0,40); ar.AnchorPoint = Vector2.new(0.5,0)
     ar.Position = UDim2.new(0.5,0,0,8); ar.BackgroundColor3 = COLOR_PANEL; ar.BackgroundTransparency = 0.15
-    ar.Text = "TRACK: " .. dName; ar.TextColor3 = getCol(entity.Name); ar.TextSize = 9; ar.Font = Enum.Font.Code; ar.Parent = ind
+    ar.Text = "TRACKING: " .. dName; ar.TextColor3 = getCol(entity.Name); ar.TextSize = 9; ar.Font = Enum.Font.Code; ar.Parent = ind
     Instance.new("UIStroke", ar).Color = getCol(entity.Name)
     viewIndicator = ind
     viewConn = RunService.Heartbeat:Connect(function()
         if not viewing or not entity or not entity.Parent then stopV(); return end
         if not root or not root.Parent then root = getPart(entity); data.targetPart = root; if not root then stopV(); return end end
         local sp, on = Camera:WorldToScreenPoint(root.Position); local vpS = Camera.ViewportSize
-        ar.Text = "LOCK_ON // " .. dName .. "\nRNG: " .. math.floor((LP.Character.HumanoidRootPart.Position-root.Position).Magnitude) .. " STUDS"
+        ar.Text = "TRACKING // " .. dName .. "\nRANGE: " .. math.floor((LP.Character.HumanoidRootPart.Position-root.Position).Magnitude) .. " STUDS"
         if on then ar.Position = UDim2.new(0, math.clamp(sp.X,90,vpS.X-90), 0, math.clamp(sp.Y,8,55)) end
     end); layoutGUI() 
 end
 
--- Release Spectator Controllers
 vwB.MouseButton1Click:Connect(stopV)
 veB.MouseButton1Click:Connect(stopVE)
 
@@ -782,14 +744,14 @@ end
 showAl = function(name, dist, allR, spTxt, threat)
     totalAlerts += 1
     if alertOn and alertEnt == name then
-        ad.Text = "RNG: " .. dist .. " STUDS | " .. (spTxt or ""); asp.Text = getSurvivalTip(name)
+        ad.Text = "RANGE: " .. dist .. " STUDS | " .. (spTxt or ""); asp.Text = getSurvivalTip(name)
         updLS(allR, name)
         return 
     end
-    alertEnt = name; an.Text = "HOSTILE_DETECTED // "..name; ad.Text = "RNG: " .. dist .. " STUDS | " .. (spTxt or ""); asp.Text = getSurvivalTip(name)
-    athreat.Text = "THREAT LEVEL: " .. (threat or "UNKNOWN"); athreat.TextColor3 = getThreatCol(threat or "UNKNOWN")
+    alertEnt = name; an.Text = "HOSTILE SIGNAL DETECTED // "..name; ad.Text = "RANGE: " .. dist .. " STUDS | " .. (spTxt or ""); asp.Text = getSurvivalTip(name)
+    athreat.Text = "THREAT VECTOR: " .. (threat or "UNKNOWN"); athreat.TextColor3 = getThreatCol(threat or "UNKNOWN")
     if not alertOn then AF.Size = UDim2.new(0,0,0,95); AF.Visible = true; alertOn = true
-        TweenService:Create(AF, TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Size = UDim2.new(0,450,0,95)}):Play() 
+        TweenService:Create(AF, TweenInfo.new(0.15, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Size = UDim2.new(0,450,0,95)}):Play() 
     end
     alertOn = true
     if alertScrConn then alertScrConn:Disconnect() end; local sx, tw = 0, 500
@@ -800,7 +762,7 @@ end
 
 hideAl = function() 
     if not alertOn then return end; alertOn = false; alertEnt = nil
-    TweenService:Create(AF, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {Size = UDim2.new(0,0,0,95)}):Play()
+    TweenService:Create(AF, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {Size = UDim2.new(0,0,0,95)}):Play()
     if alertScrConn then alertScrConn:Disconnect(); alertScrConn = nil end
     clrLS() 
 end
@@ -812,7 +774,7 @@ untrack = function(entity)
     if d.dConn then d.dConn:Disconnect() end
     pcall(function() if d.entry then d.entry:Destroy() end end)
     spd[entity] = nil; tracked[entity] = nil; entCount = math.max(0, entCount-1)
-    cl2.Text = "ACTIVE THREATS: " .. entCount
+    cl2.Text = "ACTIVE TARGETS: " .. entCount
     if alertEnt == entity.Name or alertEnt == getDisplayName(entity) then hideAl() end 
 end
 
@@ -830,8 +792,8 @@ track = function(entity)
     local threat = getThreat(entity.Name)
     local threatCol = getThreatCol(threat)
 
-    if threat == "LETHAL" or threat == "DANGER" then
-        showWarning(displayName, "NEW OUTBREAK", getSurvivalTip(entity.Name), threat)
+    if threat == "LETHAL" or threat == "CRITICAL" or threat == "DANGER" then
+        showWarning(displayName, "NEW LINK Established", getSurvivalTip(entity.Name), threat)
     end
 
     if entity:IsA("Model") or entity:IsA("BasePart") then
@@ -845,22 +807,22 @@ track = function(entity)
         if d.billboard or not part then return end
         local bb = Instance.new("BillboardGui"); bb.Adornee = part; bb.Size = UDim2.new(0,160,0,80); bb.AlwaysOnTop = true; bb.Enabled = namesOn; bb.Parent = part
         local nt = Instance.new("TextLabel"); nt.Size = UDim2.new(1,0,0,16); nt.BackgroundTransparency = 1; nt.Text = displayName; nt.TextColor3 = color; nt.TextSize = 10; nt.Font = Enum.Font.Code; nt.Parent = bb
-        local tl2 = Instance.new("TextLabel"); tl2.Size = UDim2.new(1,0,0,13); tl2.Position = UDim2.new(0,0,0,14); tl2.BackgroundTransparency = 1; tl2.Text = "[THREAT: " .. threat .. "]"; tl2.TextColor3 = threatCol; tl2.TextSize = 8; tl2.Font = Enum.Font.Code; tl2.Parent = bb
+        local tl2 = Instance.new("TextLabel"); tl2.Size = UDim2.new(1,0,0,13); tl2.Position = UDim2.new(0,0,0,14); tl2.BackgroundTransparency = 1; tl2.Text = "[TYPE: " .. threat .. "]"; tl2.TextColor3 = threatCol; tl2.TextSize = 8; tl2.Font = Enum.Font.Code; tl2.Parent = bb
         d.billboard = bb 
     end
     if root then sBB(root) end
 
     if root then spd[entity] = {lP=root.Position, lT=tick(), sp=0, sa={}, pP=root.Position, pT=tick(), warnedClose=false} end
 
-    local entry = Instance.new("Frame"); entry.Size = UDim2.new(1,-4,0,46); entry.BackgroundColor3 = COLOR_BG; entry.Parent = scr; Instance.new("UICorner", entry).CornerRadius = UDim.new(0,3)
-    local es = Instance.new("UIStroke"); es.Color = Color3.fromRGB(35, 38, 45); es.Thickness = 1; es.Parent = entry
+    local entry = Instance.new("Frame"); entry.Size = UDim2.new(1,-4,0,46); entry.BackgroundColor3 = COLOR_BG; entry.Parent = scr; Instance.new("UICorner", entry).CornerRadius = UDim.new(0,2)
+    local es = Instance.new("UIStroke"); es.Color = COLOR_BORDER; es.Thickness = 1; es.Parent = entry
     local tBar = Instance.new("Frame"); tBar.Size = UDim2.new(0, 3, 1, -6); tBar.Position = UDim2.new(0, 3, 0, 3); tBar.BackgroundColor3 = threatCol; tBar.Parent = entry
     
     local nl2 = Instance.new("TextLabel"); nl2.Size = UDim2.new(0.4,0,0,15); nl2.Position = UDim2.new(0,12,0,2); nl2.BackgroundTransparency = 1; nl2.Text = displayName; nl2.TextColor3 = color; nl2.TextSize = 9; nl2.Font = Enum.Font.Code; nl2.Parent = entry
-    local edl = Instance.new("TextLabel"); edl.Size = UDim2.new(0,80,0,12); edl.Position = UDim2.new(1,-168,0,4); edl.BackgroundTransparency = 1; edl.Text = "--- STUDS"; edl.TextColor3 = COLOR_TEXT_Muted; edl.TextSize = 9; edl.Font = Enum.Font.Code; edl.Parent = entry
-    local esl = Instance.new("TextLabel"); esl.Size = UDim2.new(0.65,0,0,12); esl.Position = UDim2.new(0,12,0,28); esl.BackgroundTransparency = 1; esl.Text = "CALCULATING VECTOR..."; esl.TextColor3 = COLOR_TEXT_Muted; esl.TextSize = 8; esl.Font = Enum.Font.Code; esl.Parent = entry
+    local edl = Instance.new("TextLabel"); edl.Size = UDim2.new(0,80,0,12); edl.Position = UDim2.new(1,-168,0,4); edl.BackgroundTransparency = 1; edl.Text = "--- STUDS"; edl.TextColor3 = COLOR_TEXT_MUTED; edl.TextSize = 9; edl.Font = Enum.Font.Code; edl.Parent = entry
+    local esl = Instance.new("TextLabel"); esl.Size = UDim2.new(0.65,0,0,12); esl.Position = UDim2.new(0,12,0,28); esl.BackgroundTransparency = 1; esl.Text = "CALCULATING VECTOR..."; esl.TextColor3 = COLOR_TEXT_MUTED; esl.TextSize = 8; esl.Font = Enum.Font.Code; esl.Parent = entry
 
-    local xbb = Instance.new("TextButton"); xbb.Size = UDim2.new(0,18,0,18); xbb.Position = UDim2.new(1,-82,0.5,-9); xbb.BackgroundColor3 = Color3.fromRGB(35,15,15); xbb.Text = "X"; xbb.TextColor3 = Color3.fromRGB(240, 80, 80); xbb.Font = Enum.Font.Code; xbb.Parent = entry; Instance.new("UICorner", xbb).CornerRadius = UDim.new(0,2)
+    local xbb = Instance.new("TextButton"); xbb.Size = UDim2.new(0,18,0,18); xbb.Position = UDim2.new(1,-82,0.5,-9); xbb.BackgroundColor3 = Color3.fromRGB(35,15,15); xbb.Text = "X"; xbb.TextColor3 = COLOR_ALERT; xbb.Font = Enum.Font.Code; xbb.Parent = entry; Instance.new("UICorner", xbb).CornerRadius = UDim.new(0,2)
     local vb2 = Instance.new("TextButton"); vb2.Size = UDim2.new(0,22,0,18); vb2.Position = UDim2.new(1,-60,0.5,-9); vb2.BackgroundColor3 = Color3.fromRGB(24, 26, 32); vb2.Text = "LK"; vb2.TextColor3 = COLOR_ACCENT; vb2.Font = Enum.Font.Code; vb2.Parent = entry; Instance.new("UICorner", vb2).CornerRadius = UDim.new(0,2)
     local veb3 = Instance.new("TextButton"); veb3.Size = UDim2.new(0,22,0,18); veb3.Position = UDim2.new(1,-34,0.5,-9); veb3.BackgroundColor3 = Color3.fromRGB(24, 26, 32); veb3.Text = "CAM"; veb3.TextColor3 = COLOR_ACCENT; veb3.Font = Enum.Font.Code; veb3.Parent = entry; Instance.new("UICorner", veb3).CornerRadius = UDim.new(0,2)
 
@@ -870,10 +832,10 @@ track = function(entity)
 
     d.entry = entry; d.entryDist = edl; d.entryName = nl2; d.entryStroke = es; d.entrySpeed = esl
     d.dConn = entity.AncestryChanged:Connect(function(_, p) if not p then untrack(entity) end end)
-    tracked[entity] = d; entCount += 1; cl2.Text = "ACTIVE THREATS: "..entCount; el.Visible = false
+    tracked[entity] = d; entCount += 1; cl2.Text = "ACTIVE TARGETS: "..entCount; el.Visible = false
 end
 
--- Hook Workspace (Optimized Setup)
+-- Track Workspace Objects
 task.spawn(function()
     for _, obj in ipairs(workspace:GetChildren()) do 
         if isEnt(obj) then track(obj) end 
@@ -888,9 +850,9 @@ table.insert(workspaceConnections, workspace.DescendantAdded:Connect(function(ob
 end))
 table.insert(workspaceConnections, workspace.DescendantRemoving:Connect(function(obj) if tracked[obj] then untrack(obj) end end))
 
--- ============================================
--- MAIN SCANNER THREAD (THROTTLED INTERFACES)
--- ============================================
+-- ========================================================
+-- DECOUPLED TELEMETRY LOOP (INSTANT REAL-TIME CALCULATIONS)
+-- ========================================================
 local lastUpdate = 0
 local mainHeartbeatConn
 mainHeartbeatConn = RunService.Heartbeat:Connect(function()
@@ -898,80 +860,114 @@ mainHeartbeatConn = RunService.Heartbeat:Connect(function()
     
     updateRadar()
     
-    -- Performance scan throttle limit (10Hz / 100ms updates)
-    if tick() - lastUpdate < 0.1 then return end
-    lastUpdate = tick()
-    
-    local char = LP.Character; local myR = char and char:FindFirstChild("HumanoidRootPart")
+    local char = LP.Character
+    local myR = char and char:FindFirstChild("HumanoidRootPart")
     if not myR then return end
-    local myP = myR.Position; local now = tick(); local cRN, cRD, cRS, cRT = nil, math.huge, "", "UNKNOWN"; local allR = {}
-    local nearestDist = math.huge; local nearestName = "NULL"
+    local myP = myR.Position
+    local now = tick()
+    
+    -- Real-Time Telemetry Pipeline (Runs every frame for immediate warning updates)
+    local nearestDist = math.huge
+    local nearestName = "NULL"
     local highestThreat = "SAFE"
+    local activeAlerts = {}
 
     for ent, d in pairs(tracked) do
         local tp = d.targetPart
         if tp and tp.Parent then
-            local dist = math.floor((myP-tp.Position).Magnitude)
+            local rawDist = (myP - tp.Position).Magnitude
+            local dist = math.floor(rawDist)
             local threat = getThreat(ent.Name)
 
-            if dist < nearestDist then nearestDist = dist; nearestName = getDisplayName(ent) end
-            if threat == "LETHAL" and dist < RED_THRESH then highestThreat = threat end
+            if rawDist < nearestDist then 
+                nearestDist = rawDist 
+                nearestName = getDisplayName(ent) 
+            end
+            
+            if threat == "LETHAL" or threat == "CRITICAL" then
+                highestThreat = threat
+                activeAlerts[getDisplayName(ent)] = dist
+                
+                -- Instant Auto-Shield Triggering
+                if autoDefenseOn and rawDist < 100 then
+                    executeAutoDefend()
+                end
+            end
 
+            -- Update distance values on the GUI list instantly
+            if d.entryDist then 
+                d.entryDist.Text = dist .. " STUDS" 
+            end
+
+            -- High-Speed Intercept Vectors (Throttled for path updates)
             local sd = spd[ent]
             if sd then
                 local dt = now - sd.lT
-                if dt > 0.1 then
-                    local s = (tp.Position-sd.lP).Magnitude/dt
-                    sd.lP = tp.Position; sd.lT = now; sd.sp = s
+                if dt >= 0.05 then -- Accelerated vector math for rapid targets (20Hz)
+                    local s = (tp.Position - sd.lP).Magnitude / dt
+                    sd.lP = tp.Position
+                    sd.lT = now
+                    sd.sp = s
                     
                     local approachTxt = "VECTOR: STATIC"
                     if s > FAST_THRESH then
-                        approachTxt = "WARN: HIGH VELOCITY DETECTED"
-                        if autoDefenseOn and dist < 50 and threat == "LETHAL" then
-                            executeAutoDefend()
-                        end
+                        approachTxt = "WARN: FAST VECTOR " .. math.floor(s) .. "m/s"
                     elseif s > SLOW_THRESH then
-                        approachTxt = "WARN: MOVING PATTERN"
+                        approachTxt = "WARN: MOVEMENT SIGNAL"
                     end
                     
-                    if d.entryDist then d.entryDist.Text = dist .. " STUDS" end
-                    if d.entrySpeed then d.entrySpeed.Text = approachTxt end
+                    if d.entrySpeed then 
+                        d.entrySpeed.Text = approachTxt 
+                    end
                 end
             end
         end
     end
 
-    timeL.Text = "SYS_T: " .. formatTime(tick() - sessionStart)
-    statL.Text = "DET: " .. totalDetected .. " | ALERTS: " .. totalAlerts
-    nearL.Text = "PROX: " .. (nearestDist < math.huge and (nearestName .. " [" .. nearestDist .. "S]") or "NULL")
-    threatL.Text = "STATUS: " .. highestThreat; threatL.TextColor3 = getThreatCol(highestThreat)
+    -- Real-time HUD banner update
+    local alertCount = 0
+    for name, distance in pairs(activeAlerts) do
+        alertCount = alertCount + 1
+        showAl(name, distance, activeAlerts, "CRITICAL WARNING", getThreat(name))
+    end
+    if alertCount == 0 then 
+        hideAl() 
+    end
+
+    -- Throttled UI Telemetry (10Hz / saves enormous rendering overhead)
+    if now - lastUpdate >= 0.1 then
+        lastUpdate = now
+        timeL.Text = "SYS_T: " .. formatTime(now - sessionStart)
+        statL.Text = "DET: " .. totalDetected .. " | ALERTS: " .. totalAlerts
+        nearL.Text = "PROX_DIST: " .. (nearestDist < math.huge and (nearestName .. " [" .. math.floor(nearestDist) .. "s]") or "NULL")
+        threatL.Text = "STATUS: " .. highestThreat
+        threatL.TextColor3 = getThreatCol(highestThreat)
+    end
 end)
 
--- Buttons Interaction Listeners
+-- Controls Interfaces
 espB.MouseButton1Click:Connect(function() espOn = not espOn; espB.Text = espOn and "ESP: ON" or "ESP: OFF"; espB.BackgroundColor3 = espOn and Color3.fromRGB(24, 26, 32) or Color3.fromRGB(35, 15, 15) end)
 namB.MouseButton1Click:Connect(function() namesOn = not namesOn; namB.Text = namesOn and "TAGS: ON" or "TAGS: OFF"; namB.BackgroundColor3 = namesOn and Color3.fromRGB(24, 26, 32) or Color3.fromRGB(35, 15, 15) end)
 radB.MouseButton1Click:Connect(function() radarOn = not radarOn; radB.Text = radarOn and "RADAR: ON" or "RADAR: OFF"; radB.BackgroundColor3 = radarOn and Color3.fromRGB(24, 26, 32) or Color3.fromRGB(35, 15, 15) end)
 defB.MouseButton1Click:Connect(function() autoDefenseOn = not autoDefenseOn; defB.Text = autoDefenseOn and "SHIELD: ON" or "SHIELD: OFF"; defB.BackgroundColor3 = autoDefenseOn and Color3.fromRGB(24, 26, 32) or Color3.fromRGB(35, 15, 15) end)
 
--- Clear Blacklist Command
 clrB.MouseButton1Click:Connect(function()
     bl = {}; blCount = 0; updUndo()
     for _, f in pairs(undoEntries) do pcall(function() f:Destroy() end) end; undoEntries = {}
 end)
 
--- Dynamic Deep Scanner Triggers
 dbB.MouseButton1Click:Connect(function()
     dbB.Text = "SCANNING..."
-    task.delay(1, function()
+    task.delay(0.5, function()
         for _, obj in ipairs(workspace:GetDescendants()) do 
             if isEnt(obj) then track(obj) end 
         end
-        dbB.Text = "DEEP SCAN"
+        dbB.Text = "FORCE SCAN"
     end)
 end)
 
 -- ============================================
--- CLEAN DISPATCH TERMINATOR
+-- SYSTEM TERMINATOR
 -- ============================================
 xbtn.MouseButton1Click:Connect(function() 
     active = false
@@ -994,6 +990,6 @@ xbtn.MouseButton1Click:Connect(function()
 end)
 
 print("═══════════════════════════════════════")
-print(" ☠ DISPATCH RADAR DISPATCH TERMINAL LOADED")
-print(" 🛡 STEALTH HUDS ACTIVE // ZERO-LAG MODE")
+print(" ☠ SCANNER CONTROLLER STABLE LOADED")
+print(" 🛡 TACTICAL HUD MODULE: ACTIVE")
 print("═══════════════════════════════════════")
