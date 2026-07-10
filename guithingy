@@ -1,7 +1,7 @@
 --[[
-    ☠ ENTITY SCANNER ULTRA v10.6 ☠ - TACTICAL ESCAPE EDITION
+    ☠ ENTITY SCANNER ULTRA v10.7 ☠ - OFFICIAL WHITELIST EDITION
     Engineered for high-speed games like Rooms Re-Established & Doors.
-    High-fidelity, real-time physics telemetry paired with a professional military HUD.
+    Strictly filters out spawners, despawn remnants, fake decoys, and fan-made hostiles.
 ]]
 
 local Players = game:GetService("Players")
@@ -54,23 +54,22 @@ local itemTracked = {}
 local safeSpots = { Lockers = {}, Tables = {} }
 local safeSpotTracked = {}
 
--- Normalized keys (alphanumeric only) to resolve lookup mismatches
+-- STRICT WHELIST: Only real, official gameplay hostiles
 local KNOWN_ENTITIES = {
+    -- Official Doors
     ["rush"] = true, ["ambush"] = true, ["seek"] = true, ["figure"] = true,
-    ["halt"] = true, ["eyes"] = true, ["screech"] = true, ["hide"] = true,
+    ["halt"] = true, ["eyes"] = true, ["screech"] = true, ["dread"] = true,
+    -- Official Rooms / Rooms Re-Established
     ["a60"] = true, ["a90"] = true, ["a120"] = true, ["a200"] = true,
-    ["a270"] = true, ["a300"] = true, ["x60"] = true, ["x120"] = true,
-    ["x200"] = true, ["x300"] = true, ["v60"] = true, ["v120"] = true,
-    ["giggle"] = true, ["grumble"] = true, ["dread"] = true, ["haste"] = true,
+    ["a270"] = true, ["a300"] = true,
 }
 
 local THREAT_LEVEL = {
     ["rush"] = "LETHAL", ["ambush"] = "LETHAL", ["seek"] = "LETHAL",
     ["figure"] = "LETHAL", ["halt"] = "DANGER", ["screech"] = "DANGER",
-    ["eyes"] = "DANGER", 
+    ["eyes"] = "DANGER", ["dread"] = "LETHAL",
     ["a60"] = "LETHAL", ["a90"] = "CRITICAL", ["a120"] = "LETHAL", ["a200"] = "LETHAL",
-    ["a270"] = "LETHAL", ["a300"] = "LETHAL", ["x60"] = "LETHAL", ["x120"] = "LETHAL",
-    ["giggle"] = "DANGER", ["dread"] = "LETHAL", ["haste"] = "LETHAL",
+    ["a270"] = "LETHAL", ["a300"] = "LETHAL",
 }
 
 local THREAT_COLOR = {
@@ -121,26 +120,32 @@ end
 local function matchPat(name)
     local low = name:lower()
     
-    -- Filter out normal doors, switches, interface buttons, and prompt regions
-    if low:find("prompt") or low:find("trigger") or low:find("part") or low:find("interact") or low:find("location") or low:find("marker") or low:find("zone") then
+    -- STRICT ANTI-FAKE/SPAWN/DESPAWN BLACKLIST
+    if low:find("prompt") or low:find("trigger") or low:find("part") or low:find("interact") 
+       or low:find("location") or low:find("marker") or low:find("zone") or low:find("node")
+       or low:find("spawn") or low:find("despawn") or low:find("template") or low:find("fake") 
+       or low:find("clone") or low:find("decoy") or low:find("dummy") or low:find("troll")
+       or low:find("test") or low:find("mock") or low:find("fanmade") or low:find("visual")
+       or low:find("model") or low:find("audio") or low:find("sound") or low:find("setup") then
         return false
     end
     
-    -- FILTER STATIC "HIDE" PROMPTS OUT: If name is "hide", "hidepoint", "hidetrigger" etc., block it
+    -- Prevent static prompt "Hide" mechanics from spamming detection lists
     if low == "hide" or low:find("^hide%d+") or low:find("hidepoint") or low:find("hidespot") or low:find("hideto") then
-        return false
-    end
-    
-    if low:find("button") or low:find("lever") or low:find("door") or low:find("key") or low:find("item") then
         return false
     end
     
     local cleanName = cleanSymbols(name)
     if KNOWN_ENTITIES[cleanName] then return true end
     
-    -- Dynamic Prefix Check (Matches A, X, or V followed by any numbering format)
-    if low:match("^[axv]%-%d+") or low:match("^[axv]%_%d+") or low:match("^[axv]%d+") or low:match("^[axv]%s%d+") then
-        return true
+    -- Strict Official Rooms Verification Pattern (No Custom letters/numbers allowed)
+    local roomsLetter, roomsNum = low:match("^([a])%-?(%d+)")
+    if roomsLetter and roomsNum then
+        local num = tonumber(roomsNum)
+        -- Strictly whitelist actual official numbers
+        if num == 60 or num == 90 or num == 120 or num == 200 or num == 270 or num == 300 then
+            return true
+        end
     end
     
     return false
@@ -180,6 +185,7 @@ local function isEnt(obj)
     if pChars[obj] then return false end
     if bl[obj.Name] then return false end
     
+    -- Filter out local characters and teammates
     for _, plr in ipairs(Players:GetPlayers()) do
         if plr.Character and (obj == plr.Character or obj:IsDescendantOf(plr.Character)) then
             return false
@@ -215,6 +221,50 @@ local function playComfortablePing()
 end
 
 -- ============================================
+-- PERFORMANCE TUNE: LOW-COST NEAREST CLOSET
+-- ============================================
+local lastClosetScan = 0
+local cachedCloset = nil
+
+local function findNearestSafeClosetOptimized()
+    if tick() - lastClosetScan < 0.5 and cachedCloset then
+        return cachedCloset, (LP.Character.HumanoidRootPart.Position - cachedCloset.PrimaryPart.Position).Magnitude
+    end
+    
+    local char = LP.Character; local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root then return nil, math.huge end
+    local nearest, minDist = nil, math.huge
+    
+    for _, v in ipairs(workspace:GetChildren()) do
+        if v:IsA("Model") and (v.Name:lower():find("locker") or v.Name:lower():find("closet")) then
+            local primary = v.PrimaryPart or v:FindFirstChildWhichIsA("BasePart", true)
+            if primary then
+                local d = (root.Position - primary.Position).Magnitude
+                if d < minDist then minDist = d; nearest = v end
+            end
+        end
+    end
+    
+    lastClosetScan = tick()
+    cachedCloset = nearest
+    return nearest, minDist
+end
+
+local function executeAutoDefend()
+    local closet, dist = findNearestSafeClosetOptimized()
+    if closet and dist < 150 then
+        local targetPart = closet.PrimaryPart or closet:FindFirstChildWhichIsA("BasePart", true)
+        if targetPart then
+            local char = LP.Character
+            if char and char:FindFirstChild("HumanoidRootPart") then
+                char.HumanoidRootPart.CFrame = targetPart.CFrame * CFrame.new(0, 0, 1.5)
+                postLog("Shield Activated: Bunker Teleport executed.")
+            end
+        end
+    end
+end
+
+-- ============================================
 -- MAIN GUI GENERATOR (STEALTH MILITARY TERMINAL)
 -- ============================================
 local SG = Instance.new("ScreenGui"); SG.Name = "EntityScannerGui"; SG.ResetOnSpawn = false; SG.DisplayOrder = 100; SG.Parent = LP.PlayerGui
@@ -228,7 +278,7 @@ local TB = Instance.new("Frame"); TB.Size = UDim2.new(1, 0, 0, 36); TB.Backgroun
 Instance.new("UICorner", TB).CornerRadius = UDim.new(0, 3)
 local tbf = Instance.new("Frame"); tbf.Size = UDim2.new(1, 0, 0, 6); tbf.Position = UDim2.new(0, 0, 1, -6); tbf.BackgroundColor3 = COLOR_PANEL; tbf.BorderSizePixel = 0; tbf.Parent = TB
 
-local tl = Instance.new("TextLabel"); tl.Size = UDim2.new(1, -100, 1, 0); tl.Position = UDim2.new(0, 12, 0, 0); tl.BackgroundTransparency = 1; tl.Text = "TACTICAL SCANNER [v10.6]"; tl.TextColor3 = COLOR_ACCENT; tl.TextSize = 11; tl.Font = Enum.Font.Code; tl.TextXAlignment = Enum.TextXAlignment.Left; tl.Parent = TB
+local tl = Instance.new("TextLabel"); tl.Size = UDim2.new(1, -100, 1, 0); tl.Position = UDim2.new(0, 12, 0, 0); tl.BackgroundTransparency = 1; tl.Text = "TACTICAL SCANNER [v10.7]"; tl.TextColor3 = COLOR_ACCENT; tl.TextSize = 11; tl.Font = Enum.Font.Code; tl.TextXAlignment = Enum.TextXAlignment.Left; tl.Parent = TB
 
 -- Control Buttons
 local minBtn = Instance.new("TextButton"); minBtn.Size = UDim2.new(0, 24, 0, 24); minBtn.Position = UDim2.new(1, -58, 0.5, -12); minBtn.BackgroundColor3 = Color3.fromRGB(24, 26, 32); minBtn.BorderSizePixel = 0; minBtn.Text = "-"; minBtn.TextColor3 = COLOR_TEXT_MUTED; minBtn.TextSize = 12; minBtn.Font = Enum.Font.Code; minBtn.Parent = TB; Instance.new("UICorner", minBtn).CornerRadius = UDim.new(0, 2)
@@ -319,7 +369,7 @@ local tabF = Instance.new("Frame"); tabF.Size = UDim2.new(1, -12, 0, 22); tabF.P
 local liveTab = mb(tabF, "SCAN_HUD", COLOR_ACCENT, 0, 0.25)
 local undoTab = mb(tabF, "BLACKLIST", COLOR_TEXT_MUTED, 0.25, 0.25)
 local wpTab = mb(tabF, "WAYPOINTS", COLOR_TEXT_MUTED, 0.50, 0.25)
-local hideTab = mb(tabF, "SAFE ZONES", COLOR_TEXT_MUTED, 0.75, 0.25) -- The Hiding Tab
+local hideTab = mb(tabF, "SAFE ZONES", COLOR_TEXT_MUTED, 0.75, 0.25) -- Safe hiding tab
 
 -- Scrolling Content Viewports
 local scr = Instance.new("ScrollingFrame"); scr.BackgroundColor3 = COLOR_PANEL; scr.ScrollBarThickness = 1; scr.ScrollBarImageColor3 = COLOR_BORDER
@@ -344,7 +394,7 @@ local addWpBtn = Instance.new("TextButton"); addWpBtn.Size = UDim2.new(0.32, 0, 
 local we = Instance.new("TextLabel"); we.Size = UDim2.new(1, 0, 0, 30); we.Position = UDim2.new(0,0,0,30); we.BackgroundTransparency = 1; we.Text = "COORDINATE BANK DEVOID"; we.TextColor3 = COLOR_TEXT_MUTED; we.TextSize = 8; we.Font = Enum.Font.Code; we.Parent = wpscr
 
 -- ========================================================
--- [NEW] HIDING SPOTS MAIN VIEWPORT (LOCKERS vs TABLES TABS)
+-- HIDING SPOTS VIEWPORT (LOCKERS vs TABLES TABS)
 -- ========================================================
 local hideScrFrame = Instance.new("Frame"); hideScrFrame.Size = UDim2.new(1, -12, 1, -212); hideScrFrame.Position = UDim2.new(0, 6, 0, 204); hideScrFrame.BackgroundTransparency = 1; hideScrFrame.Visible = false; hideScrFrame.Parent = MF
 
@@ -475,11 +525,11 @@ end
 layoutGUI()
 
 -- ========================================================
--- [NEW] ESCAPE HUD: RIGHT-SLIDE ESCAPE PLAN PANEL
+-- ESCAPE HUD: RIGHT-SLIDE ESCAPE PLAN PANEL
 -- ========================================================
 local escapeHud = Instance.new("Frame")
 escapeHud.Size = UDim2.new(0, 140, 0, 150)
-escapeHud.Position = UDim2.new(1, 20, 0.5, -75) -- Starts completely off-screen on the right
+escapeHud.Position = UDim2.new(1, 20, 0.5, -75) -- Offscreen right
 escapeHud.BackgroundColor3 = COLOR_PANEL
 escapeHud.Parent = SG
 Instance.new("UICorner", escapeHud).CornerRadius = UDim.new(0, 2)
@@ -574,7 +624,7 @@ ehTableBtn.MouseButton1Click:Connect(function()
         end
     end
     if nearest then
-        root.CFrame = nearest.CFrame * CFrame.new(0, -3.5, 0) -- Teleport safely under the table structure
+        root.CFrame = nearest.CFrame * CFrame.new(0, -3.5, 0) -- Under Table
         postLog("Escape Warp: Teleported Under Table protection.")
         slideOutEscapeHud()
     end
@@ -610,7 +660,7 @@ local function createDropdownAlert(entityName, threatLevel)
     
     totalAlerts = totalAlerts + 1
     playComfortablePing()
-    slideInEscapeHud() -- Open the safe zone selection panel on the right of the screen
+    slideInEscapeHud() -- Open HUD on right of screen
     
     local wrapper = Instance.new("Frame")
     wrapper.Size = UDim2.new(0, 230, 0, 70)
@@ -688,7 +738,7 @@ local function removeDropdownAlert(entityName)
         alert.Wrapper:Destroy()
     end)
     
-    -- Hide escape HUD when no enemies are left
+    -- Close escape panel if screen is clear
     local activeCount = 0
     for _ in pairs(activeNotifications) do activeCount = activeCount + 1 end
     if activeCount == 0 then
@@ -826,7 +876,7 @@ local function applyItemESP(obj)
 end
 
 -- ========================================================
--- [NEW] REALTIME ENVIRONMENT HIDING SPOT SCANNERS
+-- REALTIME ENVIRONMENT HIDING SPOT SCANNERS
 -- ========================================================
 local function registerSafeSpot(obj)
     if not obj:IsA("Model") or safeSpotTracked[obj] then return end
@@ -837,17 +887,15 @@ local function registerSafeSpot(obj)
     
     local entry = { Instance = obj, Name = obj.Name:upper(), Primary = primary, UI = nil }
     
-    -- Locker / Closet / Green Locker Pattern Check
     if name:find("locker") or name:find("closet") or name:find("wardrobe") or name:find("hideout") then
         safeSpotTracked[obj] = true
         table.insert(safeSpots.Lockers, entry)
-        postLog("Safety Point Added: Locker Closet model registered.")
+        postLog("Safety Point Added: Locker model registered.")
     
-    -- Table / Bed / Desk Pattern Check
     elseif name:find("table") or name:find("bed") or name:find("desk") or name:find("under") then
         safeSpotTracked[obj] = true
         table.insert(safeSpots.Tables, entry)
-        postLog("Safety Point Added: Safe Table model registered.")
+        postLog("Safety Point Added: Table model registered.")
     end
 end
 
@@ -909,7 +957,7 @@ local function renderHidingSpotGUI()
                 if LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
                     local warpOffset = curHideSubTab == "lockers" and CFrame.new(0, 0, 1.5) or CFrame.new(0, -3.5, 0)
                     LP.Character.HumanoidRootPart.CFrame = spot.Primary.CFrame * warpOffset
-                    postLog("Safety Warp executed successfully.")
+                    postLog("Safety Warp executed.")
                 end
             end)
             
@@ -1343,6 +1391,6 @@ xbtn.MouseButton1Click:Connect(function()
 end)
 
 print("═══════════════════════════════════════")
-print(" ☠ SCANNER CONTROLLER v10.6 LOADED")
+print(" ☠ SCANNER CONTROLLER v10.7 LOADED")
 print(" 🛡 ADVANCED MULTI-DROPDOWN ACTIVE")
 print("═══════════════════════════════════════")
