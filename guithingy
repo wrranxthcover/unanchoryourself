@@ -1,10 +1,11 @@
 --[[
-    ☠ ENTITY SCANNER ULTRA v11.1 ☠ - PERFORMANCE OPTIMIZED EDITION bruh
+    ☠ ENTITY SCANNER ULTRA v11.2 ☠ - AUTO DOOR OPENER EDITION
     Fixed: Custom/Fan-Made entity scanning (A-85, A-20i, A-928u, G-291i, B-1920J)
     Fixed: Minimize button scoping bug
     Fixed: MAJOR FPS DROPS from uncapped per-frame string ops & UI writes
     New: Display names strip dashes (A-20i -> A20I)
     New: Proximity Zone system (NEAR / MID / FAR)
+    New: AO DOOR - Auto Door Opener (teleport → E press → next door)
     Engineered for high-speed games like Rooms Re-Established & Doors.
 ]]
 
@@ -30,6 +31,18 @@ local RED_THRESH = 10000
 -- ============================================
 local HEAVY_UPDATE_INTERVAL = 0.1   -- Distance/speed/zone/UI text logic runs at 10Hz instead of raw FPS
 local RADAR_UPDATE_INTERVAL = 1/30  -- Radar visuals run at 30Hz (dt-scaled sweep stays smooth)
+
+-- ============================================
+-- AUTO DOOR SYSTEM (v11.2 NEW)
+-- ============================================
+local aoDoorEnabled = false
+local aoDoors = {}
+local aoDoorTracked = {}
+local currentAODoor = nil
+local aoLastTeleport = 0
+local aoTeleportDelay = 0.5  -- Delay between teleports (seconds)
+local aoLastEPress = 0
+local aoEPressDelay = 0.2    -- Delay between E presses (seconds)
 
 -- Tactical Color Scheme
 local COLOR_BG = Color3.fromRGB(12, 13, 17)       -- Deep Matte Charcoal
@@ -177,7 +190,6 @@ local function matchPat(name)
 end
 
 local function getDisplayName(entity)
-    -- Removes dashes from dynamic pattern names (e.g. "A-20i" -> "A20I")
     return entity.Name:upper():gsub("%-", "")
 end
 
@@ -305,6 +317,98 @@ local function executeAutoDefend()
 end
 
 -- ============================================
+-- AUTO DOOR SYSTEM (v11.2 NEW)
+-- ============================================
+local function scanForDoors()
+    aoDoors = {}
+    aoDoorTracked = {}
+    
+    for _, descendant in ipairs(workspace:GetDescendants()) do
+        if descendant:IsA("ProximityPrompt") then
+            local parentName = descendant.Parent.Name:lower()
+            if parentName:find("door") or parentName:find("gate") or parentName:find("entrance") then
+                local part = descendant.Parent:IsA("BasePart") and descendant.Parent or descendant.Parent:FindFirstChildWhichIsA("BasePart")
+                if part and not aoDoorTracked[descendant] then
+                    aoDoorTracked[descendant] = true
+                    table.insert(aoDoors, {
+                        Prompt = descendant,
+                        Part = part,
+                        Name = descendant.Parent.Name,
+                        Opened = false
+                    })
+                end
+            end
+        end
+    end
+    
+    -- Sort by distance
+    local char = LP.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if root then
+        table.sort(aoDoors, function(a, b)
+            local distA = (root.Position - a.Part.Position).Magnitude
+            local distB = (root.Position - b.Part.Position).Magnitude
+            return distA < distB
+        end)
+    end
+end
+
+local function getNextUnopedDoor()
+    scanForDoors()
+    for _, door in ipairs(aoDoors) do
+        if not door.Opened and door.Prompt and door.Prompt.Parent then
+            return door
+        end
+    end
+    return nil
+end
+
+local function aoDoorTick()
+    if not aoDoorEnabled then return end
+    
+    local char = LP.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+    
+    local now = tick()
+    
+    -- Get next unopened door
+    if not currentAODoor or not currentAODoor.Prompt or not currentAODoor.Prompt.Parent or currentAODoor.Opened then
+        currentAODoor = getNextUnopedDoor()
+        if not currentAODoor then
+            postLog("AO DOOR: All doors opened or no doors found.")
+            aoDoorEnabled = false
+            return
+        end
+    end
+    
+    local doorPart = currentAODoor.Part
+    if not doorPart or not doorPart.Parent then
+        currentAODoor = getNextUnopedDoor()
+        return
+    end
+    
+    local dist = (root.Position - doorPart.Position).Magnitude
+    
+    -- Teleport to door if far away
+    if dist > 5 and now - aoLastTeleport >= aoTeleportDelay then
+        root.CFrame = doorPart.CFrame * CFrame.new(0, 0, 3)
+        aoLastTeleport = now
+        postLog("AO DOOR: Teleporting to " .. currentAODoor.Name)
+    end
+    
+    -- Press E when close enough
+    if dist <= 10 and now - aoLastEPress >= aoEPressDelay then
+        UIS:SendKeyEvent(true, Enum.KeyCode.E, false, LP)
+        task.wait(0.05)
+        UIS:SendKeyEvent(false, Enum.KeyCode.E, false, LP)
+        aoLastEPress = now
+        currentAODoor.Opened = true
+        postLog("AO DOOR: Opened " .. currentAODoor.Name)
+    end
+end
+
+-- ============================================
 -- MAIN GUI GENERATOR (STEALTH MILITARY TERMINAL)
 -- ============================================
 local SG = Instance.new("ScreenGui"); SG.Name = "EntityScannerGui"; SG.ResetOnSpawn = false; SG.DisplayOrder = 100; SG.Parent = LP.PlayerGui
@@ -318,15 +422,11 @@ local TB = Instance.new("Frame"); TB.Size = UDim2.new(1, 0, 0, 36); TB.Backgroun
 Instance.new("UICorner", TB).CornerRadius = UDim.new(0, 3)
 local tbf = Instance.new("Frame"); tbf.Size = UDim2.new(1, 0, 0, 6); tbf.Position = UDim2.new(0, 0, 1, -6); tbf.BackgroundColor3 = COLOR_PANEL; tbf.BorderSizePixel = 0; tbf.Parent = TB
 
-local tl = Instance.new("TextLabel"); tl.Size = UDim2.new(1, -100, 1, 0); tl.Position = UDim2.new(0, 12, 0, 0); tl.BackgroundTransparency = 1; tl.Text = "SCANNER [v11.1 PERF]"; tl.TextColor3 = COLOR_ACCENT; tl.TextSize = 11; tl.Font = Enum.Font.Code; tl.TextXAlignment = Enum.TextXAlignment.Left; tl.Parent = TB
+local tl = Instance.new("TextLabel"); tl.Size = UDim2.new(1, -100, 1, 0); tl.Position = UDim2.new(0, 12, 0, 0); tl.BackgroundTransparency = 1; tl.Text = "SCANNER [v11.2 AO]"; tl.TextColor3 = COLOR_ACCENT; tl.TextSize = 11; tl.Font = Enum.Font.Code; tl.TextXAlignment = Enum.TextXAlignment.Left; tl.Parent = TB
 
 -- Control Buttons
 local minBtn = Instance.new("TextButton"); minBtn.Size = UDim2.new(0, 24, 0, 24); minBtn.Position = UDim2.new(1, -58, 0.5, -12); minBtn.BackgroundColor3 = Color3.fromRGB(24, 26, 32); minBtn.BorderSizePixel = 0; minBtn.Text = "-"; minBtn.TextColor3 = COLOR_TEXT_MUTED; minBtn.TextSize = 12; minBtn.Font = Enum.Font.Code; minBtn.Parent = TB; Instance.new("UICorner", minBtn).CornerRadius = UDim.new(0, 2)
 local xbtn = Instance.new("TextButton"); xbtn.Size = UDim2.new(0, 24, 0, 24); xbtn.Position = UDim2.new(1, -30, 0.5, -12); xbtn.BackgroundColor3 = Color3.fromRGB(35, 15, 15); xbtn.BorderSizePixel = 0; xbtn.Text = "X"; xbtn.TextColor3 = COLOR_ALERT; xbtn.TextSize = 10; xbtn.Font = Enum.Font.Code; xbtn.Parent = TB; Instance.new("UICorner", xbtn).CornerRadius = UDim.new(0, 2)
-
--- NOTE: minBtn's click handler is intentionally attached LATER in this script
--- (after scr/uscr/wpscr/hideScrFrame/vp2/vep2/renderHidingSpotGUI are declared)
--- to avoid a Lua upvalue scoping bug where those locals wouldn't be resolvable yet.
 
 -- Live System Telemetry Banner
 local sf = Instance.new("Frame"); sf.Size = UDim2.new(1, -12, 0, 70); sf.Position = UDim2.new(0, 6, 0, 42); sf.BackgroundColor3 = COLOR_PANEL; sf.Parent = MF; Instance.new("UICorner", sf).CornerRadius = UDim.new(0, 3)
@@ -403,11 +503,15 @@ local itemEspB = mb(r2, "LOOT ESP: ON", Color3.fromRGB(0, 160, 150), 0, 0.35)
 local dbB = mb(r2, "FORCE SCAN", Color3.fromRGB(80, 85, 95), 0.35, 0.30)
 local clrB = mb(r2, "CLEAR BL", Color3.fromRGB(150, 50, 50), 0.65, 0.35)
 
-local tabF = Instance.new("Frame"); tabF.Size = UDim2.new(1, -12, 0, 22); tabF.Position = UDim2.new(0, 6, 0, 178); tabF.BackgroundTransparency = 1; tabF.Parent = MF
+-- Row 3: AO DOOR Button (NEW v11.2)
+local r3 = Instance.new("Frame"); r3.Size = UDim2.new(1, -12, 0, 24); r3.Position = UDim2.new(0, 6, 0, 176); r3.BackgroundTransparency = 1; r3.Parent = MF
+local aoDoorB = mb(r3, "AO DOOR: OFF", Color3.fromRGB(200, 100, 50), 0, 1)
+
+local tabF = Instance.new("Frame"); tabF.Size = UDim2.new(1, -12, 0, 22); tabF.Position = UDim2.new(0, 6, 0, 204); tabF.BackgroundTransparency = 1; tabF.Parent = MF
 local liveTab = mb(tabF, "SCAN_HUD", COLOR_ACCENT, 0, 0.25)
 local undoTab = mb(tabF, "BLACKLIST", COLOR_TEXT_MUTED, 0.25, 0.25)
 local wpTab = mb(tabF, "WAYPOINTS", COLOR_TEXT_MUTED, 0.50, 0.25)
-local hideTab = mb(tabF, "SAFE ZONES", COLOR_TEXT_MUTED, 0.75, 0.25) -- Safe hiding tab
+local hideTab = mb(tabF, "SAFE ZONES", COLOR_TEXT_MUTED, 0.75, 0.25)
 
 -- Scrolling Content Viewports
 local scr = Instance.new("ScrollingFrame"); scr.BackgroundColor3 = COLOR_PANEL; scr.ScrollBarThickness = 1; scr.ScrollBarImageColor3 = COLOR_BORDER
@@ -434,7 +538,7 @@ local we = Instance.new("TextLabel"); we.Size = UDim2.new(1, 0, 0, 30); we.Posit
 -- ========================================================
 -- HIDING SPOTS VIEWPORT (LOCKERS vs TABLES TABS)
 -- ========================================================
-local hideScrFrame = Instance.new("Frame"); hideScrFrame.Size = UDim2.new(1, -12, 1, -212); hideScrFrame.Position = UDim2.new(0, 6, 0, 204); hideScrFrame.BackgroundTransparency = 1; hideScrFrame.Visible = false; hideScrFrame.Parent = MF
+local hideScrFrame = Instance.new("Frame"); hideScrFrame.Size = UDim2.new(1, -12, 1, -212); hideScrFrame.Position = UDim2.new(0, 6, 0, 230); hideScrFrame.BackgroundTransparency = 1; hideScrFrame.Visible = false; hideScrFrame.Parent = MF
 
 local subHideTabF = Instance.new("Frame"); subHideTabF.Size = UDim2.new(1, 0, 0, 20); subHideTabF.Position = UDim2.new(0, 0, 0, 0); subHideTabF.BackgroundTransparency = 1; subHideTabF.Parent = hideScrFrame
 local subLockersBtn = mb(subHideTabF, "LOCKERS / CLOSETS", COLOR_ACCENT, 0, 0.5)
@@ -548,7 +652,7 @@ veB.TextColor3 = COLOR_ALERT; veB.TextSize = 8; veB.Font = Enum.Font.Code; veB.P
 Instance.new("UICorner", veB).CornerRadius = UDim.new(0, 2)
 
 local function layoutGUI()
-    local y = 206
+    local y = 232
     local reserve = (viewing or viewingEnt) and 112 or 76
     
     scr.Size = UDim2.new(1, -12, 1, -(y+reserve))
@@ -567,7 +671,7 @@ layoutGUI()
 -- ========================================================
 local escapeHud = Instance.new("Frame")
 escapeHud.Size = UDim2.new(0, 140, 0, 150)
-escapeHud.Position = UDim2.new(1, 20, 0.5, -75) -- Offscreen right
+escapeHud.Position = UDim2.new(1, 20, 0.5, -75)
 escapeHud.BackgroundColor3 = COLOR_PANEL
 escapeHud.Parent = SG
 Instance.new("UICorner", escapeHud).CornerRadius = UDim.new(0, 2)
@@ -662,7 +766,7 @@ ehTableBtn.MouseButton1Click:Connect(function()
         end
     end
     if nearest then
-        root.CFrame = nearest.CFrame * CFrame.new(0, -3.5, 0) -- Under Table
+        root.CFrame = nearest.CFrame * CFrame.new(0, -3.5, 0)
         postLog("Escape Warp: Teleported Under Table protection.")
         slideOutEscapeHud()
     end
@@ -677,7 +781,6 @@ AlertSystem.ResetOnSpawn = false
 AlertSystem.DisplayOrder = 200
 AlertSystem.Parent = LP.PlayerGui
 
--- The Horizontal Stacking Frame
 local alertShelf = Instance.new("Frame")
 alertShelf.Size = UDim2.new(0, 960, 0, 80)
 alertShelf.Position = UDim2.new(0.5, -480, 0, 10)
@@ -698,7 +801,7 @@ local function createDropdownAlert(entityName, threatLevel)
     
     totalAlerts = totalAlerts + 1
     playComfortablePing()
-    slideInEscapeHud() -- Open HUD on right of screen
+    slideInEscapeHud()
     
     local wrapper = Instance.new("Frame")
     wrapper.Size = UDim2.new(0, 230, 0, 70)
@@ -822,10 +925,6 @@ local radarDots = {}
 local RADAR_RANGE = 250
 local sweepAngle = 0
 
--- ============================================
--- RADAR UPDATE (v11.1 FIX: now takes dt, throttled externally,
--- uses cached d.threat instead of recomputing via getThreat())
--- ============================================
 local function updateRadar(dt)
     if not radarOn then radarFrame.Visible = false; return end
     radarFrame.Visible = true
@@ -839,7 +938,6 @@ local function updateRadar(dt)
     local rightVec = Vector3.new(camCF.RightVector.X, 0, camCF.RightVector.Z)
     if rightVec.Magnitude > 0.01 then rightVec = rightVec.Unit else rightVec = Vector3.new(1,0,0) end
 
-    -- dt-scaled sweep speed keeps rotation smooth regardless of update rate
     sweepAngle = sweepAngle + (240 * (dt or RADAR_UPDATE_INTERVAL))
     if sweepAngle >= 360 then sweepAngle = sweepAngle % 360 end
     sweepLine.Rotation = sweepAngle
@@ -868,7 +966,6 @@ local function updateRadar(dt)
                     dot._entity = ent; radarDots[dotKey] = dot
                 end
                 dot.Position = UDim2.new(0.5 + relX, 0, 0.5 + relY, 0)
-                -- Use cached threat color instead of recomputing getThreat() every call
                 dot.BackgroundColor3 = d.threatCol or getThreatCol(d.threat or "UNKNOWN")
             end
         end
@@ -943,7 +1040,6 @@ local function registerSafeSpot(obj)
     end
 end
 
--- Clear & Re-render safe zones list in tab
 local function renderHidingSpotGUI()
     for _, item in ipairs(safeSpotsScr:GetChildren()) do
         if item:IsA("Frame") then item:Destroy() end
@@ -1011,7 +1107,6 @@ local function renderHidingSpotGUI()
     end
 end
 
--- Navigation tab control listeners
 local function switchTab(t) 
     curTab = t
     scr.Visible = (t == "live")
@@ -1032,7 +1127,6 @@ undoTab.MouseButton1Click:Connect(function() switchTab("undo") end)
 wpTab.MouseButton1Click:Connect(function() switchTab("waypoints") end)
 hideTab.MouseButton1Click:Connect(function() switchTab("safezones") end)
 
--- Sub Tab click interactions
 subLockersBtn.MouseButton1Click:Connect(function()
     curHideSubTab = "lockers"
     subLockersBtn.BackgroundColor3 = COLOR_ACCENT
@@ -1048,8 +1142,7 @@ subTablesBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ========================================================
--- MINIMIZE TOGGLE (Positioned here — after all referenced
--- GUI elements/functions exist — to fix upvalue scoping bug)
+-- MINIMIZE TOGGLE
 -- ========================================================
 minBtn.MouseButton1Click:Connect(function()
     minimized = not minimized
@@ -1062,6 +1155,7 @@ minBtn.MouseButton1Click:Connect(function()
     r1.Visible = not minimized
     div1.Visible = not minimized
     r2.Visible = not minimized
+    r3.Visible = not minimized
     tabF.Visible = not minimized
     consoleFrame.Visible = not minimized
 
@@ -1221,11 +1315,6 @@ blacklistEnt = function(name)
     for _, ent in ipairs(rem) do untrack(ent) end 
 end
 
--- ============================================
--- TRACK (v11.1 FIX: caches threat/threatCol/displayName
--- onto the tracked data table so hot loops never
--- recompute string operations every frame)
--- ============================================
 track = function(entity)
     if tracked[entity] or not entity.Parent or bl[entity.Name] then return end
     totalDetected += 1
@@ -1234,7 +1323,6 @@ track = function(entity)
     local threat = getThreat(entity.Name)
     local threatCol = getThreatCol(threat)
 
-    -- Cache these so the Heartbeat/radar loops never call getThreat/getDisplayName again
     d.threat = threat
     d.threatCol = threatCol
     d.displayName = displayName
@@ -1312,8 +1400,6 @@ table.insert(workspaceConnections, workspace.DescendantRemoving:Connect(function
 
 -- ========================================================
 -- HEAVY TELEMETRY TICK (v11.1 FIX)
--- Runs at HEAVY_UPDATE_INTERVAL (10Hz) instead of raw framerate.
--- Uses cached d.threat / d.displayName instead of recomputing.
 -- ========================================================
 local function heavyUpdateTick()
     local char = LP.Character
@@ -1331,11 +1417,11 @@ local function heavyUpdateTick()
         if tp and tp.Parent then
             local rawDist = (myP - tp.Position).Magnitude
             local dist = math.floor(rawDist)
-            local threat = d.threat -- cached, no recompute
+            local threat = d.threat
 
             if rawDist < nearestDist then 
                 nearestDist = rawDist 
-                nearestName = d.displayName -- cached, no recompute
+                nearestName = d.displayName
             end
             
             if threat == "LETHAL" or threat == "CRITICAL" or threat == "DANGER" then
@@ -1384,7 +1470,6 @@ local function heavyUpdateTick()
         end
     end
 
-    -- Escape HUD distance readouts
     local closet, closetDist = findNearestSafeClosetOptimized()
     if closetDist < math.huge then
         setText(ehLockerBtn, "TELEPORT LOCKER\nDIST: " .. math.floor(closetDist) .. " STUDS")
@@ -1422,7 +1507,6 @@ local function heavyUpdateTick()
         setText(ehTableBtn, "TELEPORT TABLE\nDIST: ---")
     end
 
-    -- Top banner telemetry
     setText(timeL, "SYS_T: " .. formatTime(now - sessionStart))
     setText(statL, "DET: " .. totalDetected .. " | ALERTS: " .. totalAlerts)
     
@@ -1440,9 +1524,7 @@ local function heavyUpdateTick()
 end
 
 -- ========================================================
--- MAIN LOOP (v11.1 FIX): Both heavy telemetry and radar are
--- now throttled to fixed intervals instead of raw Heartbeat
--- rate, which scales uncontrollably with high FPS.
+-- MAIN LOOP (v11.1 FIX)
 -- ========================================================
 local lastHeavyUpdate = 0
 local lastRadarUpdate = 0
@@ -1461,6 +1543,9 @@ mainHeartbeatConn = RunService.Heartbeat:Connect(function()
         lastHeavyUpdate = now
         heavyUpdateTick()
     end
+    
+    -- Auto Door System (v11.2 NEW)
+    aoDoorTick()
 end)
 
 -- Controls Interfaces
@@ -1468,6 +1553,21 @@ espB.MouseButton1Click:Connect(function() espOn = not espOn; espB.Text = espOn a
 namB.MouseButton1Click:Connect(function() namesOn = not namesOn; namB.Text = namesOn and "TAGS: ON" or "TAGS: OFF"; namB.BackgroundColor3 = namesOn and Color3.fromRGB(24, 26, 32) or Color3.fromRGB(35, 15, 15) end)
 radB.MouseButton1Click:Connect(function() radarOn = not radarOn; radB.Text = radarOn and "RADAR: ON" or "RADAR: OFF"; radB.BackgroundColor3 = radarOn and Color3.fromRGB(24, 26, 32) or Color3.fromRGB(35, 15, 15) end)
 defB.MouseButton1Click:Connect(function() autoDefenseOn = not autoDefenseOn; defB.Text = autoDefenseOn and "SHIELD: ON" or "SHIELD: OFF"; defB.BackgroundColor3 = autoDefenseOn and Color3.fromRGB(24, 26, 32) or Color3.fromRGB(35, 15, 15) end)
+
+-- AO Door Button (v11.2 NEW)
+aoDoorB.MouseButton1Click:Connect(function()
+    aoDoorEnabled = not aoDoorEnabled
+    aoDoorB.Text = aoDoorEnabled and "AO DOOR: ON" or "AO DOOR: OFF"
+    aoDoorB.BackgroundColor3 = aoDoorEnabled and Color3.fromRGB(24, 26, 32) or Color3.fromRGB(200, 100, 50)
+    if aoDoorEnabled then
+        currentAODoor = nil
+        aoLastTeleport = 0
+        aoLastEPress = 0
+        postLog("AO DOOR: Activated - Scanning for doors...")
+    else
+        postLog("AO DOOR: Deactivated")
+    end
+end)
 
 clrB.MouseButton1Click:Connect(function()
     bl = {}; blCount = 0; updUndo()
@@ -1514,7 +1614,7 @@ xbtn.MouseButton1Click:Connect(function()
 end)
 
 print("═══════════════════════════════════════")
-print(" ☠ SCANNER CONTROLLER v11.1 LOADED")
+print(" ☠ SCANNER CONTROLLER v11.2 LOADED")
 print(" 🔧 FIXED: PATTERN MATCHING (A-85, A-20i, A-928u, G-291i, B-1920J)")
 print(" 🔧 FIXED: MINIMIZE BUTTON SCOPING BUG")
 print(" 🚀 PERF: Cached threat/displayName (no per-frame string ops)")
@@ -1523,4 +1623,5 @@ print(" 🚀 PERF: Radar throttled to 30Hz with dt-scaled sweep")
 print(" 🚀 PERF: Redundant UI text/color writes now skipped")
 print(" ✨ NEW: DASH-FREE DISPLAY NAMES (A-20i -> A20I)")
 print(" ✨ NEW: PROXIMITY ZONES (NEAR <=50 / MID <=150 / FAR >150)")
+print(" ✨ NEW: AO DOOR (Auto Door Opener) - Teleports to doors & presses E")
 print("═══════════════════════════════════════")
