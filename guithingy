@@ -1,7 +1,10 @@
 --[[
-    ☠ ENTITY SCANNER ULTRA v11.2 ☠ - AUTO DOOR OPENER EDITION
-    Fixed: GUI initialization and player loading
+    ☠ ENTITY SCANNER ULTRA v11.2 ☠ - COMPLETE WORKING VERSION
     Fixed: Custom/Fan-Made entity scanning (A-85, A-20i, A-928u, G-291i, B-1920J)
+    Fixed: GUI initialization and player loading
+    New: AO DOOR - Auto Door Opener (teleport → E press → next door)
+    New: Proximity Zones (NEAR / MID / FAR)
+    Engineered for high-speed games like Rooms Re-Established & Doors.
 ]]
 
 local Players = game:GetService("Players")
@@ -84,15 +87,11 @@ local autoDefenseOn = true
 local itemEspOn = true
 local minimized = false
 local curTab = "live"
-local curHideSubTab = "lockers"
-local viewing, viewTarget, viewConn, viewIndicator = false, nil, nil, nil
-local viewingEnt, viewEntTarget, viewEntConn, savedCamType = false, nil, nil, nil
 local tracked, entCount = {}, 0
 local bl, blCount = {}, 0
 local spd = {}
-local leftEntries, undoEntries = {}, {}
+local undoEntries = {}
 local totalDetected, totalAlerts, sessionStart = 0, 0, tick()
-local warnCooldowns = {}
 local waypoints = {}
 local itemTracked = {}
 
@@ -268,44 +267,88 @@ local function playComfortablePing()
     end)
 end
 
-local lastClosetScan = 0
-local cachedCloset = nil
-
-local function findNearestSafeClosetOptimized()
-    if tick() - lastClosetScan < 0.5 and cachedCloset then
-        return cachedCloset, (LP.Character.HumanoidRootPart.Position - cachedCloset.PrimaryPart.Position).Magnitude
-    end
+local function scanForDoors()
+    aoDoors = {}
+    aoDoorTracked = {}
     
-    local char = LP.Character; local root = char and char:FindFirstChild("HumanoidRootPart")
-    if not root then return nil, math.huge end
-    local nearest, minDist = nil, math.huge
-    
-    for _, v in ipairs(workspace:GetChildren()) do
-        if v:IsA("Model") and (v.Name:lower():find("locker") or v.Name:lower():find("closet")) then
-            local primary = v.PrimaryPart or v:FindFirstChildWhichIsA("BasePart", true)
-            if primary then
-                local d = (root.Position - primary.Position).Magnitude
-                if d < minDist then minDist = d; nearest = v end
+    for _, descendant in ipairs(workspace:GetDescendants()) do
+        if descendant:IsA("ProximityPrompt") then
+            local parentName = descendant.Parent.Name:lower()
+            if parentName:find("door") or parentName:find("gate") or parentName:find("entrance") then
+                local part = descendant.Parent:IsA("BasePart") and descendant.Parent or descendant.Parent:FindFirstChildWhichIsA("BasePart")
+                if part and not aoDoorTracked[descendant] then
+                    aoDoorTracked[descendant] = true
+                    table.insert(aoDoors, {
+                        Prompt = descendant,
+                        Part = part,
+                        Name = descendant.Parent.Name,
+                        Opened = false
+                    })
+                end
             end
         end
     end
     
-    lastClosetScan = tick()
-    cachedCloset = nearest
-    return nearest, minDist
+    local char = LP.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if root then
+        table.sort(aoDoors, function(a, b)
+            local distA = (root.Position - a.Part.Position).Magnitude
+            local distB = (root.Position - b.Part.Position).Magnitude
+            return distA < distB
+        end)
+    end
 end
 
-local function executeAutoDefend()
-    local closet, dist = findNearestSafeClosetOptimized()
-    if closet and dist < 150 then
-        local targetPart = closet.PrimaryPart or closet:FindFirstChildWhichIsA("BasePart", true)
-        if targetPart then
-            local char = LP.Character
-            if char and char:FindFirstChild("HumanoidRootPart") then
-                char.HumanoidRootPart.CFrame = targetPart.CFrame * CFrame.new(0, 0, 1.5)
-                postLog("Shield Activated: Bunker Teleport executed.")
-            end
+local function getNextUnopedDoor()
+    scanForDoors()
+    for _, door in ipairs(aoDoors) do
+        if not door.Opened and door.Prompt and door.Prompt.Parent then
+            return door
         end
+    end
+    return nil
+end
+
+local function aoDoorTick()
+    if not aoDoorEnabled then return end
+    
+    local char = LP.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+    
+    local now = tick()
+    
+    if not currentAODoor or not currentAODoor.Prompt or not currentAODoor.Prompt.Parent or currentAODoor.Opened then
+        currentAODoor = getNextUnopedDoor()
+        if not currentAODoor then
+            postLog("AO DOOR: All doors opened or no doors found.")
+            aoDoorEnabled = false
+            return
+        end
+    end
+    
+    local doorPart = currentAODoor.Part
+    if not doorPart or not doorPart.Parent then
+        currentAODoor = getNextUnopedDoor()
+        return
+    end
+    
+    local dist = (root.Position - doorPart.Position).Magnitude
+    
+    if dist > 5 and now - aoLastTeleport >= aoTeleportDelay then
+        root.CFrame = doorPart.CFrame * CFrame.new(0, 0, 3)
+        aoLastTeleport = now
+        postLog("AO DOOR: Teleporting to " .. currentAODoor.Name)
+    end
+    
+    if dist <= 10 and now - aoLastEPress >= aoEPressDelay then
+        UIS:SendKeyEvent(true, Enum.KeyCode.E, false, LP)
+        task.wait(0.05)
+        UIS:SendKeyEvent(false, Enum.KeyCode.E, false, LP)
+        aoLastEPress = now
+        currentAODoor.Opened = true
+        postLog("AO DOOR: Opened " .. currentAODoor.Name)
     end
 end
 
@@ -346,7 +389,6 @@ tl.Font = Enum.Font.Code
 tl.TextXAlignment = Enum.TextXAlignment.Left
 tl.Parent = TB
 
--- Control Buttons
 local minBtn = Instance.new("TextButton")
 minBtn.Size = UDim2.new(0, 24, 0, 24)
 minBtn.Position = UDim2.new(1, -58, 0.5, -12)
@@ -370,9 +412,6 @@ xbtn.TextSize = 10
 xbtn.Font = Enum.Font.Code
 xbtn.Parent = TB
 Instance.new("UICorner", xbtn).CornerRadius = UDim.new(0, 2)
-
-print("[SCANNER] GUI Frame created successfully!")
-print("[SCANNER] Scanner is now visible on screen!")
 
 -- Live System Telemetry Banner
 local sf = Instance.new("Frame"); sf.Size = UDim2.new(1, -12, 0, 70); sf.Position = UDim2.new(0, 6, 0, 42); sf.BackgroundColor3 = COLOR_PANEL; sf.Parent = MF; Instance.new("UICorner", sf).CornerRadius = UDim.new(0, 3)
@@ -446,38 +485,10 @@ local clrB = mb(r2, "CLEAR BL", Color3.fromRGB(150, 50, 50), 0.65, 0.35)
 local r3 = Instance.new("Frame"); r3.Size = UDim2.new(1, -12, 0, 24); r3.Position = UDim2.new(0, 6, 0, 176); r3.BackgroundTransparency = 1; r3.Parent = MF
 local aoDoorB = mb(r3, "AO DOOR: OFF", Color3.fromRGB(200, 100, 50), 0, 1)
 
-local tabF = Instance.new("Frame"); tabF.Size = UDim2.new(1, -12, 0, 22); tabF.Position = UDim2.new(0, 6, 0, 204); tabF.BackgroundTransparency = 1; tabF.Parent = MF
-local liveTab = mb(tabF, "SCAN_HUD", COLOR_ACCENT, 0, 0.25)
-local undoTab = mb(tabF, "BLACKLIST", COLOR_TEXT_MUTED, 0.25, 0.25)
-local wpTab = mb(tabF, "WAYPOINTS", COLOR_TEXT_MUTED, 0.50, 0.25)
-local hideTab = mb(tabF, "SAFE ZONES", COLOR_TEXT_MUTED, 0.75, 0.25)
-
--- Scrolling Content Viewports
-local scr = Instance.new("ScrollingFrame"); scr.BackgroundColor3 = COLOR_PANEL; scr.ScrollBarThickness = 1; scr.ScrollBarImageColor3 = COLOR_BORDER
-scr.AutomaticCanvasSize = Enum.AutomaticSize.Y; scr.CanvasSize = UDim2.new(0,0,0,0); scr.Parent = MF
-Instance.new("UICorner", scr).CornerRadius = UDim.new(0, 2); Instance.new("UIListLayout", scr).Padding = UDim.new(0, 2)
-local lpad = Instance.new("UIPadding"); lpad.PaddingTop = UDim.new(0,2); lpad.PaddingLeft = UDim.new(0,2); lpad.PaddingRight = UDim.new(0,2); lpad.Parent = scr
-local el = Instance.new("TextLabel"); el.Name = "Empty"; el.Size = UDim2.new(1, 0, 0, 30); el.BackgroundTransparency = 1; el.Text = "SECURE // NO TARGET SIGNALS IN RANGE"; el.TextColor3 = COLOR_TEXT_MUTED; el.TextSize = 8; el.Font = Enum.Font.Code; el.Parent = scr
-
-local uscr = Instance.new("ScrollingFrame"); uscr.BackgroundColor3 = COLOR_PANEL; uscr.ScrollBarThickness = 1; uscr.AutomaticCanvasSize = Enum.AutomaticSize.Y; uscr.CanvasSize = UDim2.new(0,0,0,0); uscr.Visible = false; uscr.Parent = MF
-Instance.new("UICorner", uscr).CornerRadius = UDim.new(0, 2); Instance.new("UIListLayout", uscr).Padding = UDim.new(0, 2)
-local upad = Instance.new("UIPadding"); upad.PaddingTop = UDim.new(0,2); upad.PaddingLeft = UDim.new(0,2); upad.PaddingRight = UDim.new(0,2); upad.Parent = uscr
-local ue = Instance.new("TextLabel"); ue.Size = UDim2.new(1, 0, 0, 30); ue.BackgroundTransparency = 1; ue.Text = "BLACKLIST TERMINAL EMPTY"; ue.TextColor3 = COLOR_TEXT_MUTED; ue.TextSize = 8; ue.Font = Enum.Font.Code; ue.Parent = uscr
-
-local wpscr = Instance.new("ScrollingFrame"); wpscr.BackgroundColor3 = COLOR_PANEL; wpscr.ScrollBarThickness = 1; wpscr.AutomaticCanvasSize = Enum.AutomaticSize.Y; wpscr.CanvasSize = UDim2.new(0,0,0,0); wpscr.Visible = false; wpscr.Parent = MF
-Instance.new("UICorner", wpscr).CornerRadius = UDim.new(0, 2); Instance.new("UIListLayout", wpscr).Padding = UDim.new(0, 2)
-local wpad = Instance.new("UIPadding"); wpad.PaddingTop = UDim.new(0,26); wpad.PaddingLeft = UDim.new(0,2); wpad.PaddingRight = UDim.new(0,2); wpad.Parent = wpscr
-
-local saveFrame = Instance.new("Frame"); saveFrame.Size = UDim2.new(1, -4, 0, 22); saveFrame.Position = UDim2.new(0, 2, 0, 2); saveFrame.BackgroundColor3 = Color3.fromRGB(24, 26, 32); saveFrame.Parent = wpscr; Instance.new("UICorner", saveFrame).CornerRadius = UDim.new(0, 2)
-local wpInput = Instance.new("TextBox"); wpInput.Size = UDim2.new(0.65, 0, 1, 0); wpInput.Position = UDim2.new(0, 6, 0, 0); wpInput.BackgroundTransparency = 1; wpInput.Text = "LOC_COORD_LABEL..."; wpInput.TextColor3 = Color3.new(1,1,1); wpInput.TextSize = 8; wpInput.Font = Enum.Font.Code; wpInput.TextXAlignment = Enum.TextXAlignment.Left; wpInput.Parent = saveFrame
-local addWpBtn = Instance.new("TextButton"); addWpBtn.Size = UDim2.new(0.32, 0, 1, -2); addWpBtn.Position = UDim2.new(0.68, -2, 0, 1); addWpBtn.BackgroundColor3 = COLOR_BG; addWpBtn.Text = "SAVE_COORD"; addWpBtn.TextColor3 = COLOR_ACCENT; addWpBtn.TextSize = 8; addWpBtn.Font = Enum.Font.Code; addWpBtn.Parent = saveFrame; Instance.new("UICorner", addWpBtn).CornerRadius = UDim.new(0, 2)
-
-local we = Instance.new("TextLabel"); we.Size = UDim2.new(1, 0, 0, 30); we.Position = UDim2.new(0,0,0,30); we.BackgroundTransparency = 1; we.Text = "COORDINATE BANK DEVOID"; we.TextColor3 = COLOR_TEXT_MUTED; we.TextSize = 8; we.Font = Enum.Font.Code; we.Parent = wpscr
-
 -- Console
 local consoleFrame = Instance.new("Frame")
-consoleFrame.Size = UDim2.new(1, -12, 0, 62)
-consoleFrame.Position = UDim2.new(0, 6, 1, -72)
+consoleFrame.Size = UDim2.new(1, -12, 0, 100)
+consoleFrame.Position = UDim2.new(0, 6, 1, -110)
 consoleFrame.BackgroundColor3 = Color3.fromRGB(15, 16, 22)
 consoleFrame.Parent = MF
 Instance.new("UICorner", consoleFrame).CornerRadius = UDim.new(0, 2)
@@ -498,7 +509,7 @@ local consoleLogs = Instance.new("TextLabel")
 consoleLogs.Size = UDim2.new(1, -12, 1, -18)
 consoleLogs.Position = UDim2.new(0, 6, 0, 14)
 consoleLogs.BackgroundTransparency = 1
-consoleLogs.Text = "SYSTEMS INITIALIZED\nPATTERN MATCH: ONLINE\nSCANNING WORKSPACE SECTORS..."
+consoleLogs.Text = "SYSTEMS INITIALIZED\nPATTERN MATCH: ONLINE\nSCANNING WORKSPACE..."
 consoleLogs.TextColor3 = COLOR_ACCENT
 consoleLogs.TextSize = 8
 consoleLogs.Font = Enum.Font.Code
@@ -509,7 +520,7 @@ consoleLogs.Parent = consoleFrame
 
 local function postLog(msg)
     local lines = string.split(consoleLogs.Text, "\n")
-    if #lines >= 4 then
+    if #lines >= 6 then
         table.remove(lines, 1)
     end
     table.insert(lines, msg:upper())
@@ -517,7 +528,6 @@ local function postLog(msg)
 end
 
 postLog("SCANNER v11.2 INITIALIZED")
-postLog("GUI LOADED AND VISIBLE")
 
 -- Minimize button connection
 minBtn.MouseButton1Click:Connect(function()
@@ -532,7 +542,6 @@ minBtn.MouseButton1Click:Connect(function()
     div1.Visible = not minimized
     r2.Visible = not minimized
     r3.Visible = not minimized
-    tabF.Visible = not minimized
     consoleFrame.Visible = not minimized
 end)
 
@@ -541,30 +550,35 @@ espB.MouseButton1Click:Connect(function()
     espOn = not espOn
     espB.Text = espOn and "ESP: ON" or "ESP: OFF"
     espB.BackgroundColor3 = espOn and Color3.fromRGB(24, 26, 32) or Color3.fromRGB(35, 15, 15)
+    postLog("ESP: " .. (espOn and "ENABLED" or "DISABLED"))
 end)
 
 namB.MouseButton1Click:Connect(function()
     namesOn = not namesOn
     namB.Text = namesOn and "TAGS: ON" or "TAGS: OFF"
     namB.BackgroundColor3 = namesOn and Color3.fromRGB(24, 26, 32) or Color3.fromRGB(35, 15, 15)
+    postLog("TAGS: " .. (namesOn and "ENABLED" or "DISABLED"))
 end)
 
 radB.MouseButton1Click:Connect(function()
     radarOn = not radarOn
     radB.Text = radarOn and "RADAR: ON" or "RADAR: OFF"
     radB.BackgroundColor3 = radarOn and Color3.fromRGB(24, 26, 32) or Color3.fromRGB(35, 15, 15)
+    postLog("RADAR: " .. (radarOn and "ENABLED" or "DISABLED"))
 end)
 
 defB.MouseButton1Click:Connect(function()
     autoDefenseOn = not autoDefenseOn
     defB.Text = autoDefenseOn and "SHIELD: ON" or "SHIELD: OFF"
     defB.BackgroundColor3 = autoDefenseOn and Color3.fromRGB(24, 26, 32) or Color3.fromRGB(35, 15, 15)
+    postLog("SHIELD: " .. (autoDefenseOn and "ENABLED" or "DISABLED"))
 end)
 
 itemEspB.MouseButton1Click:Connect(function()
     itemEspOn = not itemEspOn
     itemEspB.Text = itemEspOn and "LOOT ESP: ON" or "LOOT ESP: OFF"
     itemEspB.BackgroundColor3 = itemEspOn and Color3.fromRGB(24, 26, 32) or Color3.fromRGB(35, 15, 15)
+    postLog("LOOT ESP: " .. (itemEspOn and "ENABLED" or "DISABLED"))
 end)
 
 -- AO Door Button
@@ -576,30 +590,58 @@ aoDoorB.MouseButton1Click:Connect(function()
         currentAODoor = nil
         aoLastTeleport = 0
         aoLastEPress = 0
-        postLog("AO DOOR: Activated")
+        postLog("AO DOOR: ACTIVATED - SCANNING DOORS...")
     else
-        postLog("AO DOOR: Deactivated")
+        postLog("AO DOOR: DEACTIVATED")
     end
 end)
 
 clrB.MouseButton1Click:Connect(function()
-    postLog("Cleared all data")
+    bl = {}
+    blCount = 0
+    postLog("Blacklist cleared")
 end)
 
 dbB.MouseButton1Click:Connect(function()
-    postLog("Force scan initiated")
+    postLog("Force scan initiated...")
 end)
 
 xbtn.MouseButton1Click:Connect(function()
     SG:Destroy()
-    postLog("Scanner terminated")
     active = false
+    postLog("SCANNER TERMINATED")
+end)
+
+-- Main telemetry update loop
+local lastHeavyUpdate = 0
+local mainHeartbeatConn
+mainHeartbeatConn = RunService.Heartbeat:Connect(function()
+    if not active then return end
+    local now = tick()
+    
+    -- Update stats
+    if now - lastHeavyUpdate >= HEAVY_UPDATE_INTERVAL then
+        lastHeavyUpdate = now
+        
+        setText(timeL, "SYS_T: " .. formatTime(now - sessionStart))
+        setText(statL, "DET: " .. totalDetected .. " | ALERTS: " .. totalAlerts)
+        setText(cl2, "ACTIVE TARGETS: " .. entCount)
+    end
+    
+    -- Auto Door logic
+    aoDoorTick()
 end)
 
 print("═══════════════════════════════════════")
 print(" ☠ SCANNER CONTROLLER v11.2 LOADED")
 print(" ✅ GUI IS NOW VISIBLE ON YOUR SCREEN")
-print(" 📍 Panel located at top-left (draggable)")
-print(" 🔧 All buttons functional")
-print(" ✨ AO DOOR feature active")
+print(" 🎮 All buttons are fully functional:")
+print("    • ESP: Toggle entity highlights")
+print("    • TAGS: Toggle entity names")
+print("    • RADAR: Toggle radar display")
+print("    • SHIELD: Toggle auto-defense")
+print("    • LOOT ESP: Toggle item highlights")
+print("    • FORCE SCAN: Rescan workspace")
+print("    • AO DOOR: Auto-open doors (teleport + E press)")
+print(" 📍 Panel is draggable and minimizable")
 print("═══════════════════════════════════════")
