@@ -1,6 +1,6 @@
 --[[
-    ☠ ENTITY SCANNER ULTRA v10.8 ☠ - DYNAMIC PATTERN EDITION
-    Fixed: Now correctly scans Custom/Fan-Made entities (e.g., A-85, B-12)
+    ☠ ENTITY SCANNER ULTRA v10.9 ☠ - DYNAMIC PATTERN EDITION (SUFFIX SUPPORT)
+    Fixed: Now correctly scans Custom/Fan-Made entities (e.g., A-85, B-12, A-20i, A-928u, B-1920J)
     Engineered for high-speed games like Rooms Re-Established & Doors.
 ]]
 
@@ -118,7 +118,7 @@ local function getSurvivalTip(name)
     return SURVIVAL_TIPS[l] or "ALERT: CUSTOM VECTOR DETECTED. USE CAUTION."
 end
 
--- *** THE CRITICAL FIX ***
+-- *** THE CRITICAL FIX (v10.9): EXTENDED SUFFIX SUPPORT ***
 local function matchPat(name)
     local low = name:lower()
     
@@ -141,14 +141,18 @@ local function matchPat(name)
     local cleanName = cleanSymbols(name)
     if KNOWN_ENTITIES[cleanName] then return true end
     
-    -- 2. DYNAMIC ROOMS VERIFICATION (FIXED FOR A-85, ETC.)
-    -- Matches formats like "A-85", "b-15", "Z-4000"
-    local roomsLetter, roomsNum = low:match("^([a-zA-Z])%-?(%d+)")
+    -- 2. DYNAMIC ROOMS VERIFICATION (EXTENDED: A-85, A-20i, A-928u, G-291i, B-1920J)
+    -- Matches formats like:
+    --   "A-85"    (Letter + Dash + Number)
+    --   "A20i"    (Letter + Number + Optional Suffix Letter, no dash)
+    --   "A-928u"  (Letter + Dash + Number + Optional Suffix Letter)
+    --   "B-1920J" (Letter + Dash + Number + Optional Suffix Letter, uppercase normalized via low)
+    local roomsLetter, roomsNum, roomsSuffix = low:match("^([a-z])%-?(%d+)([a-z]?)$")
     if roomsLetter and roomsNum then
         local num = tonumber(roomsNum)
         -- Allow reasonable Entity IDs (1 to 99,999). 
-        -- This fixes the issue where only specific numbers were allowed.
-        if num >= 1 and num <= 99999 then
+        -- roomsSuffix can be "" (no suffix) or a single trailing letter (i, u, j, etc.)
+        if num and num >= 1 and num <= 99999 then
             return true
         end
     end
@@ -283,7 +287,7 @@ local TB = Instance.new("Frame"); TB.Size = UDim2.new(1, 0, 0, 36); TB.Backgroun
 Instance.new("UICorner", TB).CornerRadius = UDim.new(0, 3)
 local tbf = Instance.new("Frame"); tbf.Size = UDim2.new(1, 0, 0, 6); tbf.Position = UDim2.new(0, 0, 1, -6); tbf.BackgroundColor3 = COLOR_PANEL; tbf.BorderSizePixel = 0; tbf.Parent = TB
 
-local tl = Instance.new("TextLabel"); tl.Size = UDim2.new(1, -100, 1, 0); tl.Position = UDim2.new(0, 12, 0, 0); tl.BackgroundTransparency = 1; tl.Text = "SCANNER [v10.8 PATTERN]"; tl.TextColor3 = COLOR_ACCENT; tl.TextSize = 11; tl.Font = Enum.Font.Code; tl.TextXAlignment = Enum.TextXAlignment.Left; tl.Parent = TB
+local tl = Instance.new("TextLabel"); tl.Size = UDim2.new(1, -100, 1, 0); tl.Position = UDim2.new(0, 12, 0, 0); tl.BackgroundTransparency = 1; tl.Text = "SCANNER [v10.9 PATTERN]"; tl.TextColor3 = COLOR_ACCENT; tl.TextSize = 11; tl.Font = Enum.Font.Code; tl.TextXAlignment = Enum.TextXAlignment.Left; tl.Parent = TB
 
 -- Control Buttons
 local minBtn = Instance.new("TextButton"); minBtn.Size = UDim2.new(0, 24, 0, 24); minBtn.Position = UDim2.new(1, -58, 0.5, -12); minBtn.BackgroundColor3 = Color3.fromRGB(24, 26, 32); minBtn.BorderSizePixel = 0; minBtn.Text = "-"; minBtn.TextColor3 = COLOR_TEXT_MUTED; minBtn.TextSize = 12; minBtn.Font = Enum.Font.Code; minBtn.Parent = TB; Instance.new("UICorner", minBtn).CornerRadius = UDim.new(0, 2)
@@ -1396,6 +1400,6 @@ xbtn.MouseButton1Click:Connect(function()
 end)
 
 print("═══════════════════════════════════════")
-print(" ☠ SCANNER CONTROLLER v10.8 LOADED")
-print(" 🔧 FIXED: PATTERN MATCHING ACTIVE (A-85+)")
+print(" ☠ SCANNER CONTROLLER v10.9 LOADED")
+print(" 🔧 FIXED: PATTERN MATCHING ACTIVE (A-85, A-20i, A-928u, G-291i, B-1920J)")
 print("═══════════════════════════════════════")
