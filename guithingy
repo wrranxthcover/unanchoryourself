@@ -1,6 +1,9 @@
 --[[
-    ☠ ENTITY SCANNER ULTRA v10.9 ☠ - DYNAMIC PATTERN EDITION (SUFFIX SUPPORT)
-    Fixed: Now correctly scans Custom/Fan-Made entities (e.g., A-85, B-12, A-20i, A-928u, B-1920J)
+    ☠ ENTITY SCANNER ULTRA v11.0 ☠ - PROXIMITY ZONE EDITION
+    Fixed: Custom/Fan-Made entity scanning (A-85, A-20i, A-928u, G-291i, B-1920J)
+    Fixed: Minimize button scoping bug (now correctly restores tab/viewer state)
+    New: Display names strip dashes (A-20i -> A20I)
+    New: Proximity Zone system (NEAR / MID / FAR) on all distance readouts
     Engineered for high-speed games like Rooms Re-Established & Doors.
 ]]
 
@@ -28,6 +31,26 @@ local COLOR_BORDER = Color3.fromRGB(35, 38, 48)   -- Slate Divider
 local COLOR_ACCENT = Color3.fromRGB(0, 180, 220)   -- Cyan Telemetry Accent
 local COLOR_ALERT = Color3.fromRGB(255, 60, 60)    -- Combat Warning Red
 local COLOR_TEXT_MUTED = Color3.fromRGB(120, 125, 135)
+
+-- ============================================
+-- PROXIMITY ZONE SYSTEM (NEAR / MID / FAR)
+-- ============================================
+local ZONE_NEAR_MAX = 50   -- 0 to 50 studs = NEAR
+local ZONE_MID_MAX = 150   -- 50 to 150 studs = MID, beyond = FAR
+
+local ZONE_COLOR_NEAR = Color3.fromRGB(255, 60, 60)
+local ZONE_COLOR_MID = Color3.fromRGB(240, 180, 0)
+local ZONE_COLOR_FAR = Color3.fromRGB(0, 180, 220)
+
+local function getProximityZone(dist)
+    if dist <= ZONE_NEAR_MAX then
+        return "NEAR", ZONE_COLOR_NEAR
+    elseif dist <= ZONE_MID_MAX then
+        return "MID", ZONE_COLOR_MID
+    else
+        return "FAR", ZONE_COLOR_FAR
+    end
+end
 
 -- State Control
 local active = true
@@ -118,7 +141,7 @@ local function getSurvivalTip(name)
     return SURVIVAL_TIPS[l] or "ALERT: CUSTOM VECTOR DETECTED. USE CAUTION."
 end
 
--- *** THE CRITICAL FIX (v10.9): EXTENDED SUFFIX SUPPORT ***
+-- *** DYNAMIC PATTERN MATCHING WITH SUFFIX SUPPORT ***
 local function matchPat(name)
     local low = name:lower()
     
@@ -150,7 +173,7 @@ local function matchPat(name)
     local roomsLetter, roomsNum, roomsSuffix = low:match("^([a-z])%-?(%d+)([a-z]?)$")
     if roomsLetter and roomsNum then
         local num = tonumber(roomsNum)
-        -- Allow reasonable Entity IDs (1 to 99,999). 
+        -- Allow reasonable Entity IDs (1 to 99,999)
         -- roomsSuffix can be "" (no suffix) or a single trailing letter (i, u, j, etc.)
         if num and num >= 1 and num <= 99999 then
             return true
@@ -161,7 +184,8 @@ local function matchPat(name)
 end
 
 local function getDisplayName(entity)
-    return entity.Name:upper()
+    -- Removes dashes from dynamic pattern names (e.g. "A-20i" -> "A20I")
+    return entity.Name:upper():gsub("%-", "")
 end
 
 local function getPrefix(name)
@@ -287,17 +311,15 @@ local TB = Instance.new("Frame"); TB.Size = UDim2.new(1, 0, 0, 36); TB.Backgroun
 Instance.new("UICorner", TB).CornerRadius = UDim.new(0, 3)
 local tbf = Instance.new("Frame"); tbf.Size = UDim2.new(1, 0, 0, 6); tbf.Position = UDim2.new(0, 0, 1, -6); tbf.BackgroundColor3 = COLOR_PANEL; tbf.BorderSizePixel = 0; tbf.Parent = TB
 
-local tl = Instance.new("TextLabel"); tl.Size = UDim2.new(1, -100, 1, 0); tl.Position = UDim2.new(0, 12, 0, 0); tl.BackgroundTransparency = 1; tl.Text = "SCANNER [v10.9 PATTERN]"; tl.TextColor3 = COLOR_ACCENT; tl.TextSize = 11; tl.Font = Enum.Font.Code; tl.TextXAlignment = Enum.TextXAlignment.Left; tl.Parent = TB
+local tl = Instance.new("TextLabel"); tl.Size = UDim2.new(1, -100, 1, 0); tl.Position = UDim2.new(0, 12, 0, 0); tl.BackgroundTransparency = 1; tl.Text = "SCANNER [v11.0 PROXIMITY]"; tl.TextColor3 = COLOR_ACCENT; tl.TextSize = 11; tl.Font = Enum.Font.Code; tl.TextXAlignment = Enum.TextXAlignment.Left; tl.Parent = TB
 
 -- Control Buttons
 local minBtn = Instance.new("TextButton"); minBtn.Size = UDim2.new(0, 24, 0, 24); minBtn.Position = UDim2.new(1, -58, 0.5, -12); minBtn.BackgroundColor3 = Color3.fromRGB(24, 26, 32); minBtn.BorderSizePixel = 0; minBtn.Text = "-"; minBtn.TextColor3 = COLOR_TEXT_MUTED; minBtn.TextSize = 12; minBtn.Font = Enum.Font.Code; minBtn.Parent = TB; Instance.new("UICorner", minBtn).CornerRadius = UDim.new(0, 2)
 local xbtn = Instance.new("TextButton"); xbtn.Size = UDim2.new(0, 24, 0, 24); xbtn.Position = UDim2.new(1, -30, 0.5, -12); xbtn.BackgroundColor3 = Color3.fromRGB(35, 15, 15); xbtn.BorderSizePixel = 0; xbtn.Text = "X"; xbtn.TextColor3 = COLOR_ALERT; xbtn.TextSize = 10; xbtn.Font = Enum.Font.Code; xbtn.Parent = TB; Instance.new("UICorner", xbtn).CornerRadius = UDim.new(0, 2)
 
-minBtn.MouseButton1Click:Connect(function()
-    minimized = not minimized
-    TweenService:Create(MF, TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Size = minimized and UDim2.new(0, 340, 0, 36) or UDim2.new(0, 340, 0, 560)}):Play()
-    minBtn.Text = minimized and "+" or "-"
-end)
+-- NOTE: minBtn's click handler is intentionally attached LATER in this script
+-- (after scr/uscr/wpscr/hideScrFrame/vp2/vep2/renderHidingSpotGUI are declared)
+-- to avoid a Lua upvalue scoping bug where those locals wouldn't be resolvable yet.
 
 -- Live System Telemetry Banner
 local sf = Instance.new("Frame"); sf.Size = UDim2.new(1, -12, 0, 70); sf.Position = UDim2.new(0, 6, 0, 42); sf.BackgroundColor3 = COLOR_PANEL; sf.Parent = MF; Instance.new("UICorner", sf).CornerRadius = UDim.new(0, 3)
@@ -944,8 +966,9 @@ local function renderHidingSpotGUI()
             distL.Position = UDim2.new(0.5, 0, 0, 0)
             distL.BackgroundTransparency = 1
             local rawDist = root and (root.Position - spot.Primary.Position).Magnitude or 999
-            distL.Text = math.floor(rawDist) .. " STUDS"
-            distL.TextColor3 = COLOR_TEXT_MUTED
+            local zoneName, zoneColor = getProximityZone(rawDist)
+            distL.Text = math.floor(rawDist) .. " STUDS [" .. zoneName .. "]"
+            distL.TextColor3 = zoneColor
             distL.TextSize = 8
             distL.Font = Enum.Font.Code
             distL.TextXAlignment = Enum.TextXAlignment.Left
@@ -1009,6 +1032,46 @@ subTablesBtn.MouseButton1Click:Connect(function()
     subLockersBtn.BackgroundColor3 = COLOR_PANEL
     subTablesBtn.BackgroundColor3 = COLOR_ACCENT
     renderHidingSpotGUI()
+end)
+
+-- ========================================================
+-- MINIMIZE TOGGLE (Positioned here — after all referenced
+-- GUI elements/functions exist — to fix upvalue scoping bug)
+-- ========================================================
+minBtn.MouseButton1Click:Connect(function()
+    minimized = not minimized
+    TweenService:Create(MF, TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+        Size = minimized and UDim2.new(0, 340, 0, 36) or UDim2.new(0, 340, 0, 560)
+    }):Play()
+    minBtn.Text = minimized and "+" or "-"
+
+    -- Explicitly toggle sub-panel visibility (don't rely solely on ClipsDescendants)
+    sf.Visible = not minimized
+    r1.Visible = not minimized
+    div1.Visible = not minimized
+    r2.Visible = not minimized
+    tabF.Visible = not minimized
+    consoleFrame.Visible = not minimized
+
+    if minimized then
+        scr.Visible = false
+        uscr.Visible = false
+        wpscr.Visible = false
+        hideScrFrame.Visible = false
+        vp2.Visible = false
+        vep2.Visible = false
+    else
+        -- Restore whichever tab was active before minimizing
+        scr.Visible = (curTab == "live")
+        uscr.Visible = (curTab == "undo")
+        wpscr.Visible = (curTab == "waypoints")
+        hideScrFrame.Visible = (curTab == "safezones")
+        if curTab == "safezones" then renderHidingSpotGUI() end
+
+        -- Restore viewer/spectator bars if they were active
+        vp2.Visible = viewing
+        vep2.Visible = viewingEnt
+    end
 end)
 
 -- ============================================
@@ -1119,7 +1182,9 @@ local function startV(entity)
         if not viewing or not entity or not entity.Parent then stopV(); return end
         if not root or not root.Parent then root = getPart(entity); data.targetPart = root; if not root then stopV(); return end end
         local sp, on = Camera:WorldToScreenPoint(root.Position); local vpS = Camera.ViewportSize
-        ar.Text = "TRACKING // " .. dName .. "\nRANGE: " .. math.floor((LP.Character.HumanoidRootPart.Position-root.Position).Magnitude) .. " STUDS"
+        local liveDist = (LP.Character.HumanoidRootPart.Position-root.Position).Magnitude
+        local zoneName = getProximityZone(liveDist)
+        ar.Text = "TRACKING // " .. dName .. "\nRANGE: " .. math.floor(liveDist) .. " STUDS [" .. zoneName .. "]"
         if on then ar.Position = UDim2.new(0, math.clamp(sp.X,90,vpS.X-90), 0, math.clamp(sp.Y,8,55)) end
     end); layoutGUI() 
 end
@@ -1183,7 +1248,7 @@ track = function(entity)
     local tBar = Instance.new("Frame"); tBar.Size = UDim2.new(0, 3, 1, -6); tBar.Position = UDim2.new(0, 3, 0, 3); tBar.BackgroundColor3 = threatCol; tBar.Parent = entry
     
     local nl2 = Instance.new("TextLabel"); nl2.Size = UDim2.new(0.4,0,0,15); nl2.Position = UDim2.new(0,12,0,2); nl2.BackgroundTransparency = 1; nl2.Text = displayName; nl2.TextColor3 = color; nl2.TextSize = 9; nl2.Font = Enum.Font.Code; nl2.Parent = entry
-    local edl = Instance.new("TextLabel"); edl.Size = UDim2.new(0,80,0,12); edl.Position = UDim2.new(1,-168,0,4); edl.BackgroundTransparency = 1; edl.Text = "--- STUDS"; edl.TextColor3 = COLOR_TEXT_MUTED; edl.TextSize = 9; edl.Font = Enum.Font.Code; edl.Parent = entry
+    local edl = Instance.new("TextLabel"); edl.Size = UDim2.new(0,96,0,12); edl.Position = UDim2.new(1,-184,0,4); edl.BackgroundTransparency = 1; edl.Text = "--- STUDS"; edl.TextColor3 = COLOR_TEXT_MUTED; edl.TextSize = 8; edl.Font = Enum.Font.Code; edl.TextXAlignment = Enum.TextXAlignment.Right; edl.Parent = entry
     local esl = Instance.new("TextLabel"); esl.Size = UDim2.new(0.65,0,0,12); esl.Position = UDim2.new(0,12,0,28); esl.BackgroundTransparency = 1; esl.Text = "CALCULATING VECTOR..."; esl.TextColor3 = COLOR_TEXT_MUTED; esl.TextSize = 8; esl.Font = Enum.Font.Code; esl.Parent = entry
 
     local xbb = Instance.new("TextButton"); xbb.Size = UDim2.new(0,18,0,18); xbb.Position = UDim2.new(1,-82,0.5,-9); xbb.BackgroundColor3 = Color3.fromRGB(35,15,15); xbb.Text = "X"; xbb.TextColor3 = COLOR_ALERT; xbb.Font = Enum.Font.Code; xbb.Parent = entry; Instance.new("UICorner", xbb).CornerRadius = UDim.new(0,2)
@@ -1261,11 +1326,13 @@ mainHeartbeatConn = RunService.Heartbeat:Connect(function()
             if threat == "LETHAL" or threat == "CRITICAL" or threat == "DANGER" then
                 highestThreat = threat
                 
-                -- Real-Time Distance Card Update
+                -- Real-Time Distance Card Update (with proximity zone tagging)
                 local nameKey = getDisplayName(ent)
                 local alert = activeNotifications[nameKey]
                 if alert then
-                    alert.DistanceLabel.Text = "RANGE: " .. dist .. " STUDS"
+                    local zoneName, zoneColor = getProximityZone(rawDist)
+                    alert.DistanceLabel.Text = "RANGE: " .. dist .. " STUDS [" .. zoneName .. "]"
+                    alert.DistanceLabel.TextColor3 = zoneColor
                 end
                 
                 -- Instant Shield Safeguard Trigger
@@ -1274,9 +1341,11 @@ mainHeartbeatConn = RunService.Heartbeat:Connect(function()
                 end
             end
 
-            -- Update values in your main list GUI instantly
+            -- Update values in your main list GUI instantly (with proximity zone tagging)
             if d.entryDist then 
-                d.entryDist.Text = dist .. " STUDS" 
+                local zoneName, zoneColor = getProximityZone(rawDist)
+                d.entryDist.Text = dist .. " STUDS [" .. zoneName .. "]"
+                d.entryDist.TextColor3 = zoneColor
             end
 
             -- Path Speed Math Pipeline
@@ -1318,7 +1387,9 @@ mainHeartbeatConn = RunService.Heartbeat:Connect(function()
             local d = (myP - item.Primary.Position).Magnitude
             if d < nearestTableDist then nearestTableDist = d end
             if curTab == "safezones" and curHideSubTab == "tables" and item.UI then
-                item.UI.DistLabel.Text = math.floor(d) .. " STUDS"
+                local zoneName, zoneColor = getProximityZone(d)
+                item.UI.DistLabel.Text = math.floor(d) .. " STUDS [" .. zoneName .. "]"
+                item.UI.DistLabel.TextColor3 = zoneColor
             end
         end
     end
@@ -1327,7 +1398,9 @@ mainHeartbeatConn = RunService.Heartbeat:Connect(function()
         for _, item in ipairs(safeSpots.Lockers) do
             if item.Instance and item.Instance.Parent and item.UI then
                 local d = (myP - item.Primary.Position).Magnitude
-                item.UI.DistLabel.Text = math.floor(d) .. " STUDS"
+                local zoneName, zoneColor = getProximityZone(d)
+                item.UI.DistLabel.Text = math.floor(d) .. " STUDS [" .. zoneName .. "]"
+                item.UI.DistLabel.TextColor3 = zoneColor
             end
         end
     end
@@ -1343,7 +1416,16 @@ mainHeartbeatConn = RunService.Heartbeat:Connect(function()
         lastUpdate = now
         timeL.Text = "SYS_T: " .. formatTime(now - sessionStart)
         statL.Text = "DET: " .. totalDetected .. " | ALERTS: " .. totalAlerts
-        nearL.Text = "PROX_DIST: " .. (nearestDist < math.huge and (nearestName .. " [" .. math.floor(nearestDist) .. "s]") or "NULL")
+        
+        if nearestDist < math.huge then
+            local zoneName, zoneColor = getProximityZone(nearestDist)
+            nearL.Text = "PROX_DIST: " .. nearestName .. " [" .. math.floor(nearestDist) .. "s] :: " .. zoneName
+            nearL.TextColor3 = zoneColor
+        else
+            nearL.Text = "PROX_DIST: NULL"
+            nearL.TextColor3 = COLOR_TEXT_MUTED
+        end
+        
         threatL.Text = "STATUS: " .. highestThreat
         threatL.TextColor3 = getThreatCol(highestThreat)
     end
@@ -1400,6 +1482,9 @@ xbtn.MouseButton1Click:Connect(function()
 end)
 
 print("═══════════════════════════════════════")
-print(" ☠ SCANNER CONTROLLER v10.9 LOADED")
+print(" ☠ SCANNER CONTROLLER v11.0 LOADED")
 print(" 🔧 FIXED: PATTERN MATCHING ACTIVE (A-85, A-20i, A-928u, G-291i, B-1920J)")
+print(" 🔧 FIXED: MINIMIZE BUTTON SCOPING BUG")
+print(" ✨ NEW: DASH-FREE DISPLAY NAMES (A-20i -> A20I)")
+print(" ✨ NEW: PROXIMITY ZONES (NEAR <=50 / MID <=150 / FAR >150)")
 print("═══════════════════════════════════════")
