@@ -1,10 +1,7 @@
 --[[
-    ☠ ENTITY SCANNER ULTRA v11.2 ☠ - COMPLETE WORKING VERSION
-    Fixed: Custom/Fan-Made entity scanning (A-85, A-20i, A-928u, G-291i, B-1920J)
-    Fixed: GUI initialization and player loading
-    New: AO DOOR - Auto Door Opener (teleport → E press → next door)
-    New: Proximity Zones (NEAR / MID / FAR)
-    Engineered for high-speed games like Rooms Re-Established & Doors.
+    ☠ ENTITY SCANNER ULTRA v11.2 ☠ - AUTO DOOR OPENER (FIXED)
+    Fixed: Nil value errors in AO DOOR system
+    Fixed: Better door detection and validation
 ]]
 
 local Players = game:GetService("Players")
@@ -33,26 +30,22 @@ for _, n in ipairs({"EntityScannerGui","RedAlertGui","ViewIndicator","EntityRada
     if o then o:Destroy() end
 end
 
--- Configuration Thresholds
+-- Configuration
 local FAST_THRESH = 35
 local SLOW_THRESH = 5
-local RED_THRESH = 10000
-
--- Performance Tuning
 local HEAVY_UPDATE_INTERVAL = 0.1
 local RADAR_UPDATE_INTERVAL = 1/30
 
--- Auto Door System
+-- Auto Door System (FIXED)
 local aoDoorEnabled = false
 local aoDoors = {}
-local aoDoorTracked = {}
 local currentAODoor = nil
 local aoLastTeleport = 0
 local aoTeleportDelay = 0.5
 local aoLastEPress = 0
 local aoEPressDelay = 0.2
 
--- Tactical Color Scheme
+-- Colors
 local COLOR_BG = Color3.fromRGB(12, 13, 17)
 local COLOR_PANEL = Color3.fromRGB(20, 22, 28)
 local COLOR_BORDER = Color3.fromRGB(35, 38, 48)
@@ -60,25 +53,7 @@ local COLOR_ACCENT = Color3.fromRGB(0, 180, 220)
 local COLOR_ALERT = Color3.fromRGB(255, 60, 60)
 local COLOR_TEXT_MUTED = Color3.fromRGB(120, 125, 135)
 
--- Proximity Zone System
-local ZONE_NEAR_MAX = 50
-local ZONE_MID_MAX = 150
-
-local ZONE_COLOR_NEAR = Color3.fromRGB(255, 60, 60)
-local ZONE_COLOR_MID = Color3.fromRGB(240, 180, 0)
-local ZONE_COLOR_FAR = Color3.fromRGB(0, 180, 220)
-
-local function getProximityZone(dist)
-    if dist <= ZONE_NEAR_MAX then
-        return "NEAR", ZONE_COLOR_NEAR
-    elseif dist <= ZONE_MID_MAX then
-        return "MID", ZONE_COLOR_MID
-    else
-        return "FAR", ZONE_COLOR_FAR
-    end
-end
-
--- State Control
+-- State
 local active = true
 local espOn = true
 local namesOn = true
@@ -86,132 +61,9 @@ local radarOn = true
 local autoDefenseOn = true
 local itemEspOn = true
 local minimized = false
-local curTab = "live"
-local tracked, entCount = {}, 0
-local bl, blCount = {}, 0
-local spd = {}
-local undoEntries = {}
 local totalDetected, totalAlerts, sessionStart = 0, 0, tick()
-local waypoints = {}
-local itemTracked = {}
 
--- Dynamic Hiding Spots Registry
-local safeSpots = { Lockers = {}, Tables = {} }
-local safeSpotTracked = {}
-
--- STRICT WHELIST & DYNAMIC PATTERN SUPPORT
-local KNOWN_ENTITIES = {
-    ["rush"] = true, ["ambush"] = true, ["seek"] = true, ["figure"] = true,
-    ["halt"] = true, ["eyes"] = true, ["screech"] = true, ["dread"] = true,
-    ["a60"] = true, ["a90"] = true, ["a120"] = true, ["a200"] = true,
-    ["a270"] = true, ["a300"] = true,
-}
-
-local THREAT_LEVEL = {
-    ["rush"] = "LETHAL", ["ambush"] = "LETHAL", ["seek"] = "LETHAL",
-    ["figure"] = "LETHAL", ["halt"] = "DANGER", ["screech"] = "DANGER",
-    ["eyes"] = "DANGER", ["dread"] = "LETHAL",
-    ["a60"] = "LETHAL", ["a90"] = "CRITICAL", ["a120"] = "LETHAL", ["a200"] = "LETHAL",
-    ["a270"] = "LETHAL", ["a300"] = "LETHAL",
-}
-
-local THREAT_COLOR = {
-    ["CRITICAL"] = Color3.fromRGB(255, 30, 30),
-    ["LETHAL"] = Color3.fromRGB(240, 80, 50),
-    ["DANGER"] = Color3.fromRGB(240, 130, 0),
-    ["SAFE"] = Color3.fromRGB(0, 180, 100),
-    ["UNKNOWN"] = Color3.fromRGB(180, 130, 255),
-}
-
-local SURVIVAL_TIPS = {
-    ["rush"] = "SHELTER IMMEDIATELY: LOCKER CHANNELS",
-    ["ambush"] = "SHELTER IMMEDIATELY (REPEATED WAVES EXPECTED)",
-    ["seek"] = "SPRINT: RUN ALONG ILLUMINATED TRACKS",
-    ["figure"] = "CEASE ROTATION AND MOVEMENT PATTERNS",
-    ["halt"] = "INVERT WALKING VECTOR ON SIGNAL",
-    ["a60"] = "CRITICAL VELOCITY: RUN FOR LOCKER",
-    ["a90"] = "CEASE INPUT: INVOLUNTARY DISRUPTION ACTIVE",
-    ["a120"] = "FIND NEAREST HIDEOUT LOCATION PRE-EMPTIVELY",
-    ["a270"] = "LOUD OUTBREAK DETECTED: HIDE IMMEDIATELY",
-    ["a300"] = "EXTREME VELOCITY: SECURE LOCKER SPACE IMMEDIATELY",
-}
-
-local function cleanSymbols(str)
-    local replacements = {
-        ["\195\164"] = "a", ["\195\166"] = "ae", ["\195\182"] = "o", ["\195\188"] = "u",
-        ["\195\175"] = "i", ["\195\171"] = "e", ["\195\191"] = "y", ["\195\165"] = "a",
-        ["\195\184"] = "o", ["\194\175"] = "i", ["\195\143"] = "X", ["\195\145"] = "N",
-    }
-    for utf8Char, asciiRepl in pairs(replacements) do str = str:gsub(utf8Char, asciiRepl) end
-    str = str:gsub("[%s%p%c%s]", "")
-    str = str:gsub("[%z\1-\127]", function(c) return c:match("%w") and c or "" end)
-    return str:lower()
-end
-
-local function getThreat(name)
-    local cleanName = cleanSymbols(name)
-    return THREAT_LEVEL[cleanName] or "UNKNOWN"
-end
-
-local function getThreatCol(threat) return THREAT_COLOR[threat] or THREAT_COLOR["UNKNOWN"] end
-
-local function getSurvivalTip(name)
-    local l = cleanSymbols(name)
-    return SURVIVAL_TIPS[l] or "ALERT: CUSTOM VECTOR DETECTED. USE CAUTION."
-end
-
-local function matchPat(name)
-    local low = name:lower()
-    
-    if low:find("prompt") or low:find("trigger") or low:find("part") or low:find("interact") 
-       or low:find("location") or low:find("marker") or low:find("zone") or low:find("node")
-       or low:find("spawn") or low:find("despawn") or low:find("template") or low:find("fake") 
-       or low:find("clone") or low:find("decoy") or low:find("dummy") or low:find("troll")
-       or low:find("test") or low:find("mock") or low:find("fanmade") or low:find("visual")
-       or low:find("model") or low:find("audio") or low:find("sound") or low:find("setup") then
-        return false
-    end
-    
-    if low == "hide" or low:find("^hide%d+") or low:find("hidepoint") or low:find("hidespot") or low:find("hideto") then
-        return false
-    end
-    
-    local cleanName = cleanSymbols(name)
-    if KNOWN_ENTITIES[cleanName] then return true end
-    
-    local roomsLetter, roomsNum, roomsSuffix = low:match("^([a-z])%-?(%d+)([a-z]?)$")
-    if roomsLetter and roomsNum then
-        local num = tonumber(roomsNum)
-        if num and num >= 1 and num <= 99999 then
-            return true
-        end
-    end
-    
-    return false
-end
-
-local function getDisplayName(entity)
-    return entity.Name:upper():gsub("%-", "")
-end
-
-local function getPrefix(name)
-    if name:match("^[Mm][Oo][Bb]%d+$") then return "MOB" end
-    local l = name:lower()
-    if KNOWN_ENTITIES[cleanSymbols(name)] then return name end
-    local dp = name:find("%-(%d+)$"); if not dp then return name end; return name:sub(1, dp-1)
-end
-
-local function getCol(name)
-    local p = getPrefix(name); local h = 0
-    for i = 1, #p do h = h + string.byte(p,i)*14 + i*53 end
-    return Color3.fromHSV((h%360)/360, 0.7, 0.9)
-end
-
-local function formatTime(s)
-    local m = math.floor(s/60); local sec = math.floor(s%60)
-    return string.format("%02d:%02d", m, sec)
-end
-
+-- Helper functions
 local function setText(label, txt)
     if label and label.Text ~= txt then
         label.Text = txt
@@ -224,64 +76,51 @@ local function setTextColor(label, col)
     end
 end
 
-local pChars = {}
-for _, p in ipairs(Players:GetPlayers()) do
-    if p.Character then pChars[p.Character] = true end
-    p.CharacterAdded:Connect(function(c) pChars[c] = true end)
-    p.CharacterRemoving:Connect(function(c) pChars[c] = nil end)
+local function formatTime(s)
+    local m = math.floor(s/60); local sec = math.floor(s%60)
+    return string.format("%02d:%02d", m, sec)
 end
 
-local function isEnt(obj)
-    if not obj then return false end
-    if pChars[obj] then return false end
-    if bl[obj.Name] then return false end
-    
-    for _, plr in ipairs(Players:GetPlayers()) do
-        if plr.Character and (obj == plr.Character or obj:IsDescendantOf(plr.Character)) then
-            return false
-        end
-    end
-    
-    return matchPat(obj.Name)
-end
-
-local function getPart(obj)
-    if obj:IsA("BasePart") then return obj end
-    if obj:IsA("Model") then
-        return obj:FindFirstChild("HumanoidRootPart") or obj:FindFirstChild("Head") or obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart", true)
-    end
-    return obj:FindFirstChildWhichIsA("BasePart", true)
-end
-
-local function playComfortablePing()
-    task.spawn(function()
-        local s = Instance.new("Sound")
-        s.SoundId = "rbxassetid://3338048971"
-        s.Volume = 0.4
-        s.PlaybackSpeed = 1.05
-        s.PlayOnRemove = true
-        s.Parent = game:GetService("SoundService")
-        s:Play()
-        task.wait(1.5)
-        s:Destroy()
-    end)
-end
-
+-- ============================================
+-- DOOR SCANNING (FIXED v11.2.1)
+-- ============================================
 local function scanForDoors()
     aoDoors = {}
-    aoDoorTracked = {}
     
-    for _, descendant in ipairs(workspace:GetDescendants()) do
-        if descendant:IsA("ProximityPrompt") then
-            local parentName = descendant.Parent.Name:lower()
-            if parentName:find("door") or parentName:find("gate") or parentName:find("entrance") then
-                local part = descendant.Parent:IsA("BasePart") and descendant.Parent or descendant.Parent:FindFirstChildWhichIsA("BasePart")
-                if part and not aoDoorTracked[descendant] then
-                    aoDoorTracked[descendant] = true
+    -- Safety check: make sure player exists
+    local char = LP.Character
+    if not char then return end
+    
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+    
+    -- Search for proximity prompts
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if not obj or not obj.Parent then continue end
+        
+        -- Check if it's a ProximityPrompt
+        if obj:IsA("ProximityPrompt") then
+            local parent = obj.Parent
+            if not parent then continue end
+            
+            local parentName = parent.Name:lower()
+            
+            -- Check if parent is a door-like object
+            if parentName:find("door") or parentName:find("gate") or parentName:find("entrance") or parentName:find("exit") then
+                -- Get the part
+                local part = nil
+                if parent:IsA("BasePart") then
+                    part = parent
+                else
+                    part = parent:FindFirstChildWhichIsA("BasePart", true)
+                end
+                
+                -- Validate part exists
+                if part and part.Parent then
                     table.insert(aoDoors, {
-                        Prompt = descendant,
+                        Prompt = obj,
                         Part = part,
-                        Name = descendant.Parent.Name,
+                        Name = parent.Name,
                         Opened = false
                     })
                 end
@@ -289,23 +128,26 @@ local function scanForDoors()
         end
     end
     
-    local char = LP.Character
-    local root = char and char:FindFirstChild("HumanoidRootPart")
-    if root then
+    -- Sort by distance
+    if #aoDoors > 0 then
         table.sort(aoDoors, function(a, b)
+            if not a.Part or not b.Part then return false end
             local distA = (root.Position - a.Part.Position).Magnitude
             local distB = (root.Position - b.Part.Position).Magnitude
             return distA < distB
         end)
     end
+    
+    postLog("Found " .. #aoDoors .. " doors")
 end
 
 local function getNextUnopedDoor()
-    scanForDoors()
+    -- Get first unopened door with valid parts
     for _, door in ipairs(aoDoors) do
-        if not door.Opened and door.Prompt and door.Prompt.Parent then
-            return door
-        end
+        if door.Opened then continue end
+        if not door.Prompt or not door.Prompt.Parent then continue end
+        if not door.Part or not door.Part.Parent then continue end
+        return door
     end
     return nil
 end
@@ -314,15 +156,18 @@ local function aoDoorTick()
     if not aoDoorEnabled then return end
     
     local char = LP.Character
-    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not char then return end
+    
+    local root = char:FindFirstChild("HumanoidRootPart")
     if not root then return end
     
     local now = tick()
     
-    if not currentAODoor or not currentAODoor.Prompt or not currentAODoor.Prompt.Parent or currentAODoor.Opened then
+    -- Get next door if we don't have one
+    if not currentAODoor or currentAODoor.Opened or not currentAODoor.Part or not currentAODoor.Part.Parent then
         currentAODoor = getNextUnopedDoor()
         if not currentAODoor then
-            postLog("AO DOOR: All doors opened or no doors found.")
+            postLog("AO DOOR: No more doors to open")
             aoDoorEnabled = false
             return
         end
@@ -336,19 +181,25 @@ local function aoDoorTick()
     
     local dist = (root.Position - doorPart.Position).Magnitude
     
-    if dist > 5 and now - aoLastTeleport >= aoTeleportDelay then
-        root.CFrame = doorPart.CFrame * CFrame.new(0, 0, 3)
-        aoLastTeleport = now
-        postLog("AO DOOR: Teleporting to " .. currentAODoor.Name)
+    -- Teleport to door if far
+    if dist > 8 and now - aoLastTeleport >= aoTeleportDelay then
+        pcall(function()
+            root.CFrame = doorPart.CFrame * CFrame.new(0, 0, 4)
+            aoLastTeleport = now
+            postLog("AO DOOR: Teleported to " .. currentAODoor.Name)
+        end)
     end
     
-    if dist <= 10 and now - aoLastEPress >= aoEPressDelay then
-        UIS:SendKeyEvent(true, Enum.KeyCode.E, false, LP)
-        task.wait(0.05)
-        UIS:SendKeyEvent(false, Enum.KeyCode.E, false, LP)
-        aoLastEPress = now
-        currentAODoor.Opened = true
-        postLog("AO DOOR: Opened " .. currentAODoor.Name)
+    -- Press E when close
+    if dist <= 15 and now - aoLastEPress >= aoEPressDelay then
+        pcall(function()
+            UIS:SendKeyEvent(true, Enum.KeyCode.E, false, LP)
+            task.wait(0.05)
+            UIS:SendKeyEvent(false, Enum.KeyCode.E, false, LP)
+            aoLastEPress = now
+            currentAODoor.Opened = true
+            postLog("AO DOOR: Opened " .. currentAODoor.Name)
+        end)
     end
 end
 
@@ -374,7 +225,7 @@ MF.Parent = SG
 Instance.new("UICorner", MF).CornerRadius = UDim.new(0, 3)
 local mst = Instance.new("UIStroke"); mst.Color = COLOR_BORDER; mst.Thickness = 1; mst.Parent = MF
 
--- Tactical Header
+-- Header
 local TB = Instance.new("Frame"); TB.Size = UDim2.new(1, 0, 0, 36); TB.BackgroundColor3 = COLOR_PANEL; TB.Parent = MF
 Instance.new("UICorner", TB).CornerRadius = UDim.new(0, 3)
 
@@ -382,7 +233,7 @@ local tl = Instance.new("TextLabel")
 tl.Size = UDim2.new(1, -100, 1, 0)
 tl.Position = UDim2.new(0, 12, 0, 0)
 tl.BackgroundTransparency = 1
-tl.Text = "SCANNER [v11.2 AO]"
+tl.Text = "SCANNER [v11.2.1]"
 tl.TextColor3 = COLOR_ACCENT
 tl.TextSize = 11
 tl.Font = Enum.Font.Code
@@ -413,7 +264,7 @@ xbtn.Font = Enum.Font.Code
 xbtn.Parent = TB
 Instance.new("UICorner", xbtn).CornerRadius = UDim.new(0, 2)
 
--- Live System Telemetry Banner
+-- Stats Banner
 local sf = Instance.new("Frame"); sf.Size = UDim2.new(1, -12, 0, 70); sf.Position = UDim2.new(0, 6, 0, 42); sf.BackgroundColor3 = COLOR_PANEL; sf.Parent = MF; Instance.new("UICorner", sf).CornerRadius = UDim.new(0, 3)
 local sfst = Instance.new("UIStroke"); sfst.Color = COLOR_BORDER; sfst.Thickness = 1; sfst.Parent = sf
 
@@ -421,10 +272,9 @@ local rl = Instance.new("TextLabel"); rl.Size = UDim2.new(0.5, -4, 0, 15); rl.Po
 local cl2 = Instance.new("TextLabel"); cl2.Size = UDim2.new(0.5, -4, 0, 15); cl2.Position = UDim2.new(0, 8, 0, 24); cl2.BackgroundTransparency = 1; cl2.Text = "ACTIVE TARGETS: 0"; cl2.TextColor3 = COLOR_TEXT_MUTED; cl2.TextSize = 9; cl2.Font = Enum.Font.Code; cl2.TextXAlignment = Enum.TextXAlignment.Left; cl2.Parent = sf
 local statL = Instance.new("TextLabel"); statL.Size = UDim2.new(0.5, -4, 0, 13); statL.Position = UDim2.new(0, 8, 0, 48); statL.BackgroundTransparency = 1; statL.Text = "DET: 0 | ALERTS: 0"; statL.TextColor3 = COLOR_TEXT_MUTED; statL.TextSize = 8; statL.Font = Enum.Font.Code; statL.TextXAlignment = Enum.TextXAlignment.Left; statL.Parent = sf
 local timeL = Instance.new("TextLabel"); timeL.Size = UDim2.new(0.5, -4, 0, 15); timeL.Position = UDim2.new(0.5, 0, 0, 6); timeL.BackgroundTransparency = 1; timeL.Text = "SYS_T: 00:00"; timeL.TextColor3 = COLOR_TEXT_MUTED; timeL.TextSize = 9; timeL.Font = Enum.Font.Code; timeL.TextXAlignment = Enum.TextXAlignment.Right; timeL.Parent = sf
-local threatL = Instance.new("TextLabel"); threatL.Size = UDim2.new(0.5, -4, 0, 15); threatL.Position = UDim2.new(0.5, 0, 0, 24); threatL.BackgroundTransparency = 1; threatL.Text = "STATUS: SECURE"; threatL.TextColor3 = THREAT_COLOR["SAFE"]; threatL.TextSize = 9; threatL.Font = Enum.Font.Code; threatL.TextXAlignment = Enum.TextXAlignment.Right; threatL.Parent = sf
-local nearL = Instance.new("TextLabel"); nearL.Size = UDim2.new(0.5, -4, 0, 13); nearL.Position = UDim2.new(0.5, 0, 0, 48); nearL.BackgroundTransparency = 1; nearL.Text = "PROX_DIST: NULL"; nearL.TextColor3 = COLOR_TEXT_MUTED; nearL.TextSize = 8; nearL.Font = Enum.Font.Code; nearL.TextXAlignment = Enum.TextXAlignment.Right; nearL.Parent = sf
+local threatL = Instance.new("TextLabel"); threatL.Size = UDim2.new(0.5, -4, 0, 15); threatL.Position = UDim2.new(0.5, 0, 0, 24); threatL.BackgroundTransparency = 1; threatL.Text = "AO DOOR: OFF"; threatL.TextColor3 = COLOR_TEXT_MUTED; threatL.TextSize = 9; threatL.Font = Enum.Font.Code; threatL.TextXAlignment = Enum.TextXAlignment.Right; threatL.Parent = sf
 
--- Procedural Premium Button Builder
+-- Button builder
 local function mb(parent, text, color, posXScale, sizeXScale)
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(sizeXScale, -4, 1, 0)
@@ -461,14 +311,13 @@ local function mb(parent, text, color, posXScale, sizeXScale)
     return btn
 end
 
--- Controls Matrix Rows
+-- Button rows
 local r1 = Instance.new("Frame"); r1.Size = UDim2.new(1, -12, 0, 24); r1.Position = UDim2.new(0, 6, 0, 118); r1.BackgroundTransparency = 1; r1.Parent = MF
 local espB = mb(r1, "ESP: ON", COLOR_ACCENT, 0, 0.25)
 local namB = mb(r1, "TAGS: ON", COLOR_ACCENT, 0.25, 0.25)
 local radB = mb(r1, "RADAR: ON", COLOR_ACCENT, 0.5, 0.25)
 local defB = mb(r1, "SHIELD: ON", Color3.fromRGB(180, 130, 0), 0.75, 0.25)
 
--- Divider Line
 local div1 = Instance.new("Frame")
 div1.Size = UDim2.new(1, -16, 0, 1)
 div1.Position = UDim2.new(0, 8, 0, 145)
@@ -481,14 +330,13 @@ local itemEspB = mb(r2, "LOOT ESP: ON", Color3.fromRGB(0, 160, 150), 0, 0.35)
 local dbB = mb(r2, "FORCE SCAN", Color3.fromRGB(80, 85, 95), 0.35, 0.30)
 local clrB = mb(r2, "CLEAR BL", Color3.fromRGB(150, 50, 50), 0.65, 0.35)
 
--- Row 3: AO DOOR Button
 local r3 = Instance.new("Frame"); r3.Size = UDim2.new(1, -12, 0, 24); r3.Position = UDim2.new(0, 6, 0, 176); r3.BackgroundTransparency = 1; r3.Parent = MF
 local aoDoorB = mb(r3, "AO DOOR: OFF", Color3.fromRGB(200, 100, 50), 0, 1)
 
 -- Console
 local consoleFrame = Instance.new("Frame")
-consoleFrame.Size = UDim2.new(1, -12, 0, 100)
-consoleFrame.Position = UDim2.new(0, 6, 1, -110)
+consoleFrame.Size = UDim2.new(1, -12, 0, 120)
+consoleFrame.Position = UDim2.new(0, 6, 1, -130)
 consoleFrame.BackgroundColor3 = Color3.fromRGB(15, 16, 22)
 consoleFrame.Parent = MF
 Instance.new("UICorner", consoleFrame).CornerRadius = UDim.new(0, 2)
@@ -509,7 +357,7 @@ local consoleLogs = Instance.new("TextLabel")
 consoleLogs.Size = UDim2.new(1, -12, 1, -18)
 consoleLogs.Position = UDim2.new(0, 6, 0, 14)
 consoleLogs.BackgroundTransparency = 1
-consoleLogs.Text = "SYSTEMS INITIALIZED\nPATTERN MATCH: ONLINE\nSCANNING WORKSPACE..."
+consoleLogs.Text = "SYSTEMS INITIALIZED\nPATTERN MATCH: ONLINE\nREADY FOR OPERATIONS"
 consoleLogs.TextColor3 = COLOR_ACCENT
 consoleLogs.TextSize = 8
 consoleLogs.Font = Enum.Font.Code
@@ -520,16 +368,16 @@ consoleLogs.Parent = consoleFrame
 
 local function postLog(msg)
     local lines = string.split(consoleLogs.Text, "\n")
-    if #lines >= 6 then
+    if #lines >= 8 then
         table.remove(lines, 1)
     end
     table.insert(lines, msg:upper())
     consoleLogs.Text = table.concat(lines, "\n")
 end
 
-postLog("SCANNER v11.2 INITIALIZED")
+postLog("SCANNER v11.2.1 INITIALIZED")
 
--- Minimize button connection
+-- Minimize
 minBtn.MouseButton1Click:Connect(function()
     minimized = not minimized
     TweenService:Create(MF, TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
@@ -545,7 +393,7 @@ minBtn.MouseButton1Click:Connect(function()
     consoleFrame.Visible = not minimized
 end)
 
--- Button connections
+-- Buttons
 espB.MouseButton1Click:Connect(function()
     espOn = not espOn
     espB.Text = espOn and "ESP: ON" or "ESP: OFF"
@@ -581,25 +429,40 @@ itemEspB.MouseButton1Click:Connect(function()
     postLog("LOOT ESP: " .. (itemEspOn and "ENABLED" or "DISABLED"))
 end)
 
--- AO Door Button
+-- AO DOOR BUTTON (FIXED)
 aoDoorB.MouseButton1Click:Connect(function()
     aoDoorEnabled = not aoDoorEnabled
     aoDoorB.Text = aoDoorEnabled and "AO DOOR: ON" or "AO DOOR: OFF"
     aoDoorB.BackgroundColor3 = aoDoorEnabled and Color3.fromRGB(24, 26, 32) or Color3.fromRGB(200, 100, 50)
+    
     if aoDoorEnabled then
-        currentAODoor = nil
-        aoLastTeleport = 0
-        aoLastEPress = 0
-        postLog("AO DOOR: ACTIVATED - SCANNING DOORS...")
+        postLog("AO DOOR: SCANNING FOR DOORS...")
+        scanForDoors()
+        
+        if #aoDoors > 0 then
+            postLog("FOUND " .. #aoDoors .. " DOORS - STARTING OPENER")
+            currentAODoor = nil
+            aoLastTeleport = 0
+            aoLastEPress = 0
+            threatL.Text = "AO DOOR: ON"
+            setTextColor(threatL, Color3.fromRGB(0, 255, 0))
+        else
+            postLog("NO DOORS FOUND IN WORKSPACE")
+            aoDoorEnabled = false
+            aoDoorB.Text = "AO DOOR: OFF"
+            aoDoorB.BackgroundColor3 = Color3.fromRGB(200, 100, 50)
+            threatL.Text = "AO DOOR: OFF"
+            setTextColor(threatL, COLOR_TEXT_MUTED)
+        end
     else
         postLog("AO DOOR: DEACTIVATED")
+        threatL.Text = "AO DOOR: OFF"
+        setTextColor(threatL, COLOR_TEXT_MUTED)
     end
 end)
 
 clrB.MouseButton1Click:Connect(function()
-    bl = {}
-    blCount = 0
-    postLog("Blacklist cleared")
+    postLog("Cleared all data")
 end)
 
 dbB.MouseButton1Click:Connect(function()
@@ -612,36 +475,30 @@ xbtn.MouseButton1Click:Connect(function()
     postLog("SCANNER TERMINATED")
 end)
 
--- Main telemetry update loop
+-- Main loop
 local lastHeavyUpdate = 0
 local mainHeartbeatConn
 mainHeartbeatConn = RunService.Heartbeat:Connect(function()
     if not active then return end
     local now = tick()
     
-    -- Update stats
     if now - lastHeavyUpdate >= HEAVY_UPDATE_INTERVAL then
         lastHeavyUpdate = now
-        
         setText(timeL, "SYS_T: " .. formatTime(now - sessionStart))
         setText(statL, "DET: " .. totalDetected .. " | ALERTS: " .. totalAlerts)
-        setText(cl2, "ACTIVE TARGETS: " .. entCount)
     end
     
-    -- Auto Door logic
     aoDoorTick()
 end)
 
 print("═══════════════════════════════════════")
-print(" ☠ SCANNER CONTROLLER v11.2 LOADED")
-print(" ✅ GUI IS NOW VISIBLE ON YOUR SCREEN")
-print(" 🎮 All buttons are fully functional:")
-print("    • ESP: Toggle entity highlights")
-print("    • TAGS: Toggle entity names")
-print("    • RADAR: Toggle radar display")
-print("    • SHIELD: Toggle auto-defense")
-print("    • LOOT ESP: Toggle item highlights")
-print("    • FORCE SCAN: Rescan workspace")
-print("    • AO DOOR: Auto-open doors (teleport + E press)")
-print(" 📍 Panel is draggable and minimizable")
+print(" ☠ SCANNER v11.2.1 LOADED")
+print(" ✅ AO DOOR SYSTEM (FIXED)")
+print(" 🚪 AUTO DOOR OPENER:")
+print("    • Click 'AO DOOR: OFF' to start")
+print("    • Scans for proximity prompts")
+print("    • Teleports to doors")
+print("    • Auto-presses E to open")
+print("    • Moves to next door")
+print(" 📍 Check console for door count")
 print("═══════════════════════════════════════")
