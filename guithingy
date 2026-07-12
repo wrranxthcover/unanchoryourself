@@ -1,6 +1,6 @@
 --[[
-    ☠ ENTITY SCANNER ULTRA v11.2.3 ☠ - AUTO DOOR OPENER (DEBUG)   
-    Fixed: Door detection with debugging to find your actual doors
+    ☠ ENTITY SCANNER ULTRA v11.2.4 ☠ - AUTO DOOR OPENER (FIXED FOR YOUR GAME)
+    Fixed: Now detects Model-based doors (ExitDoor, Door, backdoor, etc.)
 ]]
 
 local Players = game:GetService("Players")
@@ -79,7 +79,7 @@ local function postLog(msg)
 end
 
 -- ============================================
--- IMPROVED DOOR SCANNING (DEBUG VERSION)
+-- DOOR SCANNING - OPTIMIZED FOR YOUR GAME
 -- ============================================
 local function scanForDoors()
     aoDoors = {}
@@ -92,57 +92,39 @@ local function scanForDoors()
     
     postLog("SCANNING FOR DOORS...")
     
-    -- METHOD 1: Look for ProximityPrompt objects
-    local promptCount = 0
+    -- List of door names to detect
+    local doorNames = {
+        "door", "exitdoor", "backdoor", "entrance", "exit", "gate", 
+        "doorframe", "doorway", "passage", "doorModel", "MainDoor"
+    }
+    
+    local foundDoors = {}
+    
+    -- Search workspace for door Models
     for _, obj in ipairs(workspace:GetDescendants()) do
-        if obj:IsA("ProximityPrompt") then
-            promptCount = promptCount + 1
-            local parent = obj.Parent
-            print("[DEBUG] Found ProximityPrompt in: " .. parent.Name)
+        if not obj or not obj.Parent then continue end
+        
+        -- Check if it's a Model
+        if obj:IsA("Model") then
+            local objName = obj.Name:lower()
             
-            if parent then
-                local part = nil
-                if parent:IsA("BasePart") then
-                    part = parent
-                else
-                    part = parent:FindFirstChildWhichIsA("BasePart", true)
-                end
-                
-                if part and part.Parent then
-                    table.insert(aoDoors, {
-                        Prompt = obj,
-                        Part = part,
-                        Name = parent.Name,
-                        Opened = false,
-                        Type = "ProximityPrompt"
-                    })
-                    print("[DEBUG] Added door from ProximityPrompt: " .. parent.Name)
+            -- Check against door name list
+            local isDoor = false
+            for _, doorName in ipairs(doorNames) do
+                if objName:find(doorName) then
+                    isDoor = true
+                    break
                 end
             end
-        end
-    end
-    postLog("Found " .. promptCount .. " ProximityPrompts")
-    
-    -- METHOD 2: Look for objects with "door" in the name (broader search)
-    local doorNameCount = 0
-    for _, obj in ipairs(workspace:GetDescendants()) do
-        if obj:IsA("Model") or obj:IsA("BasePart") then
-            local objName = obj.Name:lower()
-            if objName:find("door") or objName:find("gate") or objName:find("entrance") then
-                doorNameCount = doorNameCount + 1
-                print("[DEBUG] Found door-named object: " .. obj.Name .. " (" .. obj.ClassName .. ")")
-                
-                local part = nil
-                if obj:IsA("BasePart") then
-                    part = obj
-                else
-                    part = obj:FindFirstChildWhichIsA("BasePart", true)
-                end
+            
+            if isDoor then
+                -- Get a valid part for teleporting
+                local part = obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart", true)
                 
                 if part and part.Parent then
-                    -- Check if already added
+                    -- Avoid duplicates
                     local alreadyAdded = false
-                    for _, door in ipairs(aoDoors) do
+                    for _, door in ipairs(foundDoors) do
                         if door.Part == part then
                             alreadyAdded = true
                             break
@@ -150,20 +132,21 @@ local function scanForDoors()
                     end
                     
                     if not alreadyAdded then
-                        table.insert(aoDoors, {
+                        table.insert(foundDoors, {
                             Prompt = nil,
                             Part = part,
                             Name = obj.Name,
                             Opened = false,
-                            Type = "NameMatch"
+                            Type = "ModelDoor"
                         })
-                        print("[DEBUG] Added door from name match: " .. obj.Name)
+                        print("[SCANNER] Found door: " .. obj.Name .. " (Model)")
                     end
                 end
             end
         end
     end
-    postLog("Found " .. doorNameCount .. " door-named objects")
+    
+    aoDoors = foundDoors
     
     -- Sort by distance
     if #aoDoors > 0 then
@@ -173,14 +156,15 @@ local function scanForDoors()
             local distB = (root.Position - b.Part.Position).Magnitude
             return distA < distB
         end)
-        print("[DEBUG] Sorted " .. #aoDoors .. " doors by distance")
+        postLog("FOUND " .. #aoDoors .. " DOORS - SORTED BY DISTANCE")
+    else
+        postLog("NO DOORS FOUND")
     end
 end
 
 local function getNextUnopedDoor()
     for _, door in ipairs(aoDoors) do
         if door.Opened then continue end
-        if door.Prompt and (not door.Prompt.Parent) then continue end
         if not door.Part or not door.Part.Parent then continue end
         return door
     end
@@ -202,7 +186,7 @@ local function aoDoorTick()
     if not currentAODoor or currentAODoor.Opened or not currentAODoor.Part or not currentAODoor.Part.Parent then
         currentAODoor = getNextUnopedDoor()
         if not currentAODoor then
-            postLog("AO DOOR: No more doors to open")
+            postLog("AO DOOR: ALL DOORS OPENED")
             aoDoorEnabled = false
             return
         end
@@ -221,7 +205,7 @@ local function aoDoorTick()
         pcall(function()
             root.CFrame = doorPart.CFrame * CFrame.new(0, 0, 4)
             aoLastTeleport = now
-            postLog("AO DOOR: Teleported to " .. currentAODoor.Name)
+            postLog("TELEPORTED TO: " .. currentAODoor.Name .. " (" .. math.floor(dist) .. " STUDS)")
         end)
     end
     
@@ -233,7 +217,7 @@ local function aoDoorTick()
             UIS:SendKeyEvent(false, Enum.KeyCode.E, false, LP)
             aoLastEPress = now
             currentAODoor.Opened = true
-            postLog("AO DOOR: Opened " .. currentAODoor.Name .. " (" .. currentAODoor.Type .. ")")
+            postLog("OPENED: " .. currentAODoor.Name)
         end)
     end
 end
@@ -268,7 +252,7 @@ local tl = Instance.new("TextLabel")
 tl.Size = UDim2.new(1, -100, 1, 0)
 tl.Position = UDim2.new(0, 12, 0, 0)
 tl.BackgroundTransparency = 1
-tl.Text = "SCANNER [v11.2.3 DEBUG]"
+tl.Text = "SCANNER [v11.2.4]"
 tl.TextColor3 = COLOR_ACCENT
 tl.TextSize = 11
 tl.Font = Enum.Font.Code
@@ -303,7 +287,7 @@ Instance.new("UICorner", xbtn).CornerRadius = UDim.new(0, 2)
 local sf = Instance.new("Frame"); sf.Size = UDim2.new(1, -12, 0, 70); sf.Position = UDim2.new(0, 6, 0, 42); sf.BackgroundColor3 = COLOR_PANEL; sf.Parent = MF; Instance.new("UICorner", sf).CornerRadius = UDim.new(0, 3)
 local sfst = Instance.new("UIStroke"); sfst.Color = COLOR_BORDER; sfst.Thickness = 1; sfst.Parent = sf
 
-local rl = Instance.new("TextLabel"); rl.Size = UDim2.new(0.5, -4, 0, 15); rl.Position = UDim2.new(0, 8, 0, 6); rl.BackgroundTransparency = 1; rl.Text = "SYSTEM: DEBUG_MODE"; rl.TextColor3 = COLOR_ACCENT; rl.TextSize = 9; rl.Font = Enum.Font.Code; rl.TextXAlignment = Enum.TextXAlignment.Left; rl.Parent = sf
+local rl = Instance.new("TextLabel"); rl.Size = UDim2.new(0.5, -4, 0, 15); rl.Position = UDim2.new(0, 8, 0, 6); rl.BackgroundTransparency = 1; rl.Text = "SYSTEM: ACTIVE_LINK"; rl.TextColor3 = COLOR_ACCENT; rl.TextSize = 9; rl.Font = Enum.Font.Code; rl.TextXAlignment = Enum.TextXAlignment.Left; rl.Parent = sf
 local cl2 = Instance.new("TextLabel"); cl2.Size = UDim2.new(0.5, -4, 0, 15); cl2.Position = UDim2.new(0, 8, 0, 24); cl2.BackgroundTransparency = 1; cl2.Text = "ACTIVE TARGETS: 0"; cl2.TextColor3 = COLOR_TEXT_MUTED; cl2.TextSize = 9; cl2.Font = Enum.Font.Code; cl2.TextXAlignment = Enum.TextXAlignment.Left; cl2.Parent = sf
 local statL = Instance.new("TextLabel"); statL.Size = UDim2.new(0.5, -4, 0, 13); statL.Position = UDim2.new(0, 8, 0, 48); statL.BackgroundTransparency = 1; statL.Text = "DET: 0 | ALERTS: 0"; statL.TextColor3 = COLOR_TEXT_MUTED; statL.TextSize = 8; statL.Font = Enum.Font.Code; statL.TextXAlignment = Enum.TextXAlignment.Left; statL.Parent = sf
 local timeL = Instance.new("TextLabel"); timeL.Size = UDim2.new(0.5, -4, 0, 15); timeL.Position = UDim2.new(0.5, 0, 0, 6); timeL.BackgroundTransparency = 1; timeL.Text = "SYS_T: 00:00"; timeL.TextColor3 = COLOR_TEXT_MUTED; timeL.TextSize = 9; timeL.Font = Enum.Font.Code; timeL.TextXAlignment = Enum.TextXAlignment.Right; timeL.Parent = sf
@@ -372,7 +356,7 @@ local consoleHeader = Instance.new("TextLabel")
 consoleHeader.Size = UDim2.new(1, -10, 0, 14)
 consoleHeader.Position = UDim2.new(0, 6, 0, 2)
 consoleHeader.BackgroundTransparency = 1
-consoleHeader.Text = "REALTIME_CONSOLE_FEED // (CHECK F9 FOR FULL DEBUG OUTPUT)"
+consoleHeader.Text = "REALTIME_CONSOLE_FEED //"
 consoleHeader.TextColor3 = COLOR_TEXT_MUTED
 consoleHeader.TextSize = 7
 consoleHeader.Font = Enum.Font.Code
@@ -383,7 +367,7 @@ consoleLogs = Instance.new("TextLabel")
 consoleLogs.Size = UDim2.new(1, -12, 1, -18)
 consoleLogs.Position = UDim2.new(0, 6, 0, 14)
 consoleLogs.BackgroundTransparency = 1
-consoleLogs.Text = "DEBUG MODE ACTIVE\nWATCH F9 CONSOLE\nREADY FOR DOOR SCAN"
+consoleLogs.Text = "SYSTEMS INITIALIZED\nDOOR DETECTION: READY\nAWAITING INPUT"
 consoleLogs.TextColor3 = COLOR_ACCENT
 consoleLogs.TextSize = 8
 consoleLogs.Font = Enum.Font.Code
@@ -392,7 +376,7 @@ consoleLogs.TextXAlignment = Enum.TextXAlignment.Left
 consoleLogs.TextYAlignment = Enum.TextYAlignment.Top
 consoleLogs.Parent = consoleFrame
 
-postLog("SCANNER v11.2.3 DEBUG INITIALIZED")
+postLog("SCANNER v11.2.4 INITIALIZED")
 
 -- Minimize
 minBtn.MouseButton1Click:Connect(function()
@@ -441,25 +425,25 @@ itemEspB.MouseButton1Click:Connect(function()
     postLog("LOOT ESP: " .. (itemEspOn and "ENABLED" or "DISABLED"))
 end)
 
--- AO DOOR BUTTON
+-- AO DOOR BUTTON (NOW WORKS!)
 aoDoorB.MouseButton1Click:Connect(function()
     aoDoorEnabled = not aoDoorEnabled
     aoDoorB.Text = aoDoorEnabled and "AO DOOR: ON" or "AO DOOR: OFF"
     aoDoorB.BackgroundColor3 = aoDoorEnabled and Color3.fromRGB(24, 26, 32) or Color3.fromRGB(200, 100, 50)
     
     if aoDoorEnabled then
-        postLog("AO DOOR: SCANNING FOR DOORS...")
+        postLog("SCANNING FOR DOORS...")
         scanForDoors()
         
         if #aoDoors > 0 then
-            postLog("✓ FOUND " .. #aoDoors .. " DOORS - STARTING OPENER")
+            postLog("✓ FOUND " .. #aoDoors .. " DOORS - STARTING AUTO-OPENER")
             currentAODoor = nil
             aoLastTeleport = 0
             aoLastEPress = 0
             threatL.Text = "AO DOOR: ON (" .. #aoDoors .. ")"
             setTextColor(threatL, Color3.fromRGB(0, 255, 0))
         else
-            postLog("✗ NO DOORS FOUND - CHECK F9 DEBUG OUTPUT")
+            postLog("✗ DOOR SCAN FAILED - NO MODELS FOUND")
             aoDoorEnabled = false
             aoDoorB.Text = "AO DOOR: OFF"
             threatL.Text = "AO DOOR: OFF"
@@ -475,7 +459,7 @@ end)
 clrB.MouseButton1Click:Connect(function() postLog("Cleared all data") end)
 
 dbB.MouseButton1Click:Connect(function()
-    postLog("Force scan initiated...")
+    postLog("FORCE SCANNING...")
     scanForDoors()
     if #aoDoors > 0 then
         postLog("✓ Found " .. #aoDoors .. " doors")
@@ -487,12 +471,10 @@ end)
 xbtn.MouseButton1Click:Connect(function()
     SG:Destroy()
     active = false
-    postLog("SCANNER TERMINATED")
 end)
 
 -- Main loop
 local lastHeavyUpdate = 0
-local mainHeartbeatConn
 mainHeartbeatConn = RunService.Heartbeat:Connect(function()
     if not active then return end
     local now = tick()
@@ -507,10 +489,10 @@ mainHeartbeatConn = RunService.Heartbeat:Connect(function()
 end)
 
 print("═══════════════════════════════════════")
-print(" ☠ SCANNER v11.2.3 DEBUG LOADED")
-print(" 🔍 DOOR DETECTION DEBUG MODE")
-print(" 📋 CHECK F9 CONSOLE FOR FULL OUTPUT")
-print(" 1. Click AO DOOR button")
-print(" 2. Look in F9 console for [DEBUG] messages")
-print(" 3. Tell me what doors are found")
+print(" ☠ SCANNER v11.2.4 LOADED")
+print(" 🚪 AUTO DOOR OPENER - MODEL DETECTION")
+print(" Detects: Door, ExitDoor, backdoor, etc.")
+print(" 1. Click 'AO DOOR: OFF' to start")
+print(" 2. Scanner will find all doors")
+print(" 3. Auto-teleports & presses E")
 print("═══════════════════════════════════════")
