@@ -1,9 +1,10 @@
 --[[
-    ☠ ENTITY SCANNER ULTRA v11.0 ☠ - PROXIMITY ZONE EDITION
+    ☠ ENTITY SCANNER ULTRA v11.1 ☠ - PERFORMANCE OPTIMIZED EDITION
     Fixed: Custom/Fan-Made entity scanning (A-85, A-20i, A-928u, G-291i, B-1920J)
-    Fixed: Minimize button scoping bug (now correctly restores tab/viewer state)
+    Fixed: Minimize button scoping bug
+    Fixed: MAJOR FPS DROPS from uncapped per-frame string ops & UI writes
     New: Display names strip dashes (A-20i -> A20I)
-    New: Proximity Zone system (NEAR / MID / FAR) on all distance readouts
+    New: Proximity Zone system (NEAR / MID / FAR)
     Engineered for high-speed games like Rooms Re-Established & Doors.
 ]]
 
@@ -23,6 +24,12 @@ end
 local FAST_THRESH = 35
 local SLOW_THRESH = 5
 local RED_THRESH = 10000
+
+-- ============================================
+-- PERFORMANCE TUNING (v11.1 FIX)
+-- ============================================
+local HEAVY_UPDATE_INTERVAL = 0.1   -- Distance/speed/zone/UI text logic runs at 10Hz instead of raw FPS
+local RADAR_UPDATE_INTERVAL = 1/30  -- Radar visuals run at 30Hz (dt-scaled sweep stays smooth)
 
 -- Tactical Color Scheme
 local COLOR_BG = Color3.fromRGB(12, 13, 17)       -- Deep Matte Charcoal
@@ -78,12 +85,9 @@ local safeSpots = { Lockers = {}, Tables = {} }
 local safeSpotTracked = {}
 
 -- STRICT WHELIST & DYNAMIC PATTERN SUPPORT
--- Supports base entities + catches ANY Letter-Number combination (A-85, etc.)
 local KNOWN_ENTITIES = {
-    -- Official Doors
     ["rush"] = true, ["ambush"] = true, ["seek"] = true, ["figure"] = true,
     ["halt"] = true, ["eyes"] = true, ["screech"] = true, ["dread"] = true,
-    -- Standard Rooms
     ["a60"] = true, ["a90"] = true, ["a120"] = true, ["a200"] = true,
     ["a270"] = true, ["a300"] = true,
 }
@@ -101,7 +105,7 @@ local THREAT_COLOR = {
     ["LETHAL"] = Color3.fromRGB(240, 80, 50),
     ["DANGER"] = Color3.fromRGB(240, 130, 0),
     ["SAFE"] = Color3.fromRGB(0, 180, 100),
-    ["UNKNOWN"] = Color3.fromRGB(180, 130, 255), -- Changed color for Unknown/Custom to Purple/Violet
+    ["UNKNOWN"] = Color3.fromRGB(180, 130, 255),
 }
 
 local SURVIVAL_TIPS = {
@@ -145,7 +149,6 @@ end
 local function matchPat(name)
     local low = name:lower()
     
-    -- STRICT ANTI-FAKE/SPAWN/DESPAWN BLACKLIST
     if low:find("prompt") or low:find("trigger") or low:find("part") or low:find("interact") 
        or low:find("location") or low:find("marker") or low:find("zone") or low:find("node")
        or low:find("spawn") or low:find("despawn") or low:find("template") or low:find("fake") 
@@ -155,26 +158,16 @@ local function matchPat(name)
         return false
     end
     
-    -- Prevent static prompt "Hide" mechanics from spamming detection lists
     if low == "hide" or low:find("^hide%d+") or low:find("hidepoint") or low:find("hidespot") or low:find("hideto") then
         return false
     end
     
-    -- 1. Check Official Dictionary (Standard Doors/Rooms entities)
     local cleanName = cleanSymbols(name)
     if KNOWN_ENTITIES[cleanName] then return true end
     
-    -- 2. DYNAMIC ROOMS VERIFICATION (EXTENDED: A-85, A-20i, A-928u, G-291i, B-1920J)
-    -- Matches formats like:
-    --   "A-85"    (Letter + Dash + Number)
-    --   "A20i"    (Letter + Number + Optional Suffix Letter, no dash)
-    --   "A-928u"  (Letter + Dash + Number + Optional Suffix Letter)
-    --   "B-1920J" (Letter + Dash + Number + Optional Suffix Letter, uppercase normalized via low)
     local roomsLetter, roomsNum, roomsSuffix = low:match("^([a-z])%-?(%d+)([a-z]?)$")
     if roomsLetter and roomsNum then
         local num = tonumber(roomsNum)
-        -- Allow reasonable Entity IDs (1 to 99,999)
-        -- roomsSuffix can be "" (no suffix) or a single trailing letter (i, u, j, etc.)
         if num and num >= 1 and num <= 99999 then
             return true
         end
@@ -206,6 +199,21 @@ local function formatTime(s)
     return string.format("%02d:%02d", m, sec)
 end
 
+-- ============================================
+-- PERF HELPERS: SKIP REDUNDANT UI WRITES (v11.1 FIX)
+-- ============================================
+local function setText(label, txt)
+    if label.Text ~= txt then
+        label.Text = txt
+    end
+end
+
+local function setTextColor(label, col)
+    if label.TextColor3 ~= col then
+        label.TextColor3 = col
+    end
+end
+
 local pChars = {}
 for _, p in ipairs(Players:GetPlayers()) do
     if p.Character then pChars[p.Character] = true end
@@ -218,7 +226,6 @@ local function isEnt(obj)
     if pChars[obj] then return false end
     if bl[obj.Name] then return false end
     
-    -- Filter out local characters and teammates
     for _, plr in ipairs(Players:GetPlayers()) do
         if plr.Character and (obj == plr.Character or obj:IsDescendantOf(plr.Character)) then
             return false
@@ -311,7 +318,7 @@ local TB = Instance.new("Frame"); TB.Size = UDim2.new(1, 0, 0, 36); TB.Backgroun
 Instance.new("UICorner", TB).CornerRadius = UDim.new(0, 3)
 local tbf = Instance.new("Frame"); tbf.Size = UDim2.new(1, 0, 0, 6); tbf.Position = UDim2.new(0, 0, 1, -6); tbf.BackgroundColor3 = COLOR_PANEL; tbf.BorderSizePixel = 0; tbf.Parent = TB
 
-local tl = Instance.new("TextLabel"); tl.Size = UDim2.new(1, -100, 1, 0); tl.Position = UDim2.new(0, 12, 0, 0); tl.BackgroundTransparency = 1; tl.Text = "SCANNER [v11.0 PROXIMITY]"; tl.TextColor3 = COLOR_ACCENT; tl.TextSize = 11; tl.Font = Enum.Font.Code; tl.TextXAlignment = Enum.TextXAlignment.Left; tl.Parent = TB
+local tl = Instance.new("TextLabel"); tl.Size = UDim2.new(1, -100, 1, 0); tl.Position = UDim2.new(0, 12, 0, 0); tl.BackgroundTransparency = 1; tl.Text = "SCANNER [v11.1 PERF]"; tl.TextColor3 = COLOR_ACCENT; tl.TextSize = 11; tl.Font = Enum.Font.Code; tl.TextXAlignment = Enum.TextXAlignment.Left; tl.Parent = TB
 
 -- Control Buttons
 local minBtn = Instance.new("TextButton"); minBtn.Size = UDim2.new(0, 24, 0, 24); minBtn.Position = UDim2.new(1, -58, 0.5, -12); minBtn.BackgroundColor3 = Color3.fromRGB(24, 26, 32); minBtn.BorderSizePixel = 0; minBtn.Text = "-"; minBtn.TextColor3 = COLOR_TEXT_MUTED; minBtn.TextSize = 12; minBtn.Font = Enum.Font.Code; minBtn.Parent = TB; Instance.new("UICorner", minBtn).CornerRadius = UDim.new(0, 2)
@@ -769,7 +776,6 @@ local function removeDropdownAlert(entityName)
         alert.Wrapper:Destroy()
     end)
     
-    -- Close escape panel if screen is clear
     local activeCount = 0
     for _ in pairs(activeNotifications) do activeCount = activeCount + 1 end
     if activeCount == 0 then
@@ -816,7 +822,11 @@ local radarDots = {}
 local RADAR_RANGE = 250
 local sweepAngle = 0
 
-local function updateRadar()
+-- ============================================
+-- RADAR UPDATE (v11.1 FIX: now takes dt, throttled externally,
+-- uses cached d.threat instead of recomputing via getThreat())
+-- ============================================
+local function updateRadar(dt)
     if not radarOn then radarFrame.Visible = false; return end
     radarFrame.Visible = true
     local char = LP.Character; local mr = char and char:FindFirstChild("HumanoidRootPart")
@@ -829,7 +839,9 @@ local function updateRadar()
     local rightVec = Vector3.new(camCF.RightVector.X, 0, camCF.RightVector.Z)
     if rightVec.Magnitude > 0.01 then rightVec = rightVec.Unit else rightVec = Vector3.new(1,0,0) end
 
-    sweepAngle = sweepAngle + 4; if sweepAngle >= 360 then sweepAngle = 0 end
+    -- dt-scaled sweep speed keeps rotation smooth regardless of update rate
+    sweepAngle = sweepAngle + (240 * (dt or RADAR_UPDATE_INTERVAL))
+    if sweepAngle >= 360 then sweepAngle = sweepAngle % 360 end
     sweepLine.Rotation = sweepAngle
 
     for name, dot in pairs(radarDots) do
@@ -856,13 +868,14 @@ local function updateRadar()
                     dot._entity = ent; radarDots[dotKey] = dot
                 end
                 dot.Position = UDim2.new(0.5 + relX, 0, 0.5 + relY, 0)
-                dot.BackgroundColor3 = getThreatCol(getThreat(ent.Name))
+                -- Use cached threat color instead of recomputing getThreat() every call
+                dot.BackgroundColor3 = d.threatCol or getThreatCol(d.threat or "UNKNOWN")
             end
         end
     end
     
     local dotCount = 0; for _ in pairs(radarDots) do dotCount += 1 end
-    radarTitle.Text = "LIDAR RNG:" .. RADAR_RANGE .. " // ACT_SIG:" .. dotCount
+    setText(radarTitle, "LIDAR RNG:" .. RADAR_RANGE .. " // ACT_SIG:" .. dotCount)
 end
 
 -- ============================================
@@ -1045,7 +1058,6 @@ minBtn.MouseButton1Click:Connect(function()
     }):Play()
     minBtn.Text = minimized and "+" or "-"
 
-    -- Explicitly toggle sub-panel visibility (don't rely solely on ClipsDescendants)
     sf.Visible = not minimized
     r1.Visible = not minimized
     div1.Visible = not minimized
@@ -1061,14 +1073,12 @@ minBtn.MouseButton1Click:Connect(function()
         vp2.Visible = false
         vep2.Visible = false
     else
-        -- Restore whichever tab was active before minimizing
         scr.Visible = (curTab == "live")
         uscr.Visible = (curTab == "undo")
         wpscr.Visible = (curTab == "waypoints")
         hideScrFrame.Visible = (curTab == "safezones")
         if curTab == "safezones" then renderHidingSpotGUI() end
 
-        -- Restore viewer/spectator bars if they were active
         vp2.Visible = viewing
         vep2.Visible = viewingEnt
     end
@@ -1184,7 +1194,7 @@ local function startV(entity)
         local sp, on = Camera:WorldToScreenPoint(root.Position); local vpS = Camera.ViewportSize
         local liveDist = (LP.Character.HumanoidRootPart.Position-root.Position).Magnitude
         local zoneName = getProximityZone(liveDist)
-        ar.Text = "TRACKING // " .. dName .. "\nRANGE: " .. math.floor(liveDist) .. " STUDS [" .. zoneName .. "]"
+        setText(ar, "TRACKING // " .. dName .. "\nRANGE: " .. math.floor(liveDist) .. " STUDS [" .. zoneName .. "]")
         if on then ar.Position = UDim2.new(0, math.clamp(sp.X,90,vpS.X-90), 0, math.clamp(sp.Y,8,55)) end
     end); layoutGUI() 
 end
@@ -1211,6 +1221,11 @@ blacklistEnt = function(name)
     for _, ent in ipairs(rem) do untrack(ent) end 
 end
 
+-- ============================================
+-- TRACK (v11.1 FIX: caches threat/threatCol/displayName
+-- onto the tracked data table so hot loops never
+-- recompute string operations every frame)
+-- ============================================
 track = function(entity)
     if tracked[entity] or not entity.Parent or bl[entity.Name] then return end
     totalDetected += 1
@@ -1218,6 +1233,11 @@ track = function(entity)
     local displayName = getDisplayName(entity)
     local threat = getThreat(entity.Name)
     local threatCol = getThreatCol(threat)
+
+    -- Cache these so the Heartbeat/radar loops never call getThreat/getDisplayName again
+    d.threat = threat
+    d.threatCol = threatCol
+    d.displayName = displayName
 
     postLog("Acquired Signal: " .. displayName)
 
@@ -1291,22 +1311,17 @@ end))
 table.insert(workspaceConnections, workspace.DescendantRemoving:Connect(function(obj) if tracked[obj] then untrack(obj) end end))
 
 -- ========================================================
--- DECOUPLED TELEMETRY LOOP (REAL-TIME COMPUTATIONAL HUD)
+-- HEAVY TELEMETRY TICK (v11.1 FIX)
+-- Runs at HEAVY_UPDATE_INTERVAL (10Hz) instead of raw framerate.
+-- Uses cached d.threat / d.displayName instead of recomputing.
 -- ========================================================
-local lastUpdate = 0
-local mainHeartbeatConn
-mainHeartbeatConn = RunService.Heartbeat:Connect(function()
-    if not active then return end
-    
-    updateRadar()
-    
+local function heavyUpdateTick()
     local char = LP.Character
     local myR = char and char:FindFirstChild("HumanoidRootPart")
     if not myR then return end
     local myP = myR.Position
     local now = tick()
-    
-    -- Real-Time Telemetry loop running at physics framerate
+
     local nearestDist = math.huge
     local nearestName = "NULL"
     local highestThreat = "SAFE"
@@ -1316,39 +1331,35 @@ mainHeartbeatConn = RunService.Heartbeat:Connect(function()
         if tp and tp.Parent then
             local rawDist = (myP - tp.Position).Magnitude
             local dist = math.floor(rawDist)
-            local threat = getThreat(ent.Name)
+            local threat = d.threat -- cached, no recompute
 
             if rawDist < nearestDist then 
                 nearestDist = rawDist 
-                nearestName = getDisplayName(ent) 
+                nearestName = d.displayName -- cached, no recompute
             end
             
             if threat == "LETHAL" or threat == "CRITICAL" or threat == "DANGER" then
                 highestThreat = threat
                 
-                -- Real-Time Distance Card Update (with proximity zone tagging)
-                local nameKey = getDisplayName(ent)
+                local nameKey = d.displayName
                 local alert = activeNotifications[nameKey]
                 if alert then
                     local zoneName, zoneColor = getProximityZone(rawDist)
-                    alert.DistanceLabel.Text = "RANGE: " .. dist .. " STUDS [" .. zoneName .. "]"
-                    alert.DistanceLabel.TextColor3 = zoneColor
+                    setText(alert.DistanceLabel, "RANGE: " .. dist .. " STUDS [" .. zoneName .. "]")
+                    setTextColor(alert.DistanceLabel, zoneColor)
                 end
                 
-                -- Instant Shield Safeguard Trigger
                 if autoDefenseOn and rawDist < 100 then
                     executeAutoDefend()
                 end
             end
 
-            -- Update values in your main list GUI instantly (with proximity zone tagging)
             if d.entryDist then 
                 local zoneName, zoneColor = getProximityZone(rawDist)
-                d.entryDist.Text = dist .. " STUDS [" .. zoneName .. "]"
-                d.entryDist.TextColor3 = zoneColor
+                setText(d.entryDist, dist .. " STUDS [" .. zoneName .. "]")
+                setTextColor(d.entryDist, zoneColor)
             end
 
-            -- Path Speed Math Pipeline
             local sd = spd[ent]
             if sd then
                 local dt = now - sd.lT
@@ -1366,19 +1377,19 @@ mainHeartbeatConn = RunService.Heartbeat:Connect(function()
                     end
                     
                     if d.entrySpeed then 
-                        d.entrySpeed.Text = approachTxt 
+                        setText(d.entrySpeed, approachTxt)
                     end
                 end
             end
         end
     end
 
-    -- Real-Time Distance updating on Hiding Tab UI & Escape HUD
+    -- Escape HUD distance readouts
     local closet, closetDist = findNearestSafeClosetOptimized()
     if closetDist < math.huge then
-        ehLockerBtn.Text = "TELEPORT LOCKER\nDIST: " .. math.floor(closetDist) .. " STUDS"
+        setText(ehLockerBtn, "TELEPORT LOCKER\nDIST: " .. math.floor(closetDist) .. " STUDS")
     else
-        ehLockerBtn.Text = "TELEPORT LOCKER\nDIST: ---"
+        setText(ehLockerBtn, "TELEPORT LOCKER\nDIST: ---")
     end
     
     local nearestTableDist = math.huge
@@ -1388,8 +1399,8 @@ mainHeartbeatConn = RunService.Heartbeat:Connect(function()
             if d < nearestTableDist then nearestTableDist = d end
             if curTab == "safezones" and curHideSubTab == "tables" and item.UI then
                 local zoneName, zoneColor = getProximityZone(d)
-                item.UI.DistLabel.Text = math.floor(d) .. " STUDS [" .. zoneName .. "]"
-                item.UI.DistLabel.TextColor3 = zoneColor
+                setText(item.UI.DistLabel, math.floor(d) .. " STUDS [" .. zoneName .. "]")
+                setTextColor(item.UI.DistLabel, zoneColor)
             end
         end
     end
@@ -1399,35 +1410,56 @@ mainHeartbeatConn = RunService.Heartbeat:Connect(function()
             if item.Instance and item.Instance.Parent and item.UI then
                 local d = (myP - item.Primary.Position).Magnitude
                 local zoneName, zoneColor = getProximityZone(d)
-                item.UI.DistLabel.Text = math.floor(d) .. " STUDS [" .. zoneName .. "]"
-                item.UI.DistLabel.TextColor3 = zoneColor
+                setText(item.UI.DistLabel, math.floor(d) .. " STUDS [" .. zoneName .. "]")
+                setTextColor(item.UI.DistLabel, zoneColor)
             end
         end
     end
 
     if nearestTableDist < math.huge then
-        ehTableBtn.Text = "TELEPORT TABLE\nDIST: " .. math.floor(nearestTableDist) .. " STUDS"
+        setText(ehTableBtn, "TELEPORT TABLE\nDIST: " .. math.floor(nearestTableDist) .. " STUDS")
     else
-        ehTableBtn.Text = "TELEPORT TABLE\nDIST: ---"
+        setText(ehTableBtn, "TELEPORT TABLE\nDIST: ---")
     end
 
-    -- Throttled UI Telemetry (Saves enormous rendering overhead)
-    if now - lastUpdate >= 0.1 then
-        lastUpdate = now
-        timeL.Text = "SYS_T: " .. formatTime(now - sessionStart)
-        statL.Text = "DET: " .. totalDetected .. " | ALERTS: " .. totalAlerts
-        
-        if nearestDist < math.huge then
-            local zoneName, zoneColor = getProximityZone(nearestDist)
-            nearL.Text = "PROX_DIST: " .. nearestName .. " [" .. math.floor(nearestDist) .. "s] :: " .. zoneName
-            nearL.TextColor3 = zoneColor
-        else
-            nearL.Text = "PROX_DIST: NULL"
-            nearL.TextColor3 = COLOR_TEXT_MUTED
-        end
-        
-        threatL.Text = "STATUS: " .. highestThreat
-        threatL.TextColor3 = getThreatCol(highestThreat)
+    -- Top banner telemetry
+    setText(timeL, "SYS_T: " .. formatTime(now - sessionStart))
+    setText(statL, "DET: " .. totalDetected .. " | ALERTS: " .. totalAlerts)
+    
+    if nearestDist < math.huge then
+        local zoneName, zoneColor = getProximityZone(nearestDist)
+        setText(nearL, "PROX_DIST: " .. nearestName .. " [" .. math.floor(nearestDist) .. "s] :: " .. zoneName)
+        setTextColor(nearL, zoneColor)
+    else
+        setText(nearL, "PROX_DIST: NULL")
+        setTextColor(nearL, COLOR_TEXT_MUTED)
+    end
+    
+    setText(threatL, "STATUS: " .. highestThreat)
+    setTextColor(threatL, getThreatCol(highestThreat))
+end
+
+-- ========================================================
+-- MAIN LOOP (v11.1 FIX): Both heavy telemetry and radar are
+-- now throttled to fixed intervals instead of raw Heartbeat
+-- rate, which scales uncontrollably with high FPS.
+-- ========================================================
+local lastHeavyUpdate = 0
+local lastRadarUpdate = 0
+local mainHeartbeatConn
+mainHeartbeatConn = RunService.Heartbeat:Connect(function()
+    if not active then return end
+    local now = tick()
+
+    if now - lastRadarUpdate >= RADAR_UPDATE_INTERVAL then
+        local dt = now - lastRadarUpdate
+        lastRadarUpdate = now
+        updateRadar(dt)
+    end
+
+    if now - lastHeavyUpdate >= HEAVY_UPDATE_INTERVAL then
+        lastHeavyUpdate = now
+        heavyUpdateTick()
     end
 end)
 
@@ -1482,9 +1514,13 @@ xbtn.MouseButton1Click:Connect(function()
 end)
 
 print("═══════════════════════════════════════")
-print(" ☠ SCANNER CONTROLLER v11.0 LOADED")
-print(" 🔧 FIXED: PATTERN MATCHING ACTIVE (A-85, A-20i, A-928u, G-291i, B-1920J)")
+print(" ☠ SCANNER CONTROLLER v11.1 LOADED")
+print(" 🔧 FIXED: PATTERN MATCHING (A-85, A-20i, A-928u, G-291i, B-1920J)")
 print(" 🔧 FIXED: MINIMIZE BUTTON SCOPING BUG")
+print(" 🚀 PERF: Cached threat/displayName (no per-frame string ops)")
+print(" 🚀 PERF: Heavy telemetry throttled to 10Hz (was raw FPS)")
+print(" 🚀 PERF: Radar throttled to 30Hz with dt-scaled sweep")
+print(" 🚀 PERF: Redundant UI text/color writes now skipped")
 print(" ✨ NEW: DASH-FREE DISPLAY NAMES (A-20i -> A20I)")
 print(" ✨ NEW: PROXIMITY ZONES (NEAR <=50 / MID <=150 / FAR >150)")
 print("═══════════════════════════════════════")
