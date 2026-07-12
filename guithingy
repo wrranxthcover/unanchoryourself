@@ -1,7 +1,7 @@
 --[[
-    ☠ ENTITY SCANNER ULTRA v10.7 ☠ - OFFICIAL WHITELIST EDITION
+    ☠ ENTITY SCANNER ULTRA v10.8 ☠ - DYNAMIC PATTERN EDITION
+    Fixed: Now correctly scans Custom/Fan-Made entities (e.g., A-85, B-12)
     Engineered for high-speed games like Rooms Re-Established & Doors.
-    Strictly filters out spawners, despawn remnants, fake decoys, and fan-made hostiles.
 ]]
 
 local Players = game:GetService("Players")
@@ -54,12 +54,13 @@ local itemTracked = {}
 local safeSpots = { Lockers = {}, Tables = {} }
 local safeSpotTracked = {}
 
--- STRICT WHELIST: Only real, official gameplay hostiles
+-- STRICT WHELIST & DYNAMIC PATTERN SUPPORT
+-- Supports base entities + catches ANY Letter-Number combination (A-85, etc.)
 local KNOWN_ENTITIES = {
     -- Official Doors
     ["rush"] = true, ["ambush"] = true, ["seek"] = true, ["figure"] = true,
     ["halt"] = true, ["eyes"] = true, ["screech"] = true, ["dread"] = true,
-    -- Official Rooms / Rooms Re-Established
+    -- Standard Rooms
     ["a60"] = true, ["a90"] = true, ["a120"] = true, ["a200"] = true,
     ["a270"] = true, ["a300"] = true,
 }
@@ -77,7 +78,7 @@ local THREAT_COLOR = {
     ["LETHAL"] = Color3.fromRGB(240, 80, 50),
     ["DANGER"] = Color3.fromRGB(240, 130, 0),
     ["SAFE"] = Color3.fromRGB(0, 180, 100),
-    ["UNKNOWN"] = Color3.fromRGB(120, 130, 150),
+    ["UNKNOWN"] = Color3.fromRGB(180, 130, 255), -- Changed color for Unknown/Custom to Purple/Violet
 }
 
 local SURVIVAL_TIPS = {
@@ -114,9 +115,10 @@ local function getThreatCol(threat) return THREAT_COLOR[threat] or THREAT_COLOR[
 
 local function getSurvivalTip(name)
     local l = cleanSymbols(name)
-    return SURVIVAL_TIPS[l] or "ALERT: VECTOR DETECTED. RETREAT TO SECURITY."
+    return SURVIVAL_TIPS[l] or "ALERT: CUSTOM VECTOR DETECTED. USE CAUTION."
 end
 
+-- *** THE CRITICAL FIX ***
 local function matchPat(name)
     local low = name:lower()
     
@@ -135,15 +137,18 @@ local function matchPat(name)
         return false
     end
     
+    -- 1. Check Official Dictionary (Standard Doors/Rooms entities)
     local cleanName = cleanSymbols(name)
     if KNOWN_ENTITIES[cleanName] then return true end
     
-    -- Strict Official Rooms Verification Pattern (No Custom letters/numbers allowed)
-    local roomsLetter, roomsNum = low:match("^([a])%-?(%d+)")
+    -- 2. DYNAMIC ROOMS VERIFICATION (FIXED FOR A-85, ETC.)
+    -- Matches formats like "A-85", "b-15", "Z-4000"
+    local roomsLetter, roomsNum = low:match("^([a-zA-Z])%-?(%d+)")
     if roomsLetter and roomsNum then
         local num = tonumber(roomsNum)
-        -- Strictly whitelist actual official numbers
-        if num == 60 or num == 90 or num == 120 or num == 200 or num == 270 or num == 300 then
+        -- Allow reasonable Entity IDs (1 to 99,999). 
+        -- This fixes the issue where only specific numbers were allowed.
+        if num >= 1 and num <= 99999 then
             return true
         end
     end
@@ -278,7 +283,7 @@ local TB = Instance.new("Frame"); TB.Size = UDim2.new(1, 0, 0, 36); TB.Backgroun
 Instance.new("UICorner", TB).CornerRadius = UDim.new(0, 3)
 local tbf = Instance.new("Frame"); tbf.Size = UDim2.new(1, 0, 0, 6); tbf.Position = UDim2.new(0, 0, 1, -6); tbf.BackgroundColor3 = COLOR_PANEL; tbf.BorderSizePixel = 0; tbf.Parent = TB
 
-local tl = Instance.new("TextLabel"); tl.Size = UDim2.new(1, -100, 1, 0); tl.Position = UDim2.new(0, 12, 0, 0); tl.BackgroundTransparency = 1; tl.Text = "TACTICAL SCANNER [v10.7]"; tl.TextColor3 = COLOR_ACCENT; tl.TextSize = 11; tl.Font = Enum.Font.Code; tl.TextXAlignment = Enum.TextXAlignment.Left; tl.Parent = TB
+local tl = Instance.new("TextLabel"); tl.Size = UDim2.new(1, -100, 1, 0); tl.Position = UDim2.new(0, 12, 0, 0); tl.BackgroundTransparency = 1; tl.Text = "SCANNER [v10.8 PATTERN]"; tl.TextColor3 = COLOR_ACCENT; tl.TextSize = 11; tl.Font = Enum.Font.Code; tl.TextXAlignment = Enum.TextXAlignment.Left; tl.Parent = TB
 
 -- Control Buttons
 local minBtn = Instance.new("TextButton"); minBtn.Size = UDim2.new(0, 24, 0, 24); minBtn.Position = UDim2.new(1, -58, 0.5, -12); minBtn.BackgroundColor3 = Color3.fromRGB(24, 26, 32); minBtn.BorderSizePixel = 0; minBtn.Text = "-"; minBtn.TextColor3 = COLOR_TEXT_MUTED; minBtn.TextSize = 12; minBtn.Font = Enum.Font.Code; minBtn.Parent = TB; Instance.new("UICorner", minBtn).CornerRadius = UDim.new(0, 2)
@@ -434,7 +439,7 @@ local consoleLogs = Instance.new("TextLabel")
 consoleLogs.Size = UDim2.new(1, -12, 1, -18)
 consoleLogs.Position = UDim2.new(0, 6, 0, 14)
 consoleLogs.BackgroundTransparency = 1
-consoleLogs.Text = "SYSTEMS INITIALIZED\nLIDAR MATRIX: ONLINE\nSCANNING WORKSPACE SECTORS..."
+consoleLogs.Text = "SYSTEMS INITIALIZED\nPATTERN MATCH: ONLINE\nSCANNING WORKSPACE SECTORS..."
 consoleLogs.TextColor3 = COLOR_ACCENT
 consoleLogs.TextSize = 8
 consoleLogs.Font = Enum.Font.Code
@@ -1391,6 +1396,6 @@ xbtn.MouseButton1Click:Connect(function()
 end)
 
 print("═══════════════════════════════════════")
-print(" ☠ SCANNER CONTROLLER v10.7 LOADED")
-print(" 🛡 ADVANCED MULTI-DROPDOWN ACTIVE")
+print(" ☠ SCANNER CONTROLLER v10.8 LOADED")
+print(" 🔧 FIXED: PATTERN MATCHING ACTIVE (A-85+)")
 print("═══════════════════════════════════════")
