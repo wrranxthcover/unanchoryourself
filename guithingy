@@ -1,6 +1,6 @@
 --[[
-    ☠ ENTITY SCANNER ULTRA v11.2.2 ☠ - AUTO DOOR OPENER (FULLY FIXED)
-    Fixed: Function definition order and nil value errors
+    ☠ ENTITY SCANNER ULTRA v11.2.3 ☠ - AUTO DOOR OPENER (DEBUG)
+    Fixed: Door detection with debugging to find your actual doors
 ]]
 
 local Players = game:GetService("Players")
@@ -13,7 +13,6 @@ local LP = Players.LocalPlayer
 while not LP do task.wait(0.1) LP = Players.LocalPlayer end
 while not LP.Character do task.wait(0.1) end
 
-local Camera = workspace.CurrentCamera
 print("[SCANNER] Player loaded, initializing GUI...")
 
 -- Clear old GUIs
@@ -66,7 +65,7 @@ local function formatTime(s)
     return string.format("%02d:%02d", m, sec)
 end
 
--- Global console reference (will be set after GUI creation)
+-- Global console reference
 local consoleLogs = nil
 
 local function postLog(msg)
@@ -76,10 +75,11 @@ local function postLog(msg)
         table.insert(lines, msg:upper())
         consoleLogs.Text = table.concat(lines, "\n")
     end
+    print("[SCANNER LOG] " .. msg)
 end
 
 -- ============================================
--- DOOR SCANNING FUNCTIONS (MUST BE BEFORE HEARTBEAT)
+-- IMPROVED DOOR SCANNING (DEBUG VERSION)
 -- ============================================
 local function scanForDoors()
     aoDoors = {}
@@ -90,18 +90,17 @@ local function scanForDoors()
     local root = char:FindFirstChild("HumanoidRootPart")
     if not root then return end
     
-    -- Search for proximity prompts
+    postLog("SCANNING FOR DOORS...")
+    
+    -- METHOD 1: Look for ProximityPrompt objects
+    local promptCount = 0
     for _, obj in ipairs(workspace:GetDescendants()) do
-        if not obj or not obj.Parent then continue end
-        
         if obj:IsA("ProximityPrompt") then
+            promptCount = promptCount + 1
             local parent = obj.Parent
-            if not parent then continue end
+            print("[DEBUG] Found ProximityPrompt in: " .. parent.Name)
             
-            local parentName = parent.Name:lower()
-            
-            -- Check if door-like
-            if parentName:find("door") or parentName:find("gate") or parentName:find("entrance") or parentName:find("exit") then
+            if parent then
                 local part = nil
                 if parent:IsA("BasePart") then
                     part = parent
@@ -114,12 +113,57 @@ local function scanForDoors()
                         Prompt = obj,
                         Part = part,
                         Name = parent.Name,
-                        Opened = false
+                        Opened = false,
+                        Type = "ProximityPrompt"
                     })
+                    print("[DEBUG] Added door from ProximityPrompt: " .. parent.Name)
                 end
             end
         end
     end
+    postLog("Found " .. promptCount .. " ProximityPrompts")
+    
+    -- METHOD 2: Look for objects with "door" in the name (broader search)
+    local doorNameCount = 0
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("Model") or obj:IsA("BasePart") then
+            local objName = obj.Name:lower()
+            if objName:find("door") or objName:find("gate") or objName:find("entrance") then
+                doorNameCount = doorNameCount + 1
+                print("[DEBUG] Found door-named object: " .. obj.Name .. " (" .. obj.ClassName .. ")")
+                
+                local part = nil
+                if obj:IsA("BasePart") then
+                    part = obj
+                else
+                    part = obj:FindFirstChildWhichIsA("BasePart", true)
+                end
+                
+                if part and part.Parent then
+                    -- Check if already added
+                    local alreadyAdded = false
+                    for _, door in ipairs(aoDoors) do
+                        if door.Part == part then
+                            alreadyAdded = true
+                            break
+                        end
+                    end
+                    
+                    if not alreadyAdded then
+                        table.insert(aoDoors, {
+                            Prompt = nil,
+                            Part = part,
+                            Name = obj.Name,
+                            Opened = false,
+                            Type = "NameMatch"
+                        })
+                        print("[DEBUG] Added door from name match: " .. obj.Name)
+                    end
+                end
+            end
+        end
+    end
+    postLog("Found " .. doorNameCount .. " door-named objects")
     
     -- Sort by distance
     if #aoDoors > 0 then
@@ -129,13 +173,14 @@ local function scanForDoors()
             local distB = (root.Position - b.Part.Position).Magnitude
             return distA < distB
         end)
+        print("[DEBUG] Sorted " .. #aoDoors .. " doors by distance")
     end
 end
 
 local function getNextUnopedDoor()
     for _, door in ipairs(aoDoors) do
         if door.Opened then continue end
-        if not door.Prompt or not door.Prompt.Parent then continue end
+        if door.Prompt and (not door.Prompt.Parent) then continue end
         if not door.Part or not door.Part.Parent then continue end
         return door
     end
@@ -188,13 +233,13 @@ local function aoDoorTick()
             UIS:SendKeyEvent(false, Enum.KeyCode.E, false, LP)
             aoLastEPress = now
             currentAODoor.Opened = true
-            postLog("AO DOOR: Opened " .. currentAODoor.Name)
+            postLog("AO DOOR: Opened " .. currentAODoor.Name .. " (" .. currentAODoor.Type .. ")")
         end)
     end
 end
 
 -- ============================================
--- GUI CREATION (NOW COMES AFTER FUNCTIONS)
+-- GUI CREATION
 -- ============================================
 print("[SCANNER] Creating main GUI frame...")
 
@@ -223,7 +268,7 @@ local tl = Instance.new("TextLabel")
 tl.Size = UDim2.new(1, -100, 1, 0)
 tl.Position = UDim2.new(0, 12, 0, 0)
 tl.BackgroundTransparency = 1
-tl.Text = "SCANNER [v11.2.2]"
+tl.Text = "SCANNER [v11.2.3 DEBUG]"
 tl.TextColor3 = COLOR_ACCENT
 tl.TextSize = 11
 tl.Font = Enum.Font.Code
@@ -258,7 +303,7 @@ Instance.new("UICorner", xbtn).CornerRadius = UDim.new(0, 2)
 local sf = Instance.new("Frame"); sf.Size = UDim2.new(1, -12, 0, 70); sf.Position = UDim2.new(0, 6, 0, 42); sf.BackgroundColor3 = COLOR_PANEL; sf.Parent = MF; Instance.new("UICorner", sf).CornerRadius = UDim.new(0, 3)
 local sfst = Instance.new("UIStroke"); sfst.Color = COLOR_BORDER; sfst.Thickness = 1; sfst.Parent = sf
 
-local rl = Instance.new("TextLabel"); rl.Size = UDim2.new(0.5, -4, 0, 15); rl.Position = UDim2.new(0, 8, 0, 6); rl.BackgroundTransparency = 1; rl.Text = "SYSTEM: ACTIVE_LINK"; rl.TextColor3 = COLOR_ACCENT; rl.TextSize = 9; rl.Font = Enum.Font.Code; rl.TextXAlignment = Enum.TextXAlignment.Left; rl.Parent = sf
+local rl = Instance.new("TextLabel"); rl.Size = UDim2.new(0.5, -4, 0, 15); rl.Position = UDim2.new(0, 8, 0, 6); rl.BackgroundTransparency = 1; rl.Text = "SYSTEM: DEBUG_MODE"; rl.TextColor3 = COLOR_ACCENT; rl.TextSize = 9; rl.Font = Enum.Font.Code; rl.TextXAlignment = Enum.TextXAlignment.Left; rl.Parent = sf
 local cl2 = Instance.new("TextLabel"); cl2.Size = UDim2.new(0.5, -4, 0, 15); cl2.Position = UDim2.new(0, 8, 0, 24); cl2.BackgroundTransparency = 1; cl2.Text = "ACTIVE TARGETS: 0"; cl2.TextColor3 = COLOR_TEXT_MUTED; cl2.TextSize = 9; cl2.Font = Enum.Font.Code; cl2.TextXAlignment = Enum.TextXAlignment.Left; cl2.Parent = sf
 local statL = Instance.new("TextLabel"); statL.Size = UDim2.new(0.5, -4, 0, 13); statL.Position = UDim2.new(0, 8, 0, 48); statL.BackgroundTransparency = 1; statL.Text = "DET: 0 | ALERTS: 0"; statL.TextColor3 = COLOR_TEXT_MUTED; statL.TextSize = 8; statL.Font = Enum.Font.Code; statL.TextXAlignment = Enum.TextXAlignment.Left; statL.Parent = sf
 local timeL = Instance.new("TextLabel"); timeL.Size = UDim2.new(0.5, -4, 0, 15); timeL.Position = UDim2.new(0.5, 0, 0, 6); timeL.BackgroundTransparency = 1; timeL.Text = "SYS_T: 00:00"; timeL.TextColor3 = COLOR_TEXT_MUTED; timeL.TextSize = 9; timeL.Font = Enum.Font.Code; timeL.TextXAlignment = Enum.TextXAlignment.Right; timeL.Parent = sf
@@ -314,10 +359,10 @@ local clrB = mb(r2, "CLEAR BL", Color3.fromRGB(150, 50, 50), 0.65, 0.35)
 local r3 = Instance.new("Frame"); r3.Size = UDim2.new(1, -12, 0, 24); r3.Position = UDim2.new(0, 6, 0, 176); r3.BackgroundTransparency = 1; r3.Parent = MF
 local aoDoorB = mb(r3, "AO DOOR: OFF", Color3.fromRGB(200, 100, 50), 0, 1)
 
--- Console (NOW ASSIGNED TO GLOBAL VARIABLE)
+-- Console
 local consoleFrame = Instance.new("Frame")
-consoleFrame.Size = UDim2.new(1, -12, 0, 120)
-consoleFrame.Position = UDim2.new(0, 6, 1, -130)
+consoleFrame.Size = UDim2.new(1, -12, 0, 140)
+consoleFrame.Position = UDim2.new(0, 6, 1, -150)
 consoleFrame.BackgroundColor3 = Color3.fromRGB(15, 16, 22)
 consoleFrame.Parent = MF
 Instance.new("UICorner", consoleFrame).CornerRadius = UDim.new(0, 2)
@@ -327,7 +372,7 @@ local consoleHeader = Instance.new("TextLabel")
 consoleHeader.Size = UDim2.new(1, -10, 0, 14)
 consoleHeader.Position = UDim2.new(0, 6, 0, 2)
 consoleHeader.BackgroundTransparency = 1
-consoleHeader.Text = "REALTIME_CONSOLE_FEED //"
+consoleHeader.Text = "REALTIME_CONSOLE_FEED // (CHECK F9 FOR FULL DEBUG OUTPUT)"
 consoleHeader.TextColor3 = COLOR_TEXT_MUTED
 consoleHeader.TextSize = 7
 consoleHeader.Font = Enum.Font.Code
@@ -338,7 +383,7 @@ consoleLogs = Instance.new("TextLabel")
 consoleLogs.Size = UDim2.new(1, -12, 1, -18)
 consoleLogs.Position = UDim2.new(0, 6, 0, 14)
 consoleLogs.BackgroundTransparency = 1
-consoleLogs.Text = "SYSTEMS INITIALIZED\nPATTERN MATCH: ONLINE\nREADY FOR OPERATIONS"
+consoleLogs.Text = "DEBUG MODE ACTIVE\nWATCH F9 CONSOLE\nREADY FOR DOOR SCAN"
 consoleLogs.TextColor3 = COLOR_ACCENT
 consoleLogs.TextSize = 8
 consoleLogs.Font = Enum.Font.Code
@@ -347,7 +392,7 @@ consoleLogs.TextXAlignment = Enum.TextXAlignment.Left
 consoleLogs.TextYAlignment = Enum.TextYAlignment.Top
 consoleLogs.Parent = consoleFrame
 
-postLog("SCANNER v11.2.2 INITIALIZED")
+postLog("SCANNER v11.2.3 DEBUG INITIALIZED")
 
 -- Minimize
 minBtn.MouseButton1Click:Connect(function()
@@ -369,35 +414,30 @@ end)
 espB.MouseButton1Click:Connect(function()
     espOn = not espOn
     espB.Text = espOn and "ESP: ON" or "ESP: OFF"
-    espB.BackgroundColor3 = espOn and Color3.fromRGB(24, 26, 32) or Color3.fromRGB(35, 15, 15)
     postLog("ESP: " .. (espOn and "ENABLED" or "DISABLED"))
 end)
 
 namB.MouseButton1Click:Connect(function()
     namesOn = not namesOn
     namB.Text = namesOn and "TAGS: ON" or "TAGS: OFF"
-    namB.BackgroundColor3 = namesOn and Color3.fromRGB(24, 26, 32) or Color3.fromRGB(35, 15, 15)
     postLog("TAGS: " .. (namesOn and "ENABLED" or "DISABLED"))
 end)
 
 radB.MouseButton1Click:Connect(function()
     radarOn = not radarOn
     radB.Text = radarOn and "RADAR: ON" or "RADAR: OFF"
-    radB.BackgroundColor3 = radarOn and Color3.fromRGB(24, 26, 32) or Color3.fromRGB(35, 15, 15)
     postLog("RADAR: " .. (radarOn and "ENABLED" or "DISABLED"))
 end)
 
 defB.MouseButton1Click:Connect(function()
     autoDefenseOn = not autoDefenseOn
     defB.Text = autoDefenseOn and "SHIELD: ON" or "SHIELD: OFF"
-    defB.BackgroundColor3 = autoDefenseOn and Color3.fromRGB(24, 26, 32) or Color3.fromRGB(35, 15, 15)
     postLog("SHIELD: " .. (autoDefenseOn and "ENABLED" or "DISABLED"))
 end)
 
 itemEspB.MouseButton1Click:Connect(function()
     itemEspOn = not itemEspOn
     itemEspB.Text = itemEspOn and "LOOT ESP: ON" or "LOOT ESP: OFF"
-    itemEspB.BackgroundColor3 = itemEspOn and Color3.fromRGB(24, 26, 32) or Color3.fromRGB(35, 15, 15)
     postLog("LOOT ESP: " .. (itemEspOn and "ENABLED" or "DISABLED"))
 end)
 
@@ -412,17 +452,16 @@ aoDoorB.MouseButton1Click:Connect(function()
         scanForDoors()
         
         if #aoDoors > 0 then
-            postLog("FOUND " .. #aoDoors .. " DOORS - STARTING OPENER")
+            postLog("✓ FOUND " .. #aoDoors .. " DOORS - STARTING OPENER")
             currentAODoor = nil
             aoLastTeleport = 0
             aoLastEPress = 0
             threatL.Text = "AO DOOR: ON (" .. #aoDoors .. ")"
             setTextColor(threatL, Color3.fromRGB(0, 255, 0))
         else
-            postLog("NO DOORS FOUND IN WORKSPACE")
+            postLog("✗ NO DOORS FOUND - CHECK F9 DEBUG OUTPUT")
             aoDoorEnabled = false
             aoDoorB.Text = "AO DOOR: OFF"
-            aoDoorB.BackgroundColor3 = Color3.fromRGB(200, 100, 50)
             threatL.Text = "AO DOOR: OFF"
             setTextColor(threatL, COLOR_TEXT_MUTED)
         end
@@ -433,12 +472,16 @@ aoDoorB.MouseButton1Click:Connect(function()
     end
 end)
 
-clrB.MouseButton1Click:Connect(function()
-    postLog("Cleared all data")
-end)
+clrB.MouseButton1Click:Connect(function() postLog("Cleared all data") end)
 
 dbB.MouseButton1Click:Connect(function()
     postLog("Force scan initiated...")
+    scanForDoors()
+    if #aoDoors > 0 then
+        postLog("✓ Found " .. #aoDoors .. " doors")
+    else
+        postLog("✗ No doors found")
+    end
 end)
 
 xbtn.MouseButton1Click:Connect(function()
@@ -447,7 +490,7 @@ xbtn.MouseButton1Click:Connect(function()
     postLog("SCANNER TERMINATED")
 end)
 
--- Main loop (NOW aoDoorTick IS ALREADY DEFINED)
+-- Main loop
 local lastHeavyUpdate = 0
 local mainHeartbeatConn
 mainHeartbeatConn = RunService.Heartbeat:Connect(function()
@@ -460,17 +503,14 @@ mainHeartbeatConn = RunService.Heartbeat:Connect(function()
         setText(statL, "DET: " .. totalDetected .. " | ALERTS: " .. totalAlerts)
     end
     
-    -- THIS SHOULD NOW WORK BECAUSE FUNCTION IS DEFINED ABOVE
     aoDoorTick()
 end)
 
 print("═══════════════════════════════════════")
-print(" ☠ SCANNER v11.2.2 LOADED")
-print(" ✅ AO DOOR FULLY FUNCTIONAL")
-print(" 🚪 AUTO DOOR OPENER:")
-print("    • Click 'AO DOOR: OFF' to start")
-print("    • Scans for proximity prompts")
-print("    • Teleports to doors")
-print("    • Auto-presses E to open")
-print("    • Moves to next door")
+print(" ☠ SCANNER v11.2.3 DEBUG LOADED")
+print(" 🔍 DOOR DETECTION DEBUG MODE")
+print(" 📋 CHECK F9 CONSOLE FOR FULL OUTPUT")
+print(" 1. Click AO DOOR button")
+print(" 2. Look in F9 console for [DEBUG] messages")
+print(" 3. Tell me what doors are found")
 print("═══════════════════════════════════════")
